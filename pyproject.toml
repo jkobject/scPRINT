@@ -1,12 +1,35 @@
 [tool.poetry]
-name = "a-flask-test"
+name = "scprint"
 version = "0.1.0"
+license = "MIT"
 description = ""
-authors = ["rochacbruno"]
-readme = "README.md"
+authors = ["jeremie kalfon"]
+readme = ["README.md", "LICENSE"]
+repository = "https://github.com/jkobject/scPrint"
+keywords = [
+  "scRNAseq",
+  "transformer",
+  "GRN",
+  "gene regulatory network",
+  "scPrint",
+]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "3.10"
+cellxgene_census = "*"
+tiledbsoma = "*"
+torch = "*"
+anndata = "*"
+matplotlib = "*"
+seaborn = "*"
+gseapy = "*"
+ipykernel = "*"
+owlready2 = "*"
+torchdata = "*"
+biomart = "*"
+scib = "*"
+
+[tool.poetry.group.cuda.dependencies]
 
 
 [tool.poetry.group.dev.dependencies]
