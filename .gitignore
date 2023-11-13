@@ -131,3 +131,4 @@ dmypy.json
 # templates
 .github/templates/*
 .DS_Store
+data/temp/*

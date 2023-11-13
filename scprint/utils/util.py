@@ -19,6 +19,9 @@ import scib
 from matplotlib import pyplot as plt
 from matplotlib import axes
 from IPython import get_ipython
+import os
+import urllib.request
+import pandas as pd
 
 from .. import logger
 
@@ -28,6 +31,14 @@ def gene_vocabulary():
     Generate the gene name2id and id2name dictionaries.
     """
     pass
+
+def pd_load_cached(url, loc='/tmp/', cache=True, **kwargs):
+    # Check if the file exists, if not, download it
+    loc+=url.split('/')[-1]
+    if not os.path.isfile(loc) or not cache:
+        urllib.request.urlretrieve(url, loc)
+    # Load the data from the file
+    return pd.read_csv(loc, **kwargs)
 
 
 def set_seed(seed):

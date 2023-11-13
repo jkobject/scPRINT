@@ -172,6 +172,29 @@ class Similarity(nn.Module):
         return self.cos(x, y) / self.temp
 
 
+class GraphSDEExprDecoder(nn.Module):
+    def __init__(self, d_model: int, drift: nn.Module, diffusion: nn.Module):
+        """
+        Initialize the ExprNeuralSDEDecoder module.
+
+        Parameters:
+        d_model (int): The dimension of the model.
+        drift (nn.Module): The drift component of the SDE. 
+        diffusion (nn.Module): The diffusion component of the SDE.
+        """
+        super().__init__()
+        self.d_model = d_model
+        self.drift = drift
+        self.diffusion = diffusion
+
+    def forward(self, x: Tensor, dt: float) -> Tensor:
+        drift = self.drift(x)
+        diffusion = self.diffusion(x)
+        dW = torch.randn_like(x) * torch.sqrt(dt)
+        return x + drift * dt + diffusion * dW
+
+
+
 class ExprDecoder(nn.Module):
     def __init__(
         self,
@@ -370,3 +393,24 @@ class AdversarialDiscriminator(nn.Module):
         for layer in self._decoder:
             x = layer(x)
         return self.out_layer(x)
+
+
+class EGTEncoder():
+    def __init__(self, d_model: int, nhead: int, num_layers: int):
+        super().__init__()
+        self.d_model = d_model
+        self.nhead = nhead
+        self.num_layers = num_layers
+        self.transformer = dgl.nn.EGTLayer(
+            feat_size=feat_size,
+            edge_feat_size=edge_feat_size,
+            num_heads=8,
+            num_virtual_nodes=4
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.transformer(x)
+
+
+
+class EGTDecoder():
