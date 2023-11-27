@@ -15,6 +15,7 @@ keywords = [
 ]
 
 [tool.poetry.dependencies]
+lamindb = "*"
 python = "3.10"
 cellxgene_census = "*"
 tiledbsoma = "*"
@@ -28,6 +29,12 @@ owlready2 = "*"
 torchdata = "*"
 biomart = "*"
 scib = "*"
+scikit-learn = "*"
+scipy = "*"
+pandas = "*"
+numpy = "*"
+leidenalg = "*"
+decoupler = "*"
 
 [tool.poetry.group.cuda.dependencies]
 

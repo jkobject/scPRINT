@@ -1,82 +1,154 @@
-from torchvision import datasets, transforms
-from base import BaseDataLoader
-from collections import Counter
-import owlready2
-class MnistDataLoader(BaseDataLoader):
+#from base import BaseDataLoader
+import numpy as np
+from torch.utils.data import DataLoader as TorchLoader
+from torch.utils.data.dataloader import default_collate
+from torch.utils.data.sampler import SubsetRandomSampler
+
+from anndata.experimental import AnnLoader
+
+# TODO: put in config
+COARSE_TISSUE = {
+    "adipose tissue": "",
+    "bladder organ": "",
+    "blood": "",
+    "bone marrow": "",
+    "brain": "",
+    "breast": "",
+    "esophagus": "",
+    "eye": "",
+    "embryo": "",
+    "fallopian tube": "",
+    "gall bladder": "",
+    "heart": "",
+    "intestine": "",
+    "kidney": "",
+    "liver": "",
+    "lung": "",
+    "lymph node": "",
+    "musculature of body": "",
+    "nose": "",
+    "ovary": "",
+    "pancreas": "",
+    "placenta": "",
+    "skin of body": "",
+    "spinal cord": "",
+    "spleen": "",
+    "stomach": "",
+    "thymus": "",
+    "thyroid gland": "",
+    "tongue": "",
+    "uterus": "",
+}
+
+COARSE_ANCESTRY = {
+    "African": "",
+    "Chinese": "",
+    "East Asian": "",
+    "Eskimo": "",
+    "European": "",
+    "Greater Middle Eastern  (Middle Eastern, North African or Persian)": "",
+    "Hispanic or Latin American": "",
+    "Native American": "",
+    "Oceanian": "",
+    "South Asian": "",
+}
+
+COARSE_DEVELOPMENT_STAGE = {
+    "Embryonic human": "",
+    "Fetal": "",
+    "Immature": "",
+    "Mature": "",
+}
+
+COARSE_ASSAY = {
+    "10x 3'": "",
+    "10x 5'": "",
+    "10x multiome": "",
+    "CEL-seq2": "",
+    "Drop-seq": "",
+    "GEXSCOPE technology": "",
+    "inDrop": "",
+    "microwell-seq": "",
+    "sci-Plex": "",
+    "sci-RNA-seq": "",
+    "Seq-Well": "",
+    "Slide-seq": "",
+    "Smart-seq": "",
+    "SPLiT-seq": "",
+    "TruDrop": "",
+    "Visium Spatial Gene Expression": "",
+}
+CELL_ONTO: str = "https://github.com/obophenotype/cell-ontology/releases/latest/download/cl-basic.owl"
+TISSUE_ONTO: str = "https://github.com/obophenotype/uberon/releases/latest/download/uberon-basic.owl"
+ANCESTRY_ONTO: str = "https://raw.githubusercontent.com/EBISPOT/hancestro/main/hancestro-base.owl"
+ASSAY_ONTO: str = "https://github.com/obophenotype/uberon/releases/latest/download/uberon-basic.owl"
+DEVELOPMENT_STAGE_ONTO: str = "http://purl.obolibrary.org/obo/hsapdv.owl"
+DISEASE_ONTO: str = 'https://raw.githubusercontent.com/EBISPOT/efo/master/efo-base.owl'
+
+
+class DataLoader(TorchLoader):
     """
-    MNIST data loading demo using BaseDataLoader
+    Base class for all data loaders
     """
-    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True):
-        trsfm = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,))
-        ])
-        self.data_dir = data_dir
-        self.dataset = datasets.MNIST(self.data_dir, train=training, download=True, transform=trsfm)
-        super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
+    def __init__(self, mapped_dataset, batch_size, shuffle, validation_split, num_workers, collate_fn=default_collate):
+        self.validation_split = validation_split
+        self.shuffle = shuffle
+        
+        self.batch_idx = 0
+        self.n_samples = len(dataset)
 
+        self.sampler, self.valid_sampler = self._split_sampler(self.validation_split)
 
+        self.init_kwargs = {
+            'dataset': dataset,
+            'batch_size': batch_size,
+            'shuffle': self.shuffle,
+            'collate_fn': collate_fn,
+            'num_workers': num_workers
+        }
+        super().__init__(sampler=self.sampler, **self.init_kwargs)
 
+    def _split_sampler(self, split):
+        if split == 0.0:
+            return None, None
 
-class CellxGenePreDataLoader():
+        idx_full = np.arange(self.n_samples)
 
-    # TODO: put in config
-    batch = ['self_reported_ethnicity_ontology_term_id', 'sex_ontology_term_id', 'assay_ontology_term_id', 'dataset_id']
-    features = ['tissue_ontology_term_id', 'cell_type_ontology_term_id', 'development_stage_ontology_term_id', 'disease_ontology_term_id']
+        np.random.shuffle(idx_full)
 
-    def __init__(self, census, organism='all', MIN_CELLS=1000):
-        if organism=="all":
-
+        if isinstance(split, int):
+            assert split > 0
+            assert split < self.n_samples, "validation set size is configured to be larger than entire dataset."
+            len_valid = split
         else:
-            census["census_data"][organism]
+            len_valid = int(self.n_samples * split)
 
-        self.df = 
-        self.MIN_CELLS = MIN_CELLS
+        valid_idx = idx_full[0:len_valid]
+        train_idx = np.delete(idx_full, np.arange(0, len_valid))
 
-    def load(self):
-        list_of_datasets = {k: val for k, val in Counter(self.df['dataset_id']).items() if val > self.MIN_CELLS}
+        train_sampler = SubsetRandomSampler(train_idx)
+        valid_sampler = SubsetRandomSampler(valid_idx)
+
+        # turn off shuffle option which is mutually exclusive with sampler
+        self.shuffle = False
+        self.n_samples = len(train_idx)
+
+        return train_sampler, valid_sampler
+
+    def split_validation(self):
+        if self.valid_sampler is None:
+            return None
+        else:
+            return DataLoader(sampler=self.valid_sampler, **self.init_kwargs)
+
 
         # compute weightings
         # weight on large dev stage status, cell type tissue, disease, assay
 
-
         # get list of all elements in each category
-
 
         # make an anndata of the rare cells
 
-
         # make an anndata of the avg profile per metacell
 
-
         # make an anndata of the avg profile per assay
-
-
-        # 
-
-
-class adataPreProcessor():
-    def __init__(self, adata):
-        self.adata = adata
-
-    def process(self):
-        # do value check
-        # do 
-
-"https://stringdb-downloads.org/download/protein.physical.links.detailed.v12.0/9606.protein.physical.links.detailed.v12.0.txt.gz"
-
-@dataclass
-class CellxGeneDataLoader(BaseDataLoader):
-
-    #TODO: create higher level groupings for CxG's tissues and dev stages
-
-    def __init__(self, census, organism):
-
-
-
-
-
-def adata_preprocessor(adata):
-
-
-

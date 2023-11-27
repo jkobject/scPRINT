@@ -132,3 +132,11 @@ dmypy.json
 .github/templates/*
 .DS_Store
 data/temp/*
+.sync-conflict*
+notebooks/assessments/mytest2
+notebooks/assessments/mytest
+notebooks/assessments/wandb
+data/GroundTruth/*
+data/adamson
+data/fasta/*
+data/scGPT_human

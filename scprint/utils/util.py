@@ -41,6 +41,17 @@ def pd_load_cached(url, loc='/tmp/', cache=True, **kwargs):
     return pd.read_csv(loc, **kwargs)
 
 
+def onto_to_name(ids, onto, schema="http://www.ebi.ac.uk/efo/"):
+    names = []
+    for val in ids:
+        res = onto.search_one(iri=schema+val.replace(':', '_'))
+        if res is None:
+            print(val, "was not found")
+        else:
+            names.append(res.label)
+    return names
+
+
 def set_seed(seed):
     """set random seed."""
     random.seed(seed)
@@ -50,7 +61,6 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
     # if n_gpu > 0:
     #     torch.cuda.manual_seed_all(seed)
-
 
 def add_file_handler(logger: logging.Logger, log_file_path: Path):
     """

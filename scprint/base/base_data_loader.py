@@ -89,20 +89,9 @@ class BaseDataLoader(AnnLoader):
     """
     Base class for all data loaders
     """
-    def __init__(self, dataset, batch_size, shuffle, validation_split, num_workers, collate_fn=default_collate):
+    def __init__(self, anndataset, batch_size, shuffle, validation_split, num_workers, collate_fn=default_collate):
         self.validation_split = validation_split
         self.shuffle = shuffle
-        
-        ontology_dn = owlready2.get_ontology(DEVELOPMENT_STAGE_ONTO)
-        ontology_dn.load()
-        ontology_cl = owlready2.get_ontology(CELL_ONTO)
-        ontology_cl.load()
-        ontology_ub = owlready2.get_ontology(TISSUE_ONTO)
-        ontology_ub.load()
-        ontology_ac = owlready2.get_ontology(ANCESTRY_ONTO)
-        ontology_ac.load()
-        ontology_di = owlready2.get_ontology(DISEASE_ONTO)
-        ontology_di.load()
         
         self.batch_idx = 0
         self.n_samples = len(dataset)
@@ -152,109 +141,40 @@ class BaseDataLoader(AnnLoader):
             return DataLoader(sampler=self.valid_sampler, **self.init_kwargs)
 
 
-    def use_prior_network(self, name="collectri", organism='human', split_complexes=True):
-        if name == "tflink":
-            TFLINK = "https://cdn.netbiol.org/tflink/download_files/TFLink_Homo_sapiens_interactions_All_simpleFormat_v1.0.tsv.gz"
-            net = utils.pd_load_cached(TFLINK)
-            net = net.rename(columns={"Name.TF": 'regulator', 'Name.Target': "target"})
-        elif name == "htftarget":
-            HTFTARGET = "http://bioinfo.life.hust.edu.cn/static/hTFtarget/file_download/tf-target-infomation.txt"
-            net = utils.pd_load_cached(HTFTARGET)
-            net = net.rename(columns={'TF': 'regulator'})
-        elif name == 'collectri'
-            import decoupler as dc
-            net = dc.get_collectri(organism=organism, split_complexes=split_complexes)
-            net = net.rename(columns={'source': 'regulator'})
-        self.add_prior_network(net)
-
-    def add_prior_network(self, prior_network: pd.DataFrame):
-        # validate the network dataframe
-        required_columns: list[str] = ["target", "regulators"]
-        optional_columns: list[str] = ["type", "weight"]
-
-        for column in required_columns:
-            assert column in prior_network.columns, f"Column '{column}' is missing in the provided network dataframe."
-
-        for column in optional_columns:
-            if column not in prior_network.columns:
-                print(f"Optional column '{column}' is not present in the provided network dataframe.")
-
-        assert prior_network['target'].dtype == 'str', "Column 'target' should be of dtype 'str'."
-        assert prior_network['regulators'].dtype == 'str', "Column 'regulators' should be of dtype 'str'."
-
-        if 'type' in prior_network.columns:
-            assert prior_network['type'].dtype == 'str', "Column 'type' should be of dtype 'str'."
-
-        if 'weight' in prior_network.columns:
-            assert prior_network['weight'].dtype == 'float', "Column 'weight' should be of dtype 'float'."
-
-        # check that we match the genes in the network to the genes in the dataset
-
-        print("loaded {:.2f}% of the edges".format((len(prior_network)/init_len)*100))
 
 
-    def get_molecular_embeddings():
-        pass
+def weighted_random_mask_value(
+    values: Union[torch.Tensor, np.ndarray],
+    mask_ratio: float = 0.15,
+    mask_value: int = -1,
+    important_elements: Union[torch.Tensor, np.ndarray]=np.array([]),
+    important_weight: int = 0,
+    pad_value: int = 0,
+) -> torch.Tensor:
+    """
+    Randomly mask a batch of data.
 
+    Args:
+        values (array-like):
+            A batch of tokenized data, with shape (batch_size, n_features).
+        mask_ratio (float): The ratio of genes to mask, default to 0.15.
+        mask_value (int): The value to mask with, default to -1.
+        pad_value (int): The value of padding in the values, will be kept unchanged.
 
-def get_ancestry_mapping(url, type="cell_type"):
-    response = urllib.request.urlopen(url)
-    data = json.loads(response.read())
-    tot = set()
-    ntot = set()
-    for i, j in data.items():
-        tot |= set(j)
-        ntot |= set([i])
-    # for each cell type, get all its ancestors
-    ancestors = {}
-    for val in tot | ntot:
-        if type=="cell_type":
-            ancestors[val] = set(_ancestors(val)) - set([val, 'Thing'])
-        elif type=="tissue":
-            ancestors[val] = set(_ancestors_ti(val)) - set([val, 'Thing'])
-        elif type=="ancestry":
-            ancestors[val] = set(_ancestors_ac(val)) - set([val, 'Thing'])
-        else:
-            raise ValueError("type must be 'cell_type' or 'tissue'")
-    full_ancestors = set()
-    for val in ancestors.values():
-        full_ancestors |= set(val)
-
-    # remove the things that are not in CxG
-    full_ancestors = full_ancestors & set(ancestors.keys())
-
-    # if a cell type is not an ancestor then it is a leaf
-    leafs = tot - full_ancestors
-    full_ancestors = full_ancestors - leafs
-    # for each ancestor, make a dict of groupings of leafs that predict it
-    groupings = {}
-    for val in full_ancestors:
-        groupings[val] = set()
-    for leaf in leafs:
-        for ancestor in ancestors[leaf]:
-            if ancestor in full_ancestors:
-                groupings[ancestor].add(leaf)
-
-    return groupings, full_ancestors, leafs
-
-
-@lru_cache(maxsize=None)
-def _ancestors(entity_value, entity_type, onto):
-    ancestors = set()
-    entity_iri = entity_value.replace(":", "_")
-    entity = onto.search_one(iri=f"http://purl.obolibrary.org/obo/{entity_iri}")
-    if entity_type == 'dv':
-        for val in entity.ancestors(include_constructs = True, include_self = False):
-            try:
-                ancestors.add(val.name)
-            except AttributeError:
-                ancestors.add(val.value.name)
-                ancestors |= _ancestors(entity_type, val.value.name)
-        print(len(ancestors))
+    Returns:
+        torch.Tensor: A tensor of masked data.
+    """
+    if isinstance(values, torch.Tensor):
+        # it is crutial to clone the tensor, otherwise it changes the original tensor
+        values = values.clone().detach().numpy()
     else:
-        ancestors = (
-            [i.name.replace("_", ":") for i in entity.ancestors()]
-            if entity
-            else [entity_value]
-        )
-    return ancestors
+        values = values.copy()
+
+    for i in range(len(values)):
+        row = values[i]
+        non_padding_idx = np.nonzero(row - pad_value)[0]
+        non_padding_idx = np.setdiff1d(non_padding_idx, do_not_pad_index)
+        n_mask = int(len(non_padding_idx) * mask_ratio)
+        mask_idx = np.random.choice(non_padding_idx, n_mask, replace=False)
+        row[mask_idx] = mask_value
+    return torch.from_numpy(values).float()
