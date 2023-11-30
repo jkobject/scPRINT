@@ -1,44 +1,8 @@
-import random
-import time
-import numpy as np
-import torch
-import torch.optim as optim
-from torchvision import transforms, datasets
-import copy
-from Bio import SeqIO
-import argparse
-from utils.bert import (
-    get_config,
-    BertModel,
-    set_learned_params,
-    BertForMaskedLM,
-    visualize_attention,
-    show_base_PCA,
-    fix_params,
-)
-from module import Train_Module
-from dataload import DATA, MyDataset
-import datetime
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from sklearn.metrics.cluster import adjusted_rand_score
 import os
 import time
-from sklearn.metrics import (
-    normalized_mutual_info_score,
-    adjusted_rand_score,
-    completeness_score,
-    homogeneity_score,
-)
-import torch.nn.functional as F
-from sklearn.cluster import (
-    MiniBatchKMeans,
-    KMeans,
-    AgglomerativeClustering,
-    SpectralClustering,
-)
-import itertools
-
-import alignment_C as Aln_C
+import subprocess
+import pandas as pd
+from torch import load
 
 # https://github.com/agemagician/ProtTrans
 # https://academic.oup.com/nargab/article/4/1/lqac012/6534363
@@ -46,27 +10,42 @@ import alignment_C as Aln_C
 
 class PROTBERT:
     def __init__(
-        batch_size,
-        config="./RNA_bert_config.json",
-        pretrained_model="./pretrained_model/pytorch_model.bin",
-        device="cuda",
+        config="esm-extract",
+        pretrained_model="esm2_t33_650M_UR50D",
     ):
-        self.batch_size = batch_size
-        self.config = get_config(file_path=config)
-        self.config.hidden_size = self.config.num_attention_heads * self.config.multiple
-        model = BertModel(config)
-        model = BertForMaskedLM(config, model)
-        model.to(device)
-        print("device: ", device)
-        if device == "cuda":
-            model = torch.nn.DataParallel(model)  # make parallel
-        model.load_state_dict(torch.load(pretrained_model))
+        self.config = config
+        self.pretrained_model = pretrained_model
 
-    def __call__():
-        current_time = datetime.datetime.now()
-        print("-----start-------")
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-        data = DATA(args, config)
-        seqs, label, test_dl = data.load_data_EMB(args.data_embedding)
-        features = train.make_feature(model, test_dl, seqs)
+    def __call__(self, input_file, output_folder="/tmp/esm_out/", cache=True):
+        if not os.path.exists(output_folder) or not cache:
+            os.makedirs(output_folder)
+            cmd = (
+                self.config
+                + " "
+                + self.pretrained_model
+                + " "
+                + input_file
+                + " "
+                + output_folder
+            )
+            try:
+                subprocess.Popen(cmd, shell=True).wait()
+            except Exception as e:
+                raise RuntimeError(
+                    "An error occurred while running the esm-extract command: " + str(e)
+                )
+        return self.read_results(output_folder)
+
+    def read_results(self, output_folder):
+        """
+        read_results read multiple .pt files in a folder and convert in a dataframe
+
+        Args:
+            output_folder (_type_): _description_
+        """
+        files = os.listdir(output_folder)
+        files = [i for i in files if i.endswith(".pt")]
+        results = []
+        for file in files:
+            results.append(load(output_folder + file))
+        return pd.DataFrame(data=results, index=[file.split(".")[0] for file in files])

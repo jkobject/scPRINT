@@ -1,4 +1,4 @@
-#from base import BaseDataLoader
+# from base import BaseDataLoader
 import numpy as np
 from torch.utils.data import DataLoader as TorchLoader
 from torch.utils.data.dataloader import default_collate
@@ -40,19 +40,6 @@ COARSE_TISSUE = {
     "uterus": "",
 }
 
-COARSE_ANCESTRY = {
-    "African": "",
-    "Chinese": "",
-    "East Asian": "",
-    "Eskimo": "",
-    "European": "",
-    "Greater Middle Eastern  (Middle Eastern, North African or Persian)": "",
-    "Hispanic or Latin American": "",
-    "Native American": "",
-    "Oceanian": "",
-    "South Asian": "",
-}
-
 COARSE_DEVELOPMENT_STAGE = {
     "Embryonic human": "",
     "Fetal": "",
@@ -60,51 +47,35 @@ COARSE_DEVELOPMENT_STAGE = {
     "Mature": "",
 }
 
-COARSE_ASSAY = {
-    "10x 3'": "",
-    "10x 5'": "",
-    "10x multiome": "",
-    "CEL-seq2": "",
-    "Drop-seq": "",
-    "GEXSCOPE technology": "",
-    "inDrop": "",
-    "microwell-seq": "",
-    "sci-Plex": "",
-    "sci-RNA-seq": "",
-    "Seq-Well": "",
-    "Slide-seq": "",
-    "Smart-seq": "",
-    "SPLiT-seq": "",
-    "TruDrop": "",
-    "Visium Spatial Gene Expression": "",
-}
-CELL_ONTO: str = "https://github.com/obophenotype/cell-ontology/releases/latest/download/cl-basic.owl"
-TISSUE_ONTO: str = "https://github.com/obophenotype/uberon/releases/latest/download/uberon-basic.owl"
-ANCESTRY_ONTO: str = "https://raw.githubusercontent.com/EBISPOT/hancestro/main/hancestro-base.owl"
-ASSAY_ONTO: str = "https://github.com/obophenotype/uberon/releases/latest/download/uberon-basic.owl"
-DEVELOPMENT_STAGE_ONTO: str = "http://purl.obolibrary.org/obo/hsapdv.owl"
-DISEASE_ONTO: str = 'https://raw.githubusercontent.com/EBISPOT/efo/master/efo-base.owl'
-
 
 class DataLoader(TorchLoader):
     """
     Base class for all data loaders
     """
-    def __init__(self, mapped_dataset, batch_size, shuffle, validation_split, num_workers, collate_fn=default_collate):
+
+    def __init__(
+        self,
+        mapped_dataset,
+        batch_size,
+        shuffle,
+        validation_split,
+        num_workers,
+        collate_fn=default_collate,
+    ):
         self.validation_split = validation_split
         self.shuffle = shuffle
-        
+
         self.batch_idx = 0
         self.n_samples = len(dataset)
 
         self.sampler, self.valid_sampler = self._split_sampler(self.validation_split)
 
         self.init_kwargs = {
-            'dataset': dataset,
-            'batch_size': batch_size,
-            'shuffle': self.shuffle,
-            'collate_fn': collate_fn,
-            'num_workers': num_workers
+            "dataset": dataset,
+            "batch_size": batch_size,
+            "shuffle": self.shuffle,
+            "collate_fn": collate_fn,
+            "num_workers": num_workers,
         }
         super().__init__(sampler=self.sampler, **self.init_kwargs)
 
@@ -118,7 +89,9 @@ class DataLoader(TorchLoader):
 
         if isinstance(split, int):
             assert split > 0
-            assert split < self.n_samples, "validation set size is configured to be larger than entire dataset."
+            assert (
+                split < self.n_samples
+            ), "validation set size is configured to be larger than entire dataset."
             len_valid = split
         else:
             len_valid = int(self.n_samples * split)
@@ -140,7 +113,6 @@ class DataLoader(TorchLoader):
             return None
         else:
             return DataLoader(sampler=self.valid_sampler, **self.init_kwargs)
-
 
         # compute weightings
         # weight on large dev stage status, cell type tissue, disease, assay

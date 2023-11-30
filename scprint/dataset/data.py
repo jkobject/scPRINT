@@ -8,34 +8,11 @@ from datasets import Dataset
 import lamindb as ln
 import anndata as ad
 
-additional_tissues = {
-    "UBERON:0037144": "wall of heart",
-    "UBERON:0003929": "digestive tract epithelium",
-    "UBERON:0002020": "gray matter",
-    "UBERON:0000200": "gyrus",
-    "UBERON:0000101": "lobe of lung",
-    "UBERON:0001981": "blood vessel",
-    "UBERON:0001474": "bone element",
-}
-
-
-additional_diseases = {
-    "MONDO:0001106": "kidney failure",
-    "MONDO:0021166": "inflammatory disease",
-    "MONDO:0004992": "cancer",
-    "MONDO:0004994": "cardiomyopathy",
-    "MONDO:0700065": "trisomy",
-    "MONDO:0021042": "glioma",
-    "MONDO:0005265": "inflammatory bowel disease",
-    "MONDO:0005550": "infectious disease",
-    "MONDO:0005059": "leukemia",
-}
-
 
 @dataclass
 class Dataset(torchDataset):
     lamin_dataset: ln.Dataset
-    organism: list[str] = ["NCBITaxon:9606", "NCBITaxon:10090"]
+    organisms: list[str] = ["NCBITaxon:9606", "NCBITaxon:10090"]
 
     def __post_init__(self):
         files = self.lamin_dataset.files.all().df()
@@ -50,7 +27,7 @@ class Dataset(torchDataset):
         print("total dataset size is {} Gb".format(files["size"].sum() / 1e9))
         print("---")
         print("grouping into one collection")
-
+        # TODO: merge the lamin version
         self.anndatas = []
         for file in os.listdir(self.path):
             if file.endswith(".h5ad"):
@@ -64,6 +41,7 @@ class Dataset(torchDataset):
             adata_.obs["dataset_id"] = adata_.obs["dataset_id"].astype("category")
             list_adata[dataset_id] = adata_
         # generate tree from ontologies
+        # TODO: add additional groupings
         self.groupings, _, self.cell_types = get_ancestry_mapping(
             set(adata.obs["cell_type_ontology_term_id"].unique()), celltypes.df()
         )
@@ -73,6 +51,7 @@ class Dataset(torchDataset):
         self.groupings, _, self.cell_types = get_ancestry_mapping(
             set(adata.obs["cell_type_ontology_term_id"].unique()), celltypes.df()
         )
+        # TODO: manage multiple species
         genesdf = ln.Gene.df()
         genesdf = genesdf.drop_duplicates(subset="ensembl_gene_id")
         genesdf = genesdf.set_index("ensembl_gene_id")
@@ -87,8 +66,12 @@ class Dataset(torchDataset):
     # def __len__():
 
     # def __getitem__(self, idx):
+    #TODO: serve the input (in dataloader)
+
+    #TODO: serve the output (in dataloader)
 
     def add(adata):
+        # TODO: finish or remove
         if type(adata) is str:
             adata = anndata.read_h5ad(adata)
 
@@ -98,11 +81,6 @@ class Dataset(torchDataset):
             raise TypeError(
                 "anndata must be either a string or an anndata.AnnData object"
             )
-
-
-class GeneAnnData(AnnData):
-    def __init__():
-        super().__init__()
 
     def use_prior_network(
         self, name="collectri", organism="human", split_complexes=True
@@ -155,19 +133,21 @@ class GeneAnnData(AnnData):
                 prior_network["weight"].dtype == "float"
             ), "Column 'weight' should be of dtype 'float'."
 
-        # check that we match the genes in the network to the genes in the dataset
+        # TODO: check that we match the genes in the network to the genes in the dataset
 
         print(
             "loaded {:.2f}% of the edges".format((len(prior_network) / init_len) * 100)
         )
-        # transform it into a sparse matrix
-        # add it into the anndata varp
-        
+        # TODO: transform it into a sparse matrix
+        # TODO: add it into the anndata varp
+
         self.prior_network = prior_network
         self.network_size = len(prior_network)
         self.overla
         self.edge_freq
 
+    def load_embeddings():
+        #TODO: finish
 
 ##########################################
 ################### OLD ####################

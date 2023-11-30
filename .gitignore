@@ -140,3 +140,4 @@ data/GroundTruth/*
 data/adamson
 data/fasta/*
 data/scGPT_human
+wandb/*

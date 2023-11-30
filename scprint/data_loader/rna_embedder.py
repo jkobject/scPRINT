@@ -1,44 +1,12 @@
-import random
-import time
-import numpy as np
 import torch
-import torch.optim as optim
-from torchvision import transforms, datasets
-import copy
-from Bio import SeqIO
-import argparse
 from utils.bert import (
     get_config,
     BertModel,
-    set_learned_params,
     BertForMaskedLM,
-    visualize_attention,
-    show_base_PCA,
-    fix_params,
 )
-from module import Train_Module
-from dataload import DATA, MyDataset
+from dataload import DATA
 import datetime
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from sklearn.metrics.cluster import adjusted_rand_score
-import os
 import time
-from sklearn.metrics import (
-    normalized_mutual_info_score,
-    adjusted_rand_score,
-    completeness_score,
-    homogeneity_score,
-)
-import torch.nn.functional as F
-from sklearn.cluster import (
-    MiniBatchKMeans,
-    KMeans,
-    AgglomerativeClustering,
-    SpectralClustering,
-)
-import itertools
-
-import alignment_C as Aln_C
 
 # https://github.com/mana438/RNABERT
 # https://academic.oup.com/nargab/article/4/1/lqac012/6534363

@@ -6,7 +6,6 @@ from itertools import repeat
 from collections import OrderedDict
 
 
-
 import functools
 import logging
 import os
@@ -19,11 +18,79 @@ import scib
 from matplotlib import pyplot as plt
 from matplotlib import axes
 from IPython import get_ipython
-import os
 import urllib.request
-import pandas as pd
 
 from .. import logger
+import io
+from biomart import BiomartServer
+
+
+def _fetchFromServer(ensemble_server, attributes):
+    server = BiomartServer(ensemble_server, verbose=True)
+    ensmbl = server.datasets["hsapiens_gene_ensembl"]
+    print(attributes)
+    res = pd.read_csv(
+        io.StringIO(
+            ensmbl.search({"attributes": attributes}, header=1).content.decode()
+        ),
+        sep="\t",
+    )
+    return res
+
+
+def getBiomartTable(
+    ensemble_server="http://feb2023.archive.ensembl.org/biomart",
+    useCache=False,
+    cache_folder="/tmp/biomart/",
+    attributes=[],
+    bypass_attributes=False,
+):
+    """generate a genelist dataframe from ensembl's biomart
+
+    Args:
+        ensemble_server ([type], optional): [description]. Defaults to ENSEMBL_SERVER_V.
+        useCache (bool, optional): [description]. Defaults to False.
+        cache_folder ([type], optional): [description]. Defaults to CACHE_PATH.
+
+    Raises:
+        ValueError: [description]
+
+    Returns:
+        [type]: [description]
+    """
+    attr = (
+        [
+            "ensembl_gene_id",
+            "hgnc_symbol",
+            "gene_biotype",
+            "entrezgene_id",
+        ]
+        if not bypass_attributes
+        else []
+    )
+    assert cache_folder[-1] == "/"
+
+    cache_folder = os.path.expanduser(cache_folder)
+    createFoldersFor(cache_folder)
+    cachefile = os.path.join(cache_folder, ".biomart.csv")
+    if useCache & os.path.isfile(cachefile):
+        print("fetching gene names from biomart cache")
+        res = pd.read_csv(cachefile)
+    else:
+        print("downloading gene names from biomart")
+
+        res = _fetchFromServer(ensemble_server, attr + attributes)
+        res.to_csv(cachefile, index=False)
+
+    res.columns = attr + attributes
+    if type(res) is not type(pd.DataFrame()):
+        raise ValueError("should be a dataframe")
+    res = res[~(res["ensembl_gene_id"].isna() & res["hgnc_symbol"].isna())]
+    res.loc[res[res.hgnc_symbol.isna()].index, "hgnc_symbol"] = res[
+        res.hgnc_symbol.isna()
+    ]["ensembl_gene_id"]
+
+    return res
 
 
 def gene_vocabulary():
@@ -32,9 +99,10 @@ def gene_vocabulary():
     """
     pass
 
-def pd_load_cached(url, loc='/tmp/', cache=True, **kwargs):
+
+def pd_load_cached(url, loc="/tmp/", cache=True, **kwargs):
     # Check if the file exists, if not, download it
-    loc+=url.split('/')[-1]
+    loc += url.split("/")[-1]
     if not os.path.isfile(loc) or not cache:
         urllib.request.urlretrieve(url, loc)
     # Load the data from the file
@@ -44,7 +112,7 @@ def pd_load_cached(url, loc='/tmp/', cache=True, **kwargs):
 def onto_to_name(ids, onto, schema="http://www.ebi.ac.uk/efo/"):
     names = []
     for val in ids:
-        res = onto.search_one(iri=schema+val.replace(':', '_'))
+        res = onto.search_one(iri=schema + val.replace(":", "_"))
         if res is None:
             print(val, "was not found")
         else:
@@ -61,6 +129,18 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
     # if n_gpu > 0:
     #     torch.cuda.manual_seed_all(seed)
+
+
+def createFoldersFor(filepath):
+    """
+    will recursively create folders if needed until having all the folders required to save the file in this filepath
+    """
+    prevval = ""
+    for val in os.path.expanduser(filepath).split("/")[:-1]:
+        prevval += val + "/"
+        if not os.path.exists(prevval):
+            os.mkdir(prevval)
+
 
 def add_file_handler(logger: logging.Logger, log_file_path: Path):
     """
@@ -409,26 +489,29 @@ class MainProcessOnly:
         return attr
 
 
-
 def ensure_dir(dirname):
     dirname = Path(dirname)
     if not dirname.is_dir():
         dirname.mkdir(parents=True, exist_ok=False)
 
+
 def read_json(fname):
     fname = Path(fname)
-    with fname.open('rt') as handle:
+    with fname.open("rt") as handle:
         return json.load(handle, object_hook=OrderedDict)
+
 
 def write_json(content, fname):
     fname = Path(fname)
-    with fname.open('wt') as handle:
+    with fname.open("wt") as handle:
         json.dump(content, handle, indent=4, sort_keys=False)
 
+
 def inf_loop(data_loader):
-    ''' wrapper function for endless data loader. '''
+    """wrapper function for endless data loader."""
     for loader in repeat(data_loader):
         yield from loader
+
 
 def prepare_device(n_gpu_use):
     """
@@ -436,21 +519,26 @@ def prepare_device(n_gpu_use):
     """
     n_gpu = torch.cuda.device_count()
     if n_gpu_use > 0 and n_gpu == 0:
-        print("Warning: There\'s no GPU available on this machine,"
-              "training will be performed on CPU.")
+        print(
+            "Warning: There's no GPU available on this machine,"
+            "training will be performed on CPU."
+        )
         n_gpu_use = 0
     if n_gpu_use > n_gpu:
-        print(f"Warning: The number of GPU\'s configured to use is {n_gpu_use}, but only {n_gpu} are "
-              "available on this machine.")
+        print(
+            f"Warning: The number of GPU's configured to use is {n_gpu_use}, but only {n_gpu} are "
+            "available on this machine."
+        )
         n_gpu_use = n_gpu
-    device = torch.device('cuda:0' if n_gpu_use > 0 else 'cpu')
+    device = torch.device("cuda:0" if n_gpu_use > 0 else "cpu")
     list_ids = list(range(n_gpu_use))
     return device, list_ids
+
 
 class MetricTracker:
     def __init__(self, *keys, writer=None):
         self.writer = writer
-        self._data = pd.DataFrame(index=keys, columns=['total', 'counts', 'average'])
+        self._data = pd.DataFrame(index=keys, columns=["total", "counts", "average"])
         self.reset()
 
     def reset(self):
