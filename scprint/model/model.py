@@ -22,7 +22,6 @@ class MnistModel(BaseModel):
         return F.log_softmax(x, dim=1)
 
 
-
 class GeneEncoder(nn.Module):
     """
     Encodes gene sequences into a continuous vector space using an embedding layer.
@@ -30,6 +29,7 @@ class GeneEncoder(nn.Module):
 
     Note: not used in the current version of scprint.
     """
+
     def __init__(
         self,
         num_embeddings: int,
@@ -59,9 +59,10 @@ class PositionalEncoding(nn.Module):
         d_model (int): The dimension of the input vectors.
         dropout (float, optional): The dropout rate to apply to the output of the positional encoding.
         max_len (int, optional): The maximum length of a sequence that this module can handle.
-    
+
     Note: not used in the current version of scprint.
     """
+
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -120,6 +121,7 @@ class CategoryValueEncoder(nn.Module):
 
     Note: not used in the current version of scprint.
     """
+
     def __init__(
         self,
         num_embeddings: int,
@@ -179,7 +181,7 @@ class GraphSDEExprDecoder(nn.Module):
 
         Parameters:
         d_model (int): The dimension of the model.
-        drift (nn.Module): The drift component of the SDE. 
+        drift (nn.Module): The drift component of the SDE.
         diffusion (nn.Module): The diffusion component of the SDE.
         """
         super().__init__()
@@ -192,7 +194,6 @@ class GraphSDEExprDecoder(nn.Module):
         diffusion = self.diffusion(x)
         dW = torch.randn_like(x) * torch.sqrt(dt)
         return x + drift * dt + diffusion * dW
-
 
 
 class ExprDecoder(nn.Module):
@@ -395,7 +396,7 @@ class AdversarialDiscriminator(nn.Module):
         return self.out_layer(x)
 
 
-class EGTEncoder():
+class EGTEncoder:
     def __init__(self, d_model: int, nhead: int, num_layers: int):
         super().__init__()
         self.d_model = d_model
@@ -405,12 +406,10 @@ class EGTEncoder():
             feat_size=feat_size,
             edge_feat_size=edge_feat_size,
             num_heads=8,
-            num_virtual_nodes=4
+            num_virtual_nodes=4,
         )
 
     def forward(self, x: Tensor) -> Tensor:
         return self.transformer(x)
 
 
-
-class EGTDecoder():

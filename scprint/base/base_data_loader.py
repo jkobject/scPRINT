@@ -1,9 +1,10 @@
 import numpy as np
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader as TorchLoader
 from torch.utils.data.dataloader import default_collate
-from torch.utils.data.sampler import SubsetRandomSampler
-
-from anndata.experimental import AnnLoader
+from torch.utils.data.sampler import WeightedRandomSampler
+from scprint.dataset.mapped import MappedDataset
+from typing import Union
+import torch
 
 # TODO: put in config
 COARSE_TISSUE = {
@@ -77,77 +78,89 @@ COARSE_ASSAY = {
     "TruDrop": "",
     "Visium Spatial Gene Expression": "",
 }
-CELL_ONTO: str = "https://github.com/obophenotype/cell-ontology/releases/latest/download/cl-basic.owl"
-TISSUE_ONTO: str = "https://github.com/obophenotype/uberon/releases/latest/download/uberon-basic.owl"
-ANCESTRY_ONTO: str = "https://raw.githubusercontent.com/EBISPOT/hancestro/main/hancestro-base.owl"
-ASSAY_ONTO: str = "https://github.com/obophenotype/uberon/releases/latest/download/uberon-basic.owl"
-DEVELOPMENT_STAGE_ONTO: str = "http://purl.obolibrary.org/obo/hsapdv.owl"
-DISEASE_ONTO: str = 'https://raw.githubusercontent.com/EBISPOT/efo/master/efo-base.owl'
 
 
-class BaseDataLoader(AnnLoader):
+class DataLoader(TorchLoader):
     """
     Base class for all data loaders
     """
-    def __init__(self, anndataset, batch_size, shuffle, validation_split, num_workers, collate_fn=default_collate):
-        self.validation_split = validation_split
-        self.shuffle = shuffle
-        
-        self.batch_idx = 0
-        self.n_samples = len(dataset)
 
-        self.sampler, self.valid_sampler = self._split_sampler(self.validation_split)
+    def __init__(
+        self,
+        mapped_dataset: MappedDataset,
+        batch_size: int = 32,
+        validation_split: float = 0.2,
+        num_workers: int = 4,
+        collate_fn=default_collate,
+        sampler=None,
+        **kwargs,
+    ):
+        self.validation_split = validation_split
+        self.dataset = mapped_dataset
+
+        self.batch_idx = 0
+        self.batch_size = batch_size
+        self.n_samples = len(self.dataset)
+        if sampler is None:
+            self.sampler, self.valid_sampler = self._split_sampler(
+                self.validation_split
+            )
+        else:
+            self.sampler = sampler
+            self.valid_sampler = None
 
         self.init_kwargs = {
-            'dataset': dataset,
-            'batch_size': batch_size,
-            'shuffle': self.shuffle,
-            'collate_fn': collate_fn,
-            'num_workers': num_workers
+            "dataset": self.dataset,
+            "batch_size": batch_size,
+            "collate_fn": collate_fn,
+            "num_workers": num_workers,
         }
-        super().__init__(sampler=self.sampler, **self.init_kwargs)
+        super().__init__(sampler=self.sampler, **self.init_kwargs, **kwargs)
 
-    def _split_sampler(self, split):
-        if split == 0.0:
-            return None, None
-
+    def _split_sampler(self, split, weighting: int = 30):
         idx_full = np.arange(self.n_samples)
-
         np.random.shuffle(idx_full)
-
+        weights = self.dataset.get_label_weights(weighting)
         if isinstance(split, int):
-            assert split > 0
-            assert split < self.n_samples, "validation set size is configured to be larger than entire dataset."
+            assert (
+                split < self.n_samples
+            ), "validation set size is configured to be larger than entire dataset."
             len_valid = split
         else:
             len_valid = int(self.n_samples * split)
-
-        valid_idx = idx_full[0:len_valid]
-        train_idx = np.delete(idx_full, np.arange(0, len_valid))
-
-        train_sampler = SubsetRandomSampler(train_idx)
-        valid_sampler = SubsetRandomSampler(valid_idx)
-
-        # turn off shuffle option which is mutually exclusive with sampler
-        self.shuffle = False
-        self.n_samples = len(train_idx)
-
-        return train_sampler, valid_sampler
-
-    def split_validation(self):
-        if self.valid_sampler is None:
-            return None
+        if len_valid == 0:
+            self.train_idx = idx_full
         else:
-            return DataLoader(sampler=self.valid_sampler, **self.init_kwargs)
+            self.valid_idx = idx_full[0:len_valid]
+            self.train_idx = np.delete(idx_full, np.arange(0, len_valid))
+            valid_weights = weights.copy()
+            valid_weights[self.train_idx] = 0
+            # TODO: should we do weighted random sampling for validation set?
+            valid_sampler = WeightedRandomSampler(
+                valid_weights, len_valid, replacement=True
+            )
+        train_weights = weights.copy()
+        train_weights[self.valid_idx] = 0
+        train_sampler = WeightedRandomSampler(
+            train_weights, len(self.train_idx), replacement=True
+        )
+        # turn off shuffle option which is mutually exclusive with sampler
 
+        return train_sampler, valid_sampler if len_valid != 0 else train_sampler, None
 
+    def get_valid_dataloader(self):
+        if self.valid_sampler is None:
+            raise ValueError("No validation set is configured.")
+        return DataLoader(
+            self.dataset, batch_size=self.batch_size, sampler=self.sampler
+        )
 
 
 def weighted_random_mask_value(
     values: Union[torch.Tensor, np.ndarray],
     mask_ratio: float = 0.15,
     mask_value: int = -1,
-    important_elements: Union[torch.Tensor, np.ndarray]=np.array([]),
+    important_elements: Union[torch.Tensor, np.ndarray] = np.array([]),
     important_weight: int = 0,
     pad_value: int = 0,
 ) -> torch.Tensor:

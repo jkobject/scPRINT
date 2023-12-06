@@ -17,7 +17,6 @@ if not logger.hasHandlers() or len(logger.handlers) == 0:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-from .data_loader import data_loaders as data_loaders
 from .dataset import utils as data_utils
 from .dataset import preprocess
 

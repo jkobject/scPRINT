@@ -1,90 +1,110 @@
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Union
-from typing_extensions import Self, Literal
 from scprint import utils
-from datasets import Dataset
 import lamindb as ln
-import anndata as ad
+from scprint.dataset import mapped
+import pandas as pd
+from scprint.dataloader.embedder import embed
+from scprint.dataset.utils import get_ancestry_mapping
+from torch.utils.data import Dataset as torchDataset
+import lnschema_bionty as lb
 
 
 @dataclass
 class Dataset(torchDataset):
     lamin_dataset: ln.Dataset
-    organisms: list[str] = ["NCBITaxon:9606", "NCBITaxon:10090"]
+    genedf: pd.DataFrame = None
+    gene_embedding: pd.DataFrame = None  # TODO: make it part of specialized dataset
+    organisms: list[str] = field(default_factory=["NCBITaxon:9606", "NCBITaxon:10090"])
+    obs: list[str] = field(
+        default_factory=[
+            "self_reported_ethnicity_ontology_term_id",
+            "assay_ontology_term_id",
+            "development_stage_ontology_term_id",
+            "disease_ontology_term_id",
+            "cell_type_ontology_term_id",
+            "tissue_ontology_term_id",
+            "sex_ontology_term_id",
+            #'dataset_id',
+            #'cell_culture',
+            "dpt_group",
+            "heat_diff",
+            "nnz",
+        ]
+    )
+    encode_obs: list[str] = field(default_factory=list)
+    map_hierarchy: list[str] = field(default_factory=list)
 
     def __post_init__(self):
-        files = self.lamin_dataset.files.all().df()
-        if (
-            len(files["accessor"].unique()) != 1
-            or files["accessor"].unique()[0] != "AnnData"
-        ):
-            raise TypeError("lamin_dataset must only contain AnnData objects")
+        self.mapped_dataset = mapped.mapped(
+            self.lamin_dataset, label_keys=self.obs, encode_labels=self.encode_obs
+        )
         print(
             "won't do any check but we recommend to have your dataset coming from local storage"
         )
-        print("total dataset size is {} Gb".format(files["size"].sum() / 1e9))
-        print("---")
-        print("grouping into one collection")
-        # TODO: merge the lamin version
-        self.anndatas = []
-        for file in os.listdir(self.path):
-            if file.endswith(".h5ad"):
-                self.anndatas.append(
-                    ad.read_h5ad(os.path.join(self.path, file), backed=True)
-                )
-        for i, val in enumerate(localpath):
-            adata_ = ad.read_h5ad(val.path, backed=True)
-            dataset_id = cx_dataset.files.all()[i].uid
-            adata_.obs["dataset_id"] = dataset_id
-            adata_.obs["dataset_id"] = adata_.obs["dataset_id"].astype("category")
-            list_adata[dataset_id] = adata_
-        # generate tree from ontologies
-        # TODO: add additional groupings
-        self.groupings, _, self.cell_types = get_ancestry_mapping(
-            set(adata.obs["cell_type_ontology_term_id"].unique()), celltypes.df()
-        )
-        self.groupings, _, self.cell_types = get_ancestry_mapping(
-            set(adata.obs["cell_type_ontology_term_id"].unique()), celltypes.df()
-        )
-        self.groupings, _, self.cell_types = get_ancestry_mapping(
-            set(adata.obs["cell_type_ontology_term_id"].unique()), celltypes.df()
-        )
-        # TODO: manage multiple species
-        genesdf = ln.Gene.df()
-        genesdf = genesdf.drop_duplicates(subset="ensembl_gene_id")
-        genesdf = genesdf.set_index("ensembl_gene_id")
-        # mitochondrial genes
-        genesdf["mt"] = genesdf.symbol.astype(str).str.startswith("MT-")
-        # ribosomal genes
-        genesdf["ribo"] = genesdf.symbol.astype(str).str.startswith(("RPS", "RPL"))
-        # hemoglobin genes.
-        genesdf["hb"] = genesdf.symbol.astype(str).str.contains(("^HB[^(P)]"))
-        ...
-
-    # def __len__():
-
-    # def __getitem__(self, idx):
-    #TODO: serve the input (in dataloader)
-
-    #TODO: serve the output (in dataloader)
-
-    def add(adata):
-        # TODO: finish or remove
-        if type(adata) is str:
-            adata = anndata.read_h5ad(adata)
-
-        elif type(adata) is anndata.AnnData:
-            pass
-        else:
-            raise TypeError(
-                "anndata must be either a string or an anndata.AnnData object"
+        print(
+            "total dataset size is {} Gb".format(
+                sum([file.size for file in self.lamin_dataset.files.all()]) / 1e9
             )
+        )
+        print("---")
+        # generate tree from ontologies
+        if len(self.map_hierarchy) > 0:
+            self.define_hierarchies(self.map_hierarchy)
+
+        if self.genedf is None:
+            self.genedf = self.load_genes(self.organisms)
+
+        if self.gene_embedding is None:
+            self.gene_embedding = self.load_embeddings(self.genedf)
+        else:
+            self.genedf = pd.concat(
+                [self.genedf.set_index("ensembl_gene_id"), self.gene_embedding],
+                axis=1,
+                join="inner",
+            )
+            self.genedf.columns = self.genedf.columns.astype(str)
+
+    def __len__(self, **kwargs):
+        return self.mapped_dataset.__len__(**kwargs)
+
+    def __getitem__(self, **kwargs):
+        # mark unseen genes with a flag
+        # send the associated
+        return self.mapped_dataset.__getitem__(**kwargs)
+
+    def __repr__(self):
+        print(
+            "total dataset size is {} Gb".format(
+                sum([file.size for file in self.lamin_dataset.files.all()]) / 1e9
+            )
+        )
+        print("---")
+        print("dataset contains:")
+        print("     {} cells".format(self.mapped_dataset.__len__()))
+        print("     {} genes".format(self.genedf.shape[0]))
+        print("     {} labels".format(len(self.obs)))
+        print("     {} organisms".format(len(self.organisms)))
+        print(
+            "dataset contains {} classes to predict".format(
+                sum([len(self.class_topred[i]) for i in self.class_topred])
+            )
+        )
+        print("embedding size is {}".format(self.gene_embedding.shape[1]))
+        return ""
+
+    def get_label_weights(self, **kwargs):
+        return self.mapped_dataset.get_label_weights(**kwargs)
+
+    def get_unseen_mapped_dataset_elements(self, idx):
+        return [str(i)[2:-1] for i in self.mapped_dataset.uns(idx, "unseen_genes")]
 
     def use_prior_network(
         self, name="collectri", organism="human", split_complexes=True
     ):
+        # TODO: use omnipath instead
         if name == "tflink":
             TFLINK = "https://cdn.netbiol.org/tflink/download_files/TFLink_Homo_sapiens_interactions_All_simpleFormat_v1.0.tsv.gz"
             net = utils.pd_load_cached(TFLINK)
@@ -98,6 +118,10 @@ class Dataset(torchDataset):
 
             net = dc.get_collectri(organism=organism, split_complexes=split_complexes)
             net = net.rename(columns={"source": "regulator"})
+        else:
+            raise ValueError(
+                f"provided name: '{name}' is not amongst the available names."
+            )
         self.add_prior_network(net)
 
     def add_prior_network(self, prior_network: pd.DataFrame):
@@ -139,144 +163,100 @@ class Dataset(torchDataset):
             "loaded {:.2f}% of the edges".format((len(prior_network) / init_len) * 100)
         )
         # TODO: transform it into a sparse matrix
-        # TODO: add it into the anndata varp
-
         self.prior_network = prior_network
         self.network_size = len(prior_network)
-        self.overla
-        self.edge_freq
+        # self.overlap =
+        # self.edge_freq
 
-    def load_embeddings():
-        #TODO: finish
+    def load_genes(self, organisms):
+        organismdf = []
+        for o in organisms:
+            organism = lb.Gene(organism=lb.Organism.filter(ontology_id=o).one()).df()
+            organism["organism"] = o
+            organismdf.append(organism)
 
-##########################################
-################### OLD ####################
-##########################################
+        return pd.concat(organismdf)
 
+    def load_embeddings(self, genedfs, embedding_size=128, cache=True):
+        embeddings = []
+        for o in self.organisms:
+            genedf = genedfs[genedfs.organism == o]
+            org_name = lb.Organism.filter(ontology_id=o).one().scientific_name
+            embedding = embed(
+                genedf=genedf,
+                organism=org_name,
+                cache=cache,
+                fasta_path="/tmp/data/fasta/",
+                embedding_size=embedding_size,
+            )
+            genedf = pd.concat(
+                [genedf.set_index("ensembl_gene_id"), embedding], axis=1, join="inner"
+            )
+            genedf.columns = genedf.columns.astype(str)
+            embeddings.append(genedf)
+        return pd.concat(embeddings)
 
-@dataclass
-class DataTable:
-    """
-    The data structure for a single-cell data table.
-    """
+    def define_hierarchies(self, labels):
+        self.class_groupings = {}
+        self.class_topred = {}
+        for label in labels:
+            if label not in [
+                "cell_type_ontology_term_id",
+                "tissue_ontology_term_id",
+                "disease_ontology_term_id",
+                "development_stage_ontology_term_id",
+                "assay_ontology_term_id",
+                "self_reported_ethnicity_ontology_term_id",
+            ]:
+                raise ValueError(
+                    "label {} not in accepted labels, for now only supported from bionty sources".format(
+                        label
+                    )
+                )
+            elif label == "cell_type_ontology_term_id":
+                parentdf = (
+                    lb.CellType.filter()
+                    .df(include=["parents__ontology_id"])
+                    .set_index("ontology_id")
+                )
+            elif label == "tissue_ontology_term_id":
+                parentdf = (
+                    lb.Tissue.filter()
+                    .df(include=["parents__ontology_id"])
+                    .set_index("ontology_id")
+                )
+            elif label == "disease_ontology_term_id":
+                parentdf = (
+                    lb.Disease.filter()
+                    .df(include=["parents__ontology_id"])
+                    .set_index("ontology_id")
+                )
+            elif label == "development_stage_ontology_term_id":
+                parentdf = (
+                    lb.DevelopmentalStage.filter()
+                    .df(include=["parents__ontology_id"])
+                    .set_index("ontology_id")
+                )
+            elif label == "assay_ontology_term_id":
+                parentdf = (
+                    lb.ExperimentalFactor.filter()
+                    .df(include=["parents__ontology_id"])
+                    .set_index("ontology_id")
+                )
+            elif label == "self_reported_ethnicity_ontology_term_id":
+                parentdf = (
+                    lb.Ethnicity.filter()
+                    .df(include=["parents__ontology_id"])
+                    .set_index("ontology_id")
+                )
 
-    name: str
-    data: Optional[Dataset] = None
-
-    @property
-    def is_loaded(self) -> bool:
-        return self.data is not None and isinstance(self.data, Dataset)
-
-    def save(
-        self,
-        path: Union[Path, str],
-        format: Literal["json", "parquet"] = "json",
-    ) -> None:
-        if not self.is_loaded:
-            raise ValueError("DataTable is not loaded.")
-
-        if isinstance(path, str):
-            path = Path(path)
-
-        if format == "json":
-            self.data.to_json(path)
-        elif format == "parquet":
-            self.data.to_parquet(path)
-        else:
-            raise ValueError(f"Unknown format: {format}")
-
-
-@dataclass
-class MetaInfo:
-    """
-    The data structure for meta info of a scBank data directory.
-    """
-
-    on_disk_path: Union[Path, str, None] = None
-    on_disk_format: Literal["json", "parquet"] = "json"
-    main_table_key: Optional[str] = None
-    # TODO: use md5 to check the vocab file name on disk
-    gene_vocab_md5: Optional[str] = None
-    study_ids: Optional[List[int]] = field(
-        default=None,
-        metadata={"help": "List of study IDs"},
-    )
-    cell_ids: Optional[List[int]] = field(
-        default=None,
-        metadata={"help": "List of cell IDs"},
-    )
-    # md5: Optional[str] = field(
-    #     default=None,
-    #     metadata={"help": "MD5 hash of the gene vocabulary"},
-    # )
-
-    def __post_init__(self):
-        if self.on_disk_path is not None:
-            self.on_disk_path: Path = Path(self.on_disk_path)
-
-    def save(self, path: Union[Path, str, None] = None) -> None:
-        """
-        Save meta info to path. If path is None, will save to the same path at
-        :attr:`on_disk_path`.
-        """
-        if path is None:
-            path = self.on_disk_path
-
-        if isinstance(path, str):
-            path = Path(path)
-
-        manifests = {
-            "on_disk_format": self.on_disk_format,
-            "main_data": self.main_table_key,
-            "gene_vocab_md5": self.gene_vocab_md5,
-        }
-        with open(path / "manifest.json", "w") as f:
-            json.dump(manifests, f, indent=2)
-
-        # TODO: currently only save study table, add saving other tables
-        with open(path / "studytable.json", "w") as f:
-            json.dump({"study_ids": self.study_ids}, f, indent=2)
-
-    def load(self, path: Union[Path, str, None] = None) -> None:
-        """
-        Load meta info from path. If path is None, will load from the same path
-        at :attr:`on_disk_path`.
-        """
-        if path is None:
-            path = self.on_disk_path
-
-        if isinstance(path, str):
-            path = Path(path)
-
-        with open(path / "manifest.json") as f:
-            manifests = json.load(f)
-        self.on_disk_format = manifests["on_disk_format"]
-        self.main_table_key = manifests["main_data"]
-        self.gene_vocab_md5 = manifests["gene_vocab_md5"]
-
-        if (path / "studytable.json").exists():
-            with open(path / "studytable.json") as f:
-                study_ids = json.load(f)
-            self.study_ids = study_ids["study_ids"]
-
-    @classmethod
-    def from_path(cls, path: Union[Path, str]) -> Self:
-        """
-        Create a MetaInfo object from a path.
-        """
-        if isinstance(path, str):
-            path = Path(path)
-
-        if not path.exists():
-            raise ValueError(f"Path {path} does not exist.")
-
-        if not path.is_dir():
-            raise ValueError(f"Path {path} is not a directory.")
-
-        if not (path / "manifest.json").exists():
-            raise ValueError(f"Path {path} does not contain manifest.json.")
-
-        meta_info = cls()
-        meta_info.on_disk_path = path
-        meta_info.load(path)
-        return meta_info
+            else:
+                raise ValueError(
+                    "label {} not in accepted labels, for now only supported from bionty sources".format(
+                        label
+                    )
+                )
+            cats = self.mapped_dataset.get_merged_categories(label)
+            groupings, _, lclass = get_ancestry_mapping(cats, parentdf)
+            self.class_groupings[label] = groupings
+            self.class_topred[label] = lclass

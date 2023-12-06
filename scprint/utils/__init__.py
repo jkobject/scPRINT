@@ -1,2 +1,2 @@
-from .util import *
+from .utils import *
 from .get_seq import *

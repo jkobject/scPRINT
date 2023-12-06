@@ -35,6 +35,15 @@ pandas = ">=2.0.0"
 numpy = "*"
 leidenalg = "*"
 decoupler = "*"
+Bio = "*"
+attridict = "*"
+gget = "*"
+torchvision = "*"
+esm = { path = "https://github.com/facebookresearch/esm.git" }
+hydra-core = "*"
+lightning = "*"
+torchtext = "*"
+transformers = "*"
 
 [tool.poetry.group.cuda.dependencies]
 

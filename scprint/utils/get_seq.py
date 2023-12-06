@@ -36,6 +36,7 @@ def load_fasta_species(
     file = list_files(ftp, ".all.fa.gz")[0]
     local_file_path = output_path + file
     if not os.path.exists(local_file_path) or not cache:
+        os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
         with open(local_file_path, "wb") as local_file:
             ftp.retrbinary("RETR " + file, local_file.write)
     ftp.cwd("/pub/release-110/fasta/" + species + "/ncrna/")
@@ -49,13 +50,15 @@ def load_fasta_species(
 
 def subset_fasta(
     gene_tosubset,
-    fasta_path="../../data/fasta/Homo_sapiens.GRCh38.pep.all.fa",
-    subfasta_path="../../data/fasta/subset.fa",
+    fasta_path,
+    subfasta_path="./data/fasta/subset.fa",
     drop_unknown_seq=True,
 ):
     """
     subset_fasta: creates a new fasta file with only the sequence which names contain one of gene_names
     """
+    dup = set()
+    weird = 0
     genes_found = set()
     gene_tosubset = set(gene_tosubset)
     with open(fasta_path, "r") as original_fasta, open(
@@ -70,17 +73,20 @@ def subset_fasta(
             if gene_name in gene_tosubset:
                 if drop_unknown_seq:
                     if "*" in record.seq:
-                        print("weird seq, dropping...")
+                        weird += 1
+
                         continue
                 if not gene_name.startswith("ENSG"):
                     raise ValueError("issue", gene_name)
                 if gene_name in genes_found:
-                    print("had to drop duplicates for", gene_name)
+                    dup.add(gene_name)
                     continue
                 record.description = ""
                 record.id = gene_name
                 SeqIO.write(record, subset_fasta, "fasta")
                 genes_found.add(gene_name)
+    print(len(dup), " genes had duplicates")
+    print("dropped", weird, "weird sequences")
     return genes_found
 
 

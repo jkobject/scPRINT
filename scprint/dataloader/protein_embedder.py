@@ -1,6 +1,7 @@
 import os
 import time
 import subprocess
+from scprint.utils.utils import run_command
 import pandas as pd
 from torch import load
 
@@ -10,6 +11,7 @@ from torch import load
 
 class PROTBERT:
     def __init__(
+        self,
         config="esm-extract",
         pretrained_model="esm2_t33_650M_UR50D",
     ):
@@ -18,7 +20,8 @@ class PROTBERT:
 
     def __call__(self, input_file, output_folder="/tmp/esm_out/", cache=True):
         if not os.path.exists(output_folder) or not cache:
-            os.makedirs(output_folder)
+            os.makedirs(output_folder, exist_ok=True)
+            print("running protbert")
             cmd = (
                 self.config
                 + " "
@@ -27,9 +30,10 @@ class PROTBERT:
                 + input_file
                 + " "
                 + output_folder
+                + " --include mean"
             )
             try:
-                subprocess.Popen(cmd, shell=True).wait()
+                run_command(cmd, shell=True)
             except Exception as e:
                 raise RuntimeError(
                     "An error occurred while running the esm-extract command: " + str(e)
@@ -47,5 +51,7 @@ class PROTBERT:
         files = [i for i in files if i.endswith(".pt")]
         results = []
         for file in files:
-            results.append(load(output_folder + file))
+            results.append(
+                load(output_folder + file)["mean_representations"][33].numpy().tolist()
+            )
         return pd.DataFrame(data=results, index=[file.split(".")[0] for file in files])

@@ -5,6 +5,7 @@ from scipy.sparse import csr_matrix
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.stats import median_abs_deviation
+from django.db import IntegrityError
 
 
 def validate(adata, lb, organism):
@@ -154,15 +155,22 @@ def load_dataset_local(
         if len(organism) == 0:
             print("No organism detected")
             continue
-        lb.settings.organism = organism[0]
-        file.save()
+        organism = lb.Organism.filter(ontology_id=organism[0]).one().name
+        # lb.settings.organism = organism
+        try:
+            file.save()
+        except IntegrityError:
+            print(f"File {file.key} already exists in storage")
         # if location already has a file, don't save again
         if use_cache and os.path.exists(os.path.expanduser(download_folder + file.key)):
             print(f"File {file.key} already exists in storage")
         else:
             file.path.download_to(download_folder + file.key)
         file.storage = default_storage
-        file.save()
+        try:
+            file.save()
+        except IntegrityError:
+            print(f"File {file.key} already exists in storage")
         saved_files.append(file)
     dataset = ln.Dataset(saved_files, name=name, description=description)
     dataset.save()

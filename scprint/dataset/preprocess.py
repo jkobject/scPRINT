@@ -314,7 +314,8 @@ class Preprocessor:
             )
         for val in list(adata.obsm.keys()):
             del adata.obsm[val]
-        sc.pp.pca(adata)
+        # based on the topometry paper https://www.biorxiv.org/content/10.1101/2022.03.14.484134v2
+        sc.pp.pca(adata, n_comps=500)
         sc.pp.neighbors(adata, use_rep="X_pca")
         sc.tl.leiden(adata, key_added="leiden_3", resolution=3.0)
         sc.tl.leiden(adata, key_added="leiden_2", resolution=2.0)

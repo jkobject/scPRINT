@@ -25,6 +25,18 @@ import io
 from biomart import BiomartServer
 
 
+def run_command(command, **kwargs):
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, **kwargs)
+    while True:
+        if process.poll() is not None:
+            break
+        output = process.stdout.readline()
+        if output:
+            print(output.strip())
+    rc = process.poll()
+    return rc
+
+
 def _fetchFromServer(ensemble_server, attributes):
     server = BiomartServer(ensemble_server, verbose=True)
     ensmbl = server.datasets["hsapiens_gene_ensembl"]
@@ -140,22 +152,6 @@ def createFoldersFor(filepath):
         prevval += val + "/"
         if not os.path.exists(prevval):
             os.mkdir(prevval)
-
-
-def add_file_handler(logger: logging.Logger, log_file_path: Path):
-    """
-    Add a file handler to the logger.
-    """
-    h = logging.FileHandler(log_file_path)
-
-    # format showing time, name, function, and message
-    formatter = logging.Formatter(
-        "%(asctime)s-%(name)s-%(levelname)s-%(funcName)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
-    h.setFormatter(formatter)
-    h.setLevel(logger.level)
-    logger.addHandler(h)
 
 
 def category_str2int(category_strs: List[str]) -> List[int]:
