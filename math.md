@@ -32,12 +32,21 @@ the update itself is a $MLP({Q^iK^{iT}\over{\sqrt{d}}})$
 
 where: $Q^i = W_Q^iR^i$, $K^i = W_K^iR^i$, d is a normalizing factor and $R^i \in \R^{d,m}$ a representation of the cell's expression $e$
 
-in this current approach we can see that
+in this current approach we can see that..
 
-(WIP: need to help say that G's update here is coupled to R's but only weekly and that the learning signal could be improved by doing something like finding E = SDE(G,R)) making G strongly tied to the downstream expression
+TODO: need to help say that G's update here is coupled to R's but only weekly and that the learning signal could be improved by doing something like finding E = SDE(G,R) making G strongly tied to the downstream expression
 
+TODO: need to talk also about the graph laplacian and how this diffusivity helps define a similarity between graphs?
 
-(TODO: need to talk also about the graph laplacian and how this diffusivity helps define a similarity between graphs?)
+TODO: compare expressivity with MPNN
+
+TODO: talk about the model's equivariance. since there is not position per se. the model is equivariant to edge's position (E3 class?)
+
+TODO: talk about evolution of both nodes and edges and adjacencies
+
+long term TODO: think about 
+  - efficiency of the evolution 
+  - about universality of the functions that are computed
 
 ---
 
