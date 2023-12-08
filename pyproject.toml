@@ -17,8 +17,7 @@ keywords = [
 [tool.poetry.dependencies]
 lamindb = "*"
 python = "3.10"
-cellxgene_census = "*"
-tiledbsoma = "*"
+cellxgene-census = "*"
 torch = "*"
 anndata = "*"
 matplotlib = "*"
@@ -39,7 +38,7 @@ Bio = "*"
 attridict = "*"
 gget = "*"
 torchvision = "*"
-esm = { path = "https://github.com/facebookresearch/esm.git" }
+fair-esm = { git = "https://github.com/facebookresearch/esm.git", branch = "main" }
 hydra-core = "*"
 lightning = "*"
 torchtext = "*"

@@ -13,6 +13,7 @@ from scprint.dataset import utils as data_utils
 from scprint import logger
 
 import lamindb as ln
+from django.db import IntegrityError
 import bionty as bt
 
 FULL_LENGTH_ASSAYS = [
@@ -55,6 +56,7 @@ class Preprocessor:
         pct_mt_outlier=8,
         batch_key=None,
         erase_prev_dataset: bool = False,
+        cache: bool = True,
     ):
         r"""
         Set up the preprocessor, use the args to config the workflow steps.
@@ -113,6 +115,7 @@ class Preprocessor:
         self.batch_key = batch_key
         self.erase_prev_dataset = erase_prev_dataset
         self.length_normalize = length_normalize
+        self.cache = cache
 
     def __call__(
         self,
@@ -134,12 +137,20 @@ class Preprocessor:
             is used in the highly variable gene selection step.
         """
         files = []
+        all_ready_processed_keys = set()
+        if self.cache:
+            for i in ln.File.filter(description="preprocessed by scprint"):
+                all_ready_processed_keys.add(i.initial_version.key)
         if isinstance(data, AnnData):
             return self.preprocess(data)
         elif isinstance(data, ln.Dataset):
             for i, file in enumerate(data.files.all()[start_at:]):
                 # use the counts matrix
                 print(i)
+                if file.key in all_ready_processed_keys:
+                    print(f"{file.key} is already processed")
+                    continue
+                print(file)
                 adata = file.load(stream=True)
                 print(adata)
                 try:
@@ -153,6 +164,7 @@ class Preprocessor:
                         continue
                     else:
                         raise v
+
                 if self.erase_prev_dataset:
                     adata.write_h5ad(file.storage)
                     del adata
@@ -162,11 +174,20 @@ class Preprocessor:
                         description="preprocessed by scprint",
                     )
                 else:
-                    file = ln.File(
-                        adata,
-                        is_new_version_of=file,
-                        description="preprocessed by scprint",
-                    )
+                    try:
+                        file = ln.File(
+                            adata,
+                            is_new_version_of=file,
+                            description="preprocessed by scprint",
+                        )
+                    except IntegrityError:
+                        print("the old file is already in the local")
+                        file = ln.File(
+                            adata,
+                            is_new_version_of=ln.File.filter(uid=file.uid)[0],
+                            description="preprocessed by scprint",
+                        )
+
                 file.save()
                 files.append(file)
             dataset = ln.Dataset(files, name=name, description=description)
@@ -184,6 +205,16 @@ class Preprocessor:
             del adata.raw
         if adata.layers is not None:
             del adata.layers
+        if len(adata.varm.keys()) > 0:
+            del adata.varm
+        if len(adata.obsm.keys()) > 0:
+            del adata.obsm
+        if len(adata.obsp.keys()) > 0:
+            del adata.obsp
+        if len(adata.uns.keys()) > 0:
+            del adata.uns
+        if len(adata.varp.keys()) > 0:
+            del adata.varp
         # check that it is a count
         if (
             int(adata.X[:100].max()) != adata.X[:100].max()
@@ -224,13 +255,14 @@ class Preprocessor:
                 + str(adata.shape[0])
             )
         adata = adata[adata.obs.is_primary_data]
+        import pdb
+
+        pdb.set_trace()
         if adata.shape[0] < self.min_dataset_size:
             raise ValueError(
                 "Dataset dropped because contains too many secondary cells"
             )
 
-        # create random ids for all cells
-        adata.obs.index = [uuid4() for _ in range(adata.shape[0])]
         intersect_genes = set(adata.var.index).intersection(set(genesdf.index))
         print(f"Removed {len(adata.var.index) - len(intersect_genes)} genes.")
         if len(intersect_genes) < self.min_valid_genes_id:
@@ -312,11 +344,8 @@ class Preprocessor:
                 flavor=self.hvg_flavor,
                 subset=True,
             )
-        for val in list(adata.obsm.keys()):
-            del adata.obsm[val]
         # based on the topometry paper https://www.biorxiv.org/content/10.1101/2022.03.14.484134v2
-        sc.pp.pca(adata, n_comps=500)
-        sc.pp.neighbors(adata, use_rep="X_pca")
+        sc.pp.neighbors(adata, n_pcs=500)
         sc.tl.leiden(adata, key_added="leiden_3", resolution=3.0)
         sc.tl.leiden(adata, key_added="leiden_2", resolution=2.0)
         sc.tl.leiden(adata, key_added="leiden_1", resolution=1.0)
@@ -325,6 +354,8 @@ class Preprocessor:
         if self.additional_postprocess is not None:
             adata = self.additional_postprocess(adata)
 
+        # create random ids for all cells
+        adata.obs.index = [uuid4() for _ in range(adata.shape[0])]
         # step 6: binning
         if self.binning:
             print("Binning data ...")

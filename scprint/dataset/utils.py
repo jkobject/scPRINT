@@ -145,7 +145,6 @@ def load_dataset_local(
         if not only
         else remote_dataset.files.all()[only[0] : only[1]]
     )
-
     for file in files:
         organism = list(set([i.ontology_id for i in file.organism.all()]))
         if len(organism) > 1:
@@ -157,6 +156,7 @@ def load_dataset_local(
             continue
         organism = lb.Organism.filter(ontology_id=organism[0]).one().name
         # lb.settings.organism = organism
+        path = file.path
         try:
             file.save()
         except IntegrityError:
@@ -165,7 +165,7 @@ def load_dataset_local(
         if use_cache and os.path.exists(os.path.expanduser(download_folder + file.key)):
             print(f"File {file.key} already exists in storage")
         else:
-            file.path.download_to(download_folder + file.key)
+            path.download_to(download_folder + file.key)
         file.storage = default_storage
         try:
             file.save()
@@ -198,18 +198,23 @@ def populate_my_ontology(
     add whatever value you need afterward like it is done here with lb.$ontology(name="ddd", ontology_id="ddddd").save()
     # df["assay_ontology_term_id"].unique()
     """
+
     names = bt.CellType().df().index if not celltypes else celltypes
     records = lb.CellType.from_values(names, field=lb.CellType.ontology_id)
     ln.save(records)
     lb.CellType(name="unknown", ontology_id="unknown").save()
     # Organism
-    names = bt.Organism().df().index if not organisms else organisms
-    records = lb.Organism.from_values(names, field=lb.Organism.ontology_id)
-    ln.save(records)
-    lb.Organism(name="unknown", ontology_id="unknown").save()
+    # names = bt.Organism().df().index if not organisms else organisms
+    # records = lb.Organism.from_values(names, field=lb.Organism.ontology_id)
+    # ln.save(records)
+    # lb.Organism(name="unknown", ontology_id="unknown").save()
     # Phenotype
     name = bt.Phenotype().df().index if not sex else sex
-    records = lb.Phenotype.from_values(name, field=lb.Phenotype.ontology_id)
+    records = lb.Phenotype.from_values(
+        name,
+        field=lb.Phenotype.ontology_id,
+        bionty_source=lb.BiontySource.filter(entity="Phenotype", source="pato").one(),
+    )
     ln.save(records)
     lb.Phenotype(name="unknown", ontology_id="unknown").save()
     # ethnicity
@@ -225,10 +230,9 @@ def populate_my_ontology(
         names, field=lb.ExperimentalFactor.ontology_id
     )
     ln.save(records)
-    lb.ExperimentalFactor(name="SMART-Seq v4", ontology_id="EFO:0700016").save()
     lb.ExperimentalFactor(name="unknown", ontology_id="unknown").save()
-    lookup = lb.ExperimentalFactor.lookup()
-    lookup.smart_seq_v4.parents.add(lookup.smart_like)
+    # lookup = lb.ExperimentalFactor.lookup()
+    # lookup.smart_seq_v4.parents.add(lookup.smart_like)
     # Tissue
     names = bt.Tissue().df().index if not tissues else tissues
     records = lb.Tissue.from_values(names, field=lb.Tissue.ontology_id)

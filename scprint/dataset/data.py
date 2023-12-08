@@ -11,6 +11,41 @@ from scprint.dataset.utils import get_ancestry_mapping
 from torch.utils.data import Dataset as torchDataset
 import lnschema_bionty as lb
 
+LABELS_TOADD = {
+    "assay_ontology_term_id": [
+        "10x transcription profiling",
+        "spatial transcriptomics",
+        "10x 3' transcription profiling",
+        "10x 5' transcription profiling",
+    ],
+    "disease_ontology_term_id": [
+        "metabolic disease",
+        "chronic kidney disease",
+        "chromosomal disorder",
+        "infectious disease",
+        "inflammatory disease",
+        # "immune system disease",
+        "disorder of development or morphogenesis",
+        "mitochondrial disease",
+        "psychiatric disorder",
+        "cancer or benign tumor",
+        "neoplasm",
+    ],
+    "cell_type_ontology_term_id": [
+        "progenitor cell",
+        "hematopoietic cell",
+        "myoblast",
+        "myeloid cell",
+        "neuron",
+        "electrically active cell",
+        "epithelial cell",
+        "secretory cell",
+        "stem cell",
+        "non-terminally differentiated cell",
+        "supporting cell",
+    ],
+}
+
 
 @dataclass
 class Dataset(torchDataset):
@@ -70,10 +105,15 @@ class Dataset(torchDataset):
     def __len__(self, **kwargs):
         return self.mapped_dataset.__len__(**kwargs)
 
-    def __getitem__(self, **kwargs):
+    def __getitem__(self, *args, **kwargs):
+        item = self.mapped_dataset.__getitem__(*args, **kwargs)
+        ret = {}
+        ret["count"] = item[0]
+        for i, val in enumerate(self.obs):
+            ret[val] = item[1][i]
         # mark unseen genes with a flag
         # send the associated
-        return self.mapped_dataset.__getitem__(**kwargs)
+        return ret
 
     def __repr__(self):
         print(
@@ -95,8 +135,8 @@ class Dataset(torchDataset):
         print("embedding size is {}".format(self.gene_embedding.shape[1]))
         return ""
 
-    def get_label_weights(self, **kwargs):
-        return self.mapped_dataset.get_label_weights(**kwargs)
+    def get_label_weights(self, *args, **kwargs):
+        return self.mapped_dataset.get_label_weights(*args, **kwargs)
 
     def get_unseen_mapped_dataset_elements(self, idx):
         return [str(i)[2:-1] for i in self.mapped_dataset.uns(idx, "unseen_genes")]
@@ -257,6 +297,10 @@ class Dataset(torchDataset):
                     )
                 )
             cats = self.mapped_dataset.get_merged_categories(label)
+            cats |= set(LABELS_TOADD.get[label])
             groupings, _, lclass = get_ancestry_mapping(cats, parentdf)
+            for i, j in groupings.items():
+                if len(j) == 0:
+                    groupings.pop(i)
             self.class_groupings[label] = groupings
             self.class_topred[label] = lclass

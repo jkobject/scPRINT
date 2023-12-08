@@ -89,6 +89,8 @@ class DataLoader(TorchLoader):
         self,
         mapped_dataset: MappedDataset,
         batch_size: int = 32,
+        weight_scaler: int = 30,
+        label_to_weight: list = [],
         validation_split: float = 0.2,
         num_workers: int = 4,
         collate_fn=default_collate,
@@ -103,7 +105,9 @@ class DataLoader(TorchLoader):
         self.n_samples = len(self.dataset)
         if sampler is None:
             self.sampler, self.valid_sampler = self._split_sampler(
-                self.validation_split
+                self.validation_split,
+                weight_scaler=weight_scaler,
+                label_to_weight=label_to_weight,
             )
         else:
             self.sampler = sampler
@@ -117,10 +121,15 @@ class DataLoader(TorchLoader):
         }
         super().__init__(sampler=self.sampler, **self.init_kwargs, **kwargs)
 
-    def _split_sampler(self, split, weighting: int = 30):
+    def _split_sampler(self, split, label_to_weight=[], weight_scaler: int = 30):
         idx_full = np.arange(self.n_samples)
         np.random.shuffle(idx_full)
-        weights = self.dataset.get_label_weights(weighting)
+        if len(label_to_weight) > 0:
+            weights = self.dataset.get_label_weights(
+                label_to_weight, scaler=weight_scaler
+            )
+        else:
+            weights = np.ones(self.n_samples)
         if isinstance(split, int):
             assert (
                 split < self.n_samples
@@ -146,13 +155,15 @@ class DataLoader(TorchLoader):
         )
         # turn off shuffle option which is mutually exclusive with sampler
 
-        return train_sampler, valid_sampler if len_valid != 0 else train_sampler, None
+        return (
+            (train_sampler, valid_sampler) if len_valid != 0 else (train_sampler, None)
+        )
 
     def get_valid_dataloader(self):
         if self.valid_sampler is None:
             raise ValueError("No validation set is configured.")
         return DataLoader(
-            self.dataset, batch_size=self.batch_size, sampler=self.sampler
+            self.dataset, batch_size=self.batch_size, sampler=self.valid_sampler
         )
 
 
