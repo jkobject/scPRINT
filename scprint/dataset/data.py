@@ -74,7 +74,11 @@ class Dataset(torchDataset):
 
     def __post_init__(self):
         self.mapped_dataset = mapped.mapped(
-            self.lamin_dataset, label_keys=self.obs, encode_labels=self.encode_obs
+            self.lamin_dataset,
+            label_keys=self.obs,
+            encode_labels=self.encode_obs,
+            stream=True,
+            parallel=True,
         )
         print(
             "won't do any check but we recommend to have your dataset coming from local storage"
@@ -107,13 +111,14 @@ class Dataset(torchDataset):
 
     def __getitem__(self, *args, **kwargs):
         item = self.mapped_dataset.__getitem__(*args, **kwargs)
-        ret = {}
-        ret["count"] = item[0]
-        for i, val in enumerate(self.obs):
-            ret[val] = item[1][i]
-        # mark unseen genes with a flag
-        # send the associated
-        return ret
+        # ret = {}
+        # ret["count"] = item[0]
+        # for i, val in enumerate(self.obs):
+        #    ret[val] = item[1][i]
+        ## mark unseen genes with a flag
+        ## send the associated
+        # print(item[0].shape)
+        return item
 
     def __repr__(self):
         print(
@@ -297,7 +302,7 @@ class Dataset(torchDataset):
                     )
                 )
             cats = self.mapped_dataset.get_merged_categories(label)
-            cats |= set(LABELS_TOADD.get[label])
+            cats |= set(LABELS_TOADD.get(label, []))
             groupings, _, lclass = get_ancestry_mapping(cats, parentdf)
             for i, j in groupings.items():
                 if len(j) == 0:

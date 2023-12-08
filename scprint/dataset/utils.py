@@ -256,7 +256,13 @@ def populate_my_ontology(
         # convert onto to name
         organism = lb.Organism.filter(ontology_id=organism).one().name
         names = bt.Gene(organism=organism).df()["ensembl_gene_id"]
-        records = lb.Gene.from_values(names, field="ensembl_gene_id")
+        records = lb.Gene.from_values(
+            names,
+            field="ensembl_gene_id",
+            bionty_source=lb.BiontySource.filter(
+                entity="Gene", organism=organism
+            ).first(),
+        )
         ln.save(records)
 
 

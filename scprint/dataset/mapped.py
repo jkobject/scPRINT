@@ -1,19 +1,19 @@
 from collections import Counter
+from functools import reduce
 from os import PathLike
-from typing import List, Optional, Union
+from typing import List, Literal, Optional, Union, Iterable
 
 import numpy as np
+import pandas as pd
 from lamindb_setup.dev.upath import UPath
 
 from lamindb.dev.storage._backed_access import (
     ArrayTypes,
     GroupTypes,
     StorageType,
+    _safer_read_index,
     registry,
 )
-
-from typing import Iterable, List, Optional, Union
-
 from lamin_utils import logger
 from lnschema_core.models import (
     Data,
@@ -25,11 +25,36 @@ from lamindb.dev._run_context import run_context
 from lamindb.dev._data import _track_run_input
 
 
+class _Connect:
+    def __init__(self, storage):
+        if isinstance(storage, UPath):
+            self.conn, self.store = registry.open("h5py", storage)
+            self.to_close = True
+        else:
+            self.conn, self.store = None, storage
+            self.to_close = False
+
+    def __enter__(self):
+        return self.store
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def close(self):
+        if not self.to_close:
+            return
+        if hasattr(self.store, "close"):
+            self.store.close()
+        if hasattr(self.conn, "close"):
+            self.conn.close()
+
+
 def mapped(
     dataset,
     label_keys: Optional[Union[str, List[str]]] = None,
     encode_labels: Optional[Union[bool, List[str]]] = False,
     stream: bool = False,
+    parallel: bool = False,
     is_run_input: Optional[bool] = None,
 ) -> "MappedDataset":
     _track_run_input(dataset, is_run_input)
@@ -42,7 +67,9 @@ def mapped(
             path_list.append(file.stage())
         else:
             path_list.append(file.path)
-    return MappedDataset(path_list, label_keys, encode_labels)
+    return MappedDataset(
+        path_list, label_keys, encode_labels=encode_labels, parallel=parallel
+    )
 
 
 class MappedDataset:
@@ -62,33 +89,35 @@ class MappedDataset:
         self,
         path_list: List[Union[str, PathLike]],
         label_keys: Optional[Union[str, List[str]]] = None,
+        join_vars: Optional[Literal["auto", "inner"]] = "auto",
         encode_labels: Optional[Union[bool, List[str]]] = False,
+        parallel: bool = False,
     ):
         self.storages = []
         self.conns = []
-        for path in path_list:
-            path = UPath(path)
-            if path.exists() and path.is_file():  # type: ignore
-                conn, storage = registry.open("h5py", path)
-            else:
-                conn, storage = registry.open("zarr", path)
-            self.conns.append(conn)
-            self.storages.append(storage)
+        self.parallel = parallel
+        self._make_connections(path_list, parallel)
 
         self.n_obs_list = []
         for storage in self.storages:
-            X = storage["X"]
-            if isinstance(X, ArrayTypes):  # type: ignore
-                self.n_obs_list.append(X.shape[0])
-            else:
-                self.n_obs_list.append(X.attrs["shape"][0])
+            with _Connect(storage) as store:
+                X = store["X"]
+                if isinstance(X, ArrayTypes):  # type: ignore
+                    self.n_obs_list.append(X.shape[0])
+                else:
+                    self.n_obs_list.append(X.attrs["shape"][0])
         self.n_obs = sum(self.n_obs_list)
 
         self.indices = np.hstack([np.arange(n_obs) for n_obs in self.n_obs_list])
         self.storage_idx = np.repeat(np.arange(len(self.storages)), self.n_obs_list)
 
-        if isinstance(label_keys, str):
-            label_keys = [label_keys]
+        self.join_vars = join_vars if len(path_list) > 1 else None
+        self.var_indices = None
+        if self.join_vars is not None:
+            self._make_join_vars()
+
+        self.encode_labels = encode_labels
+        self.label_keys = [label_keys] if isinstance(label_keys, str) else label_keys
         if isinstance(encode_labels, bool):
             if encode_labels:
                 encode_labels = label_keys
@@ -101,59 +130,89 @@ class MappedDataset:
                 self.encoders[label] = {cat: i for i, cat in enumerate(cats)}
         else:
             self.encoders = {}
-        self.label_keys = label_keys
         self._closed = False
+
+    def _make_connections(self, path_list: list, parallel: bool):
+        for path in path_list:
+            path = UPath(path)
+            if path.exists() and path.is_file():  # type: ignore
+                if parallel:
+                    conn, storage = None, path
+                else:
+                    conn, storage = registry.open("h5py", path)
+            else:
+                conn, storage = registry.open("zarr", path)
+            self.conns.append(conn)
+            self.storages.append(storage)
+
+    def _make_join_vars(self):
+        var_list = []
+        for storage in self.storages:
+            with _Connect(storage) as store:
+                var_list.append(_safer_read_index(store["var"]))
+        if self.join_vars == "auto":
+            vars_eq = all([var_list[0].equals(vrs) for vrs in var_list[1:]])
+            if vars_eq:
+                self.join_vars = None
+                return
+            else:
+                self.join_vars = "inner"
+        if self.join_vars == "inner":
+            self.var_joint = reduce(pd.Index.intersection, var_list)
+            if len(self.var_joint) == 0:
+                raise ValueError(
+                    "The provided AnnData objects don't have shared varibales."
+                )
+            self.var_indices = [vrs.get_indexer(self.var_joint) for vrs in var_list]
 
     def __len__(self):
         return self.n_obs
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
         obs_idx = self.indices[idx]
-        labels = []
-        if isinstance(idx, slice):
-            out = []
-            label = []
-            for i in range(idx.start, idx.stop):
-                pout, plabel = self.__getitem__(i)
-                out.append(pout)
-                label.append(plabel)
-            return np.array(out), label
-        storage = self.storages[self.storage_idx[idx]]
-        out = self.get_data_idx(storage, obs_idx)
-        if self.label_keys is not None:
-            for label in self.label_keys:
-                label_idx = self.get_label_idx(storage, obs_idx, label)
-                if label in self.encoders:
-                    labels.append(self.encoders[label][label_idx])
-                else:
-                    labels.append(label_idx)
-        return out, labels
+        storage_idx = self.storage_idx[idx]
+        if self.var_indices is not None:
+            var_idxs = self.var_indices[storage_idx]
+        else:
+            var_idxs = None
+        with _Connect(self.storages[storage_idx]) as store:
+            out = [self.get_data_idx(store, obs_idx, var_idxs)]
+            if self.label_keys is not None:
+                for i, label in enumerate(self.label_keys):
+                    label_idx = self.get_label_idx(store, obs_idx, label)
+                    if label in self.encoders:
+                        out.append(self.encoders[label][label_idx])
+                    else:
+                        out.append(label_idx)
+        return out
 
     def uns(self, idx, key):
         storage = self.storages[self.storage_idx[idx]]
         return storage["uns"][key]
 
     def get_data_idx(
-        self, storage: StorageType, idx, layer_key: Optional[str] = None  # type: ignore # noqa
+        self,
+        storage: StorageType,
+        idx: int,
+        var_idxs: Optional[list] = None,
+        layer_key: Optional[str] = None,  # type: ignore # noqa
     ):
         """Get the index for the data."""
         layer = storage["X"] if layer_key is None else storage["layers"][layer_key]  # type: ignore # noqa
         if isinstance(layer, ArrayTypes):  # type: ignore
-            return layer[idx]
+            # todo: better way to select variables
+
+            return layer[idx] if var_idxs is None else layer[idx][var_idxs]
         else:  # assume csr_matrix here
             data = layer["data"]
             indices = layer["indices"]
             indptr = layer["indptr"]
-            if isinstance(idx, slice):
-                s = [slice(*(indptr[i : i + 2])) for i in range(idx.start, idx.stop)]
-                layer_idx = np.zeros((layer.attrs["shape"][1], len(s)))
-                for i, sl in enumerate(s):
-                    layer_idx[indices[sl], i] = data[sl]
-            else:  # assuming int
-                s = slice(*(indptr[idx : idx + 2]))
-                layer_idx = np.zeros(layer.attrs["shape"][1])
-                layer_idx[indices[s]] = data[s]
-            return layer_idx
+            s = slice(*(indptr[idx : idx + 2]))
+            # this requires more memory than csr_matrix when var_idxs is not None
+            # but it is faster
+            layer_idx = np.zeros(layer.attrs["shape"][1])
+            layer_idx[indices[s]] = data[s]
+            return layer_idx if var_idxs is None else layer_idx[var_idxs]
 
     def get_label_idx(self, storage: StorageType, idx: int, label_key: str):  # type: ignore # noqa
         """Get the index for the label by key."""
@@ -185,7 +244,7 @@ class MappedDataset:
             if i == 0:
                 labels = self.get_merged_labels(val)
             else:
-                labels += "_" + self.get_merged_labels(val)
+                labels += "_" + self.get_merged_labels(val).astype(str).astype("O")
         counter = Counter(labels)  # type: ignore
         counter = np.array([counter[label] for label in labels])
         weights = scaler / (counter + scaler)
@@ -196,13 +255,14 @@ class MappedDataset:
         labels_merge = []
         decode = np.frompyfunc(lambda x: x.decode("utf-8"), 1, 1)
         for storage in self.storages:
-            codes = self.get_codes(storage, label_key)
-            labels = decode(codes) if isinstance(codes[0], bytes) else codes
-            cats = self.get_categories(storage, label_key)
-            if cats is not None:
-                cats = decode(cats) if isinstance(cats[0], bytes) else cats
-                labels = cats[labels]
-            labels_merge.append(labels)
+            with _Connect(storage) as store:
+                codes = self.get_codes(store, label_key)
+                labels = decode(codes) if isinstance(codes[0], bytes) else codes
+                cats = self.get_categories(store, label_key)
+                if cats is not None:
+                    cats = decode(cats) if isinstance(cats[0], bytes) else cats
+                    labels = cats[labels]
+                labels_merge.append(labels)
         return np.hstack(labels_merge)
 
     def get_merged_categories(self, label_key: str):
@@ -210,14 +270,15 @@ class MappedDataset:
         cats_merge = set()
         decode = np.frompyfunc(lambda x: x.decode("utf-8"), 1, 1)
         for storage in self.storages:
-            cats = self.get_categories(storage, label_key)
-            if cats is not None:
-                cats = decode(cats) if isinstance(cats[0], bytes) else cats
-                cats_merge.update(cats)
-            else:
-                codes = self.get_codes(storage, label_key)
-                codes = decode(codes) if isinstance(codes[0], bytes) else codes
-                cats_merge.update(codes)
+            with _Connect(storage) as store:
+                cats = self.get_categories(store, label_key)
+                if cats is not None:
+                    cats = decode(cats) if isinstance(cats[0], bytes) else cats
+                    cats_merge.update(cats)
+                else:
+                    codes = self.get_codes(store, label_key)
+                    codes = decode(codes) if isinstance(codes[0], bytes) else codes
+                    cats_merge.update(codes)
         return cats_merge
 
     def get_categories(self, storage: StorageType, label_key: str):  # type: ignore
