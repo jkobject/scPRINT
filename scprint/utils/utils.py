@@ -38,7 +38,7 @@ def run_command(command, **kwargs):
 
 
 def _fetchFromServer(ensemble_server, attributes):
-    server = BiomartServer(ensemble_server, verbose=True)
+    server = BiomartServer(ensemble_server)
     ensmbl = server.datasets["hsapiens_gene_ensembl"]
     print(attributes)
     res = pd.read_csv(
@@ -51,7 +51,7 @@ def _fetchFromServer(ensemble_server, attributes):
 
 
 def getBiomartTable(
-    ensemble_server="http://feb2023.archive.ensembl.org/biomart",
+    ensemble_server="http://jul2023.archive.ensembl.org/biomart",
     useCache=False,
     cache_folder="/tmp/biomart/",
     attributes=[],

@@ -1,25 +1,23 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from base import BaseModel
+import torch
+from typing import Optional, Dict, Union
+from torch import Tensor
+import math
+import dgl
 
-
-class MnistModel(BaseModel):
-    def __init__(self, num_classes=10):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
-        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
-        self.conv2_drop = nn.Dropout2d()
-        self.fc1 = nn.Linear(320, 50)
-        self.fc2 = nn.Linear(50, num_classes)
+class scPrint(BaseModel):
+    def __init__(self, config):
+        super(scPrint, self).__init__()
+        self.config = config
+        self.encoder = Encoder(config)
+        self.decoder = Decoder(config)
 
     def forward(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = x.view(-1, 320)
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x, training=self.training)
-        x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
 
 
 class GeneEncoder(nn.Module):
@@ -63,25 +61,69 @@ class PositionalEncoding(nn.Module):
     Note: not used in the current version of scprint.
     """
 
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+    def __init__(self, d_model: int, max_len: int, dropout: float = 0.1, maxval=10000.0):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(
-            torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model)
+            torch.arange(0, d_model, 2) * (-math.log(maxval) / d_model)
         )
         pe = torch.zeros(max_len, 1, d_model)
         pe[:, 0, 0::2] = torch.sin(position * div_term)
         pe[:, 0, 1::2] = torch.cos(position * div_term)
         self.register_buffer("pe", pe)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, pos_x: Tensor) -> Tensor:
         """
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
-        x = x + self.pe[: x.size(0)]
+        x = x + self.pe[pos_x]
+        return self.dropout(x)
+
+
+class DPositionalEncoding(nn.Module):
+    """
+    The PositionalEncoding module applies a positional encoding to a sequence of vectors.
+    This is necessary for the Transformer model, which does not have any inherent notion of
+    position in a sequence. The positional encoding is added to the input embeddings and
+    allows the model to attend to positions in the sequence.
+
+    Args:
+        d_model (int): The dimension of the input vectors.
+        dropout (float, optional): The dropout rate to apply to the output of the positional encoding.
+        max_len (int, optional): The maximum length of a sequence that this module can handle.
+
+    Note: not used in the current version of scprint.
+    """
+
+    def __init__(self, d_model: int, max_len: int, dropout: float = 0.1, maxvalue=10000.0):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2) * (-math.log(maxvalue) / d_model)
+        )
+        pe = torch.zeros(max_len, 1, d_model)
+        pe[:, 0, (d_model / 2) :: 2 + (d_model / 2)] = torch.sin(position * div_term)
+        pe[:, 0, 1 + (d_model / 2) :: 2 + (d_model / 2)] = torch.cos(
+            position * div_term
+        )
+        self.register_buffer("pe", pe)
+
+        # PE(x,y,2i) = sin(x/10000^(4i/D))
+        # PE(x,y,2i+1) = cos(x/10000^(4i/D))
+        # PE(x,y,2j+D/2) = sin(y/10000^(4j/D))
+        # PE(x,y,2j+1+D/2) = cos(y/10000^(4j/D))
+
+    def forward(self, x: Tensor, pos_x: Tensor) -> Tensor:
+        """
+        Args:
+            x: Tensor, shape [seq_len, batch_size, embedding_dim]
+        """
+        x = x + self.pe[pos_x]
         return self.dropout(x)
 
 
@@ -411,5 +453,3 @@ class EGTEncoder:
 
     def forward(self, x: Tensor) -> Tensor:
         return self.transformer(x)
-
-
