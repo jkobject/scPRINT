@@ -79,16 +79,11 @@ class Dataset(torchDataset):
             encode_labels=self.encode_obs,
             stream=True,
             parallel=True,
+            join_vars="None",
         )
         print(
             "won't do any check but we recommend to have your dataset coming from local storage"
         )
-        print(
-            "total dataset size is {} Gb".format(
-                sum([file.size for file in self.lamin_dataset.files.all()]) / 1e9
-            )
-        )
-        print("---")
         # generate tree from ontologies
         if len(self.map_hierarchy) > 0:
             self.define_hierarchies(self.map_hierarchy)
@@ -99,11 +94,11 @@ class Dataset(torchDataset):
         if self.gene_embedding is None:
             self.gene_embedding = self.load_embeddings(self.genedf)
         else:
-            self.genedf = pd.concat(
-                [self.genedf.set_index("ensembl_gene_id"), self.gene_embedding],
-                axis=1,
-                join="inner",
-            )
+            # self.genedf = pd.concat(
+            #    [self.genedf.set_index("ensembl_gene_id"), self.gene_embedding],
+            #    axis=1,
+            #    join="inner",
+            # )
             self.genedf.columns = self.genedf.columns.astype(str)
 
     def __len__(self, **kwargs):
@@ -123,7 +118,7 @@ class Dataset(torchDataset):
     def __repr__(self):
         print(
             "total dataset size is {} Gb".format(
-                sum([file.size for file in self.lamin_dataset.files.all()]) / 1e9
+                sum([file.size for file in self.lamin_dataset.artifacts.all()]) / 1e9
             )
         )
         print("---")

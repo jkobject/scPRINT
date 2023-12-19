@@ -50,16 +50,11 @@ class _Connect:
 
 
 def mapped(
-    dataset,
-    label_keys: Optional[Union[str, List[str]]] = None,
-    encode_labels: Optional[Union[bool, List[str]]] = False,
-    stream: bool = False,
-    parallel: bool = False,
-    is_run_input: Optional[bool] = None,
+    dataset, stream: bool = False, is_run_input: Optional[bool] = None, **kwargs
 ) -> "MappedDataset":
     _track_run_input(dataset, is_run_input)
     path_list = []
-    for file in dataset.files.all():
+    for file in dataset.artifacts.all():
         if file.suffix not in {".h5ad", ".zrad", ".zarr"}:
             logger.warning(f"Ignoring file with suffix {file.suffix}")
             continue
@@ -67,9 +62,7 @@ def mapped(
             path_list.append(file.stage())
         else:
             path_list.append(file.path)
-    return MappedDataset(
-        path_list, label_keys, encode_labels=encode_labels, parallel=parallel
-    )
+    return MappedDataset(path_list, **kwargs)
 
 
 class MappedDataset:
@@ -89,7 +82,7 @@ class MappedDataset:
         self,
         path_list: List[Union[str, PathLike]],
         label_keys: Optional[Union[str, List[str]]] = None,
-        join_vars: Optional[Literal["auto", "inner"]] = "auto",
+        join_vars: Optional[Literal["auto", "inner", "None"]] = "auto",
         encode_labels: Optional[Union[bool, List[str]]] = False,
         parallel: bool = False,
     ):
