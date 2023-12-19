@@ -43,6 +43,7 @@ hydra-core = "*"
 lightning = "*"
 torchtext = "*"
 transformers = "*"
+pynndescent = ">=0.5.11"
 
 [tool.poetry.group.cuda.dependencies]
 

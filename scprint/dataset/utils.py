@@ -141,9 +141,9 @@ def load_dataset_local(
     saved_files = []
     default_storage = ln.Storage.filter(root=ln.settings.storage.as_posix()).one()
     files = (
-        remote_dataset.files.all()
+        remote_dataset.artifacts.all()
         if not only
-        else remote_dataset.files.all()[only[0] : only[1]]
+        else remote_dataset.artifacts.all()[only[0] : only[1]]
     )
     for file in files:
         organism = list(set([i.ontology_id for i in file.organism.all()]))

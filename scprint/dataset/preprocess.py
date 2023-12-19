@@ -1,4 +1,3 @@
-import pdb
 from typing import Dict, Optional, Union, Callable
 
 import numpy as np
@@ -32,15 +31,11 @@ class Preprocessor:
     def __init__(
         self,
         lb,
-        use_key: Optional[str] = None,
         filter_gene_by_counts: Union[int, bool] = False,
         filter_cell_by_counts: Union[int, bool] = False,
-        normalize_total: Union[float, bool] = 1e4,
-        result_normed_key: Optional[str] = "X_normed",
+        normalize_total: Union[float, bool] = False,
         log1p: bool = False,
-        result_log1p_key: str = "X_log1p",
         subset_hvg: Union[int, bool] = False,
-        hvg_use_key: Optional[str] = None,
         hvg_flavor: str = "seurat_v3",
         binning: Optional[int] = None,
         result_binned_key: str = "X_binned",
@@ -57,32 +52,23 @@ class Preprocessor:
         batch_key=None,
         erase_prev_dataset: bool = False,
         cache: bool = True,
+        stream: bool = False,
     ):
         r"""
         Set up the preprocessor, use the args to config the workflow steps.
 
         Args:
 
-        use_key (:class:`str`, optional):
-            The key of :class:`~anndata.AnnData` to use for preprocessing.
         filter_gene_by_counts (:class:`int` or :class:`bool`, default: ``False``):
             Whther to filter genes by counts, if :class:`int`, filter genes with counts
         filter_cell_by_counts (:class:`int` or :class:`bool`, default: ``False``):
             Whther to filter cells by counts, if :class:`int`, filter cells with counts
         normalize_total (:class:`float` or :class:`bool`, default: ``1e4``):
             Whether to normalize the total counts of each cell to a specific value.
-        result_normed_key (:class:`str`, default: ``"X_normed"``):
-            The key of :class:`~anndata.AnnData` to store the normalized data. If
-            :class:`None`, will use normed data to replce the :attr:`use_key`.
         log1p (:class:`bool`, default: ``True``):
             Whether to apply log1p transform to the normalized data.
-        result_log1p_key (:class:`str`, default: ``"X_log1p"``):
-            The key of :class:`~anndata.AnnData` to store the log1p transformed data.
         subset_hvg (:class:`int` or :class:`bool`, default: ``False``):
             Whether to subset highly variable genes.
-        hvg_use_key (:class:`str`, optional):
-            The key of :class:`~anndata.AnnData` to use for calculating highly variable
-            genes. If :class:`None`, will use :attr:`adata.X`.
         hvg_flavor (:class:`str`, default: ``"seurat_v3"``):
             The flavor of highly variable genes selection. See
             :func:`scanpy.pp.highly_variable_genes` for more details.
@@ -94,11 +80,8 @@ class Preprocessor:
         self.filter_gene_by_counts = filter_gene_by_counts
         self.filter_cell_by_counts = filter_cell_by_counts
         self.normalize_total = normalize_total
-        self.result_normed_key = result_normed_key
         self.log1p = log1p
-        self.result_log1p_key = result_log1p_key
         self.subset_hvg = subset_hvg
-        self.hvg_use_key = hvg_use_key
         self.hvg_flavor = hvg_flavor
         self.binning = binning
         self.result_binned_key = result_binned_key
@@ -116,6 +99,7 @@ class Preprocessor:
         self.erase_prev_dataset = erase_prev_dataset
         self.length_normalize = length_normalize
         self.cache = cache
+        self.stream = stream
 
     def __call__(
         self,
@@ -139,19 +123,23 @@ class Preprocessor:
         files = []
         all_ready_processed_keys = set()
         if self.cache:
-            for i in ln.File.filter(description="preprocessed by scprint"):
+            for i in ln.Artifact.filter(description="preprocessed by scprint"):
                 all_ready_processed_keys.add(i.initial_version.key)
         if isinstance(data, AnnData):
             return self.preprocess(data)
         elif isinstance(data, ln.Dataset):
-            for i, file in enumerate(data.files.all()[start_at:]):
+            for i, file in enumerate(data.artifacts.all()[start_at:]):
                 # use the counts matrix
                 print(i)
                 if file.key in all_ready_processed_keys:
                     print(f"{file.key} is already processed")
                     continue
                 print(file)
-                adata = file.load(stream=True)
+                if file.backed().obs.is_primary_data.sum() == 0:
+                    print(f"{file.key} only contains non primary cells")
+                    continue
+                adata = file.load(stream=self.stream)
+
                 print(adata)
                 try:
                     adata = self.preprocess(adata)
@@ -164,32 +152,19 @@ class Preprocessor:
                         continue
                     else:
                         raise v
-
-                if self.erase_prev_dataset:
-                    adata.write_h5ad(file.storage)
-                    del adata
-                    file = ln.File(
-                        file.storage,
-                        is_new_version_of=file,
-                        description="preprocessed by scprint",
-                    )
-                else:
-                    try:
-                        file = ln.File(
-                            adata,
-                            is_new_version_of=file,
-                            description="preprocessed by scprint",
-                        )
-                    except IntegrityError:
-                        print("the old file is already in the local")
-                        file = ln.File(
-                            adata,
-                            is_new_version_of=ln.File.filter(uid=file.uid)[0],
-                            description="preprocessed by scprint",
-                        )
-
-                file.save()
-                files.append(file)
+                try:
+                    file.save()
+                except IntegrityError as e:
+                    # UNIQUE constraint failed: lnschema_bionty_organism.ontology_id
+                    print(f"seeing {e}... continuing")
+                myfile = ln.Artifact(
+                    adata,
+                    is_new_version_of=file,
+                    description="preprocessed by scprint",
+                )
+                # issues with KLlggfw6I6lvmbqiZm46
+                myfile.save()
+                files.append(myfile)
             dataset = ln.Dataset(files, name=name, description=description)
             dataset.save()
             return dataset
@@ -197,7 +172,6 @@ class Preprocessor:
             raise ValueError("Please provide either anndata or ln.Dataset")
 
     def preprocess(self, adata: AnnData):
-        adata = adata.to_memory()
         if self.additional_preprocess is not None:
             adata = self.additional_preprocess(adata)
         if adata.raw is not None:
@@ -254,10 +228,8 @@ class Preprocessor:
                 "Dataset dropped due to low expressed genes and unexpressed cells: current size: "
                 + str(adata.shape[0])
             )
+        # dropping non primary
         adata = adata[adata.obs.is_primary_data]
-        import pdb
-
-        pdb.set_trace()
         if adata.shape[0] < self.min_dataset_size:
             raise ValueError(
                 "Dataset dropped because contains too many secondary cells"
@@ -272,7 +244,7 @@ class Preprocessor:
         unseen = set(genesdf.index) - set(adata.var.index)
         # adding them to adata
         emptyda = ad.AnnData(
-            csr_matrix((adata.shape[0], len(unseen))),
+            csr_matrix((adata.shape[0], len(unseen)), dtype=np.float32),
             var=pd.DataFrame(index=list(unseen)),
             obs=pd.DataFrame(index=adata.obs.index),
         )
@@ -345,7 +317,10 @@ class Preprocessor:
                 subset=True,
             )
         # based on the topometry paper https://www.biorxiv.org/content/10.1101/2022.03.14.484134v2
-        sc.pp.neighbors(adata, n_pcs=500)
+        # https://rapids-singlecell.readthedocs.io/en/latest/api/generated/rapids_singlecell.pp.pca.html#rapids_singlecell.pp.pca
+        sc.pp.neighbors(
+            adata, n_pcs=500 if adata.shape[0] > 500 else adata.shape[0] - 2
+        )
         sc.tl.leiden(adata, key_added="leiden_3", resolution=3.0)
         sc.tl.leiden(adata, key_added="leiden_2", resolution=2.0)
         sc.tl.leiden(adata, key_added="leiden_1", resolution=1.0)
@@ -353,9 +328,12 @@ class Preprocessor:
         # additional
         if self.additional_postprocess is not None:
             adata = self.additional_postprocess(adata)
-
+        adata = adata[:, adata.var.sort_index().index]
         # create random ids for all cells
-        adata.obs.index = [uuid4() for _ in range(adata.shape[0])]
+        adata.obs.index = [str(uuid4()) for _ in range(adata.shape[0])]
+        # not necessary, int causes issues in some cases and you
+        # do not get more information / less space for your bucks
+        # adata.X = adata.X.astype(int32)
         # step 6: binning
         if self.binning:
             print("Binning data ...")
@@ -489,3 +467,106 @@ def binning(row: np.ndarray, n_bins: int) -> np.ndarray:
         bins = np.quantile(row, np.linspace(0, 1, n_bins - 1))
         binned_row = _digitize(row, bins)
     return binned_row.astype(dtype)
+
+
+#################
+### specific #####
+#################
+
+
+def additional_preprocess(adata):
+    adata.obs = adata.obs.replace(
+        {
+            "self_reported_ethnicity_ontology_term_id": {
+                "multiethnic": "unknown",
+                "American": "unknown",
+                "Jewish Israeli": "unknown",
+                "na": "unknown",
+            }
+        }
+    )  # multi ethnic will have to get renamed
+    adata.obs["cell_culture"] = False
+    # if cell_type contains the word "(cell culture)" then it is a cell culture and we mark it as so and remove this from the cell type
+    loc = adata.obs["cell_type_ontology_term_id"].str.contains("(cell culture)")
+    if loc.sum() > 0:
+        adata.obs["cell_type_ontology_term_id"] = adata.obs[
+            "cell_type_ontology_term_id"
+        ].astype(str)
+        adata.obs.loc[loc, "cell_culture"] = True
+        adata.obs.loc[loc, "cell_type_ontology_term_id"] = adata.obs.loc[
+            loc, "cell_type_ontology_term_id"
+        ].str.replace(" (cell culture)", "")
+
+    loc = adata.obs["tissue_ontology_term_id"].str.contains("(cell culture)")
+    if loc.sum() > 0:
+        adata.obs.loc[loc, "cell_culture"] = True
+        adata.obs["tissue_ontology_term_id"] = adata.obs[
+            "tissue_ontology_term_id"
+        ].astype(str)
+        adata.obs.loc[loc, "tissue_ontology_term_id"] = adata.obs.loc[
+            loc, "tissue_ontology_term_id"
+        ].str.replace(r" \(cell culture\)", "")
+
+    loc = adata.obs["tissue_ontology_term_id"].str.contains("(organoid)")
+    if loc.sum() > 0:
+        adata.obs.loc[loc, "cell_culture"] = True
+        adata.obs["tissue_ontology_term_id"] = adata.obs[
+            "tissue_ontology_term_id"
+        ].astype(str)
+        adata.obs.loc[loc, "tissue_ontology_term_id"] = adata.obs.loc[
+            loc, "tissue_ontology_term_id"
+        ].str.replace(r" \(organoid\)", "")
+
+    loc = adata.obs["tissue_ontology_term_id"].str.contains("CL:")
+    if loc.sum() > 0:
+        adata.obs["tissue_ontology_term_id"] = adata.obs[
+            "tissue_ontology_term_id"
+        ].astype(str)
+        adata.obs.loc[loc, "tissue_ontology_term_id"] = "unknown"
+    return adata
+
+
+def additional_postprocess(adata):
+    # define the "up to" 10 neighbors for each cells and add to obs
+    # compute neighbors
+    # need to be connectivities and same labels [cell type, assay, dataset, disease]
+    # define the "neighbor" up to 10(N) cells and add to obs
+    # define the "next time point" up to 5(M) cells and add to obs  # step 1: filter genes
+    sc.tl.diffmap(adata)
+    # create a meta group
+    adata.obs["dpt_group"] = (
+        adata.obs["leiden_1"].astype(str)
+        + "_"
+        + adata.obs["disease_ontology_term_id"].astype(str)
+        + "_"
+        + adata.obs["cell_type_ontology_term_id"].astype(str)
+        + "_"
+        + adata.obs["tissue_ontology_term_id"].astype(str)
+    )  # + "_" + adata.obs['dataset_id'].astype(str)
+
+    # if group is too small
+    okgroup = [i for i, j in adata.obs["dpt_group"].value_counts().items() if j >= 10]
+    not_okgroup = [i for i, j in adata.obs["dpt_group"].value_counts().items() if j < 3]
+    # set the group to empty
+    adata.obs.loc[adata.obs["dpt_group"].isin(not_okgroup), "dpt_group"] = ""
+    adata.obs["heat_diff"] = np.nan
+    # for each group
+    for val in set(okgroup):
+        if val == "":
+            continue
+        # get the best root cell
+        eq = adata.obs.dpt_group == val
+        loc = np.where(eq)[0]
+
+        root_ixs = loc[adata.obsm["X_diffmap"][eq, 0].argmin()]
+        adata.uns["iroot"] = root_ixs
+        # compute the diffusion pseudo time from it
+        sc.tl.dpt(adata)
+        adata.obs.loc[eq, "heat_diff"] = adata.obs.loc[eq, "dpt_pseudotime"]
+        adata.obs.drop(columns=["dpt_pseudotime"], inplace=True)
+
+    # sort so that the next time points are aligned for all groups
+    adata = adata[adata.obs.sort_values(["dpt_group", "heat_diff"]).index]
+    # to query N next time points we just get the N elements below and check they are in the group
+    # to query the N nearest neighbors we just get the N elements above and N below and check they are in the group
+    return adata
