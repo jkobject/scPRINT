@@ -1,2 +1,10 @@
 site_name: scprint
 theme: readthedocs
+site_url: https://www.jkobject.com/scPRINT/
+nav:
+  - Home: index.md
+  - About: about.md
+plugins: 
+  - search
+  - mkdocstrings:
+    enable_inventory: false
