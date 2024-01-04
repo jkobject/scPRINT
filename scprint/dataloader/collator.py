@@ -14,5 +14,4 @@ class Collator:
         # do encoding of graph location
         # find a way to encode all the nodes in some sparse way
         
-        
     

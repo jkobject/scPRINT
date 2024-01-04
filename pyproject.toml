@@ -44,6 +44,9 @@ lightning = "*"
 torchtext = "*"
 transformers = "*"
 pynndescent = ">=0.5.11"
+scDataLoader = "*"
+# packaging, ninja
+# pip install flash-attn --no-build-isolation
 
 [tool.poetry.group.cuda.dependencies]
 

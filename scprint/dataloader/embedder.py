@@ -1,5 +1,4 @@
 from scprint import utils
-from scprint.utils.utils import run_command
 from scprint.dataloader import PROTBERT, RNABERT
 from torch.nn import AdaptiveAvgPool1d
 import pandas as pd
