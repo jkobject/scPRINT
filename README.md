@@ -4,11 +4,12 @@
 [![codecov](https://codecov.io/gh/jkobject/scPRINT/branch/main/graph/badge.svg?token=scPRINT_token_here)](https://codecov.io/gh/jkobject/scPRINT)
 [![CI](https://github.com/jkobject/scPRINT/actions/workflows/main.yml/badge.svg)](https://github.com/jkobject/scPRINT/actions/workflows/main.yml)
 
-Awesome scprint created by Jeremie Kalfon
+Awesome Large Transcriptional Model created by Jeremie Kalfon
+
+scprint = single cell pretrained regulation inference neural network from transcripts
 
 using: 
-[pytorch template](https://github.com/victoresque/pytorch-template)
-[python template](https://github.com/rochacbruno/python-project-template)
+
 
 ## Install it from PyPI
 
@@ -45,3 +46,9 @@ Read the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 - ✅ Code linting using [flake8](https://flake8.pycqa.org/en/latest/)
 - 📊 Code coverage reports using [codecov](https://about.codecov.io/sign-up/)
 - 🛳️ Automatic release to [PyPI](https://pypi.org) using [twine](https://twine.readthedocs.io/en/latest/) and github actions.
+
+
+acknowledgement:
+[python template](https://github.com/rochacbruno/python-project-template)
+[scGPT]()
+[laminDB]()

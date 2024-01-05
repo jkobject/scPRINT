@@ -30,12 +30,12 @@ class ExprDecoder(nn.Module):
         self,
         d_model: int,
         explicit_zero_prob: bool = False,
-        n_batches: int = 1,
+        n_labels: int = 0,
     ):
         super().__init__()
-        d_in = d_model * n_batches
+        self.n_labels = n_labels
         self.fc = nn.Sequential(
-            nn.Linear(d_in, d_model),
+            nn.Linear(d_model, d_model),
             nn.LeakyReLU(),
             nn.Linear(d_model, d_model),
             nn.LeakyReLU(),
@@ -48,6 +48,8 @@ class ExprDecoder(nn.Module):
 
     def forward(self, x: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
+        # we don't do it on the labels
+        x = x[:, self.n_labels :, :]
         z = self.fc(x)
         pred_value = self.pred(z).squeeze(-1)  # (batch, seq_len)
         var_value = self.variance(z).squeeze(-1)  # (batch, seq_len)
@@ -96,9 +98,6 @@ class ClsDecoder(nn.Module):
         return self.out_layer(x)
 
 
-class MVCDecoderTransformer(nn.Module):
-    
-
 class MVCDecoder(nn.Module):
     """
     Decoder for the masked value prediction for cell embeddings.
@@ -111,7 +110,7 @@ class MVCDecoder(nn.Module):
         query_activation: nn.Module = nn.Sigmoid,
         hidden_activation: nn.Module = nn.PReLU,
         explicit_zero_prob: bool = False,
-        n_batches: int = 1,
+        n_labels: int = 1,
     ) -> None:
         """
         Args:
@@ -123,9 +122,9 @@ class MVCDecoder(nn.Module):
             hidden_activation (:obj:`nn.Module`): activation function for the hidden
                 layers.
         """
-        super().__init__()            
+        super().__init__()
         if arch_style == "cell product":
-            self.cell2query = nn.Linear(d_model*n_batches, d_model)
+            self.cell2query = nn.Linear(d_model * n_labels, d_model)
             self.query_activation = query_activation()
             self.W = nn.Linear(d_model, d_model, bias=False)
         if arch_style in ["gene product", "gene product, detach"]:

@@ -148,14 +148,15 @@ class ContinuousValueEncoder(nn.Module):
 
     def __init__(self, d_model: int, dropout: float = 0.1, max_value: int = 512):
         super().__init__()
-        self.dropout = nn.Dropout(p=dropout)
+        self.max_value = max_value
+        self.mask = nn.embedding(2, d_model)
         self.linear1 = nn.Linear(1, d_model)
         self.activation = nn.ReLU()
         # self.linear2 = nn.Linear(d_model, d_model)
         self.norm = nn.LayerNorm(d_model)
-        self.max_value = max_value
+        self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, mask: Tensor = None) -> Tensor:
         """
         Args:
             x: Tensor, shape [batch_size, seq_len]
@@ -163,12 +164,17 @@ class ContinuousValueEncoder(nn.Module):
         # TODO: test using actual embedding layer if input is categorical
         # expand last dimension
         x = x.unsqueeze(-1)
-        # clip x to [-inf, max_value]
-        x = torch.clamp(x, min=0, max=1)
+
+        # use the mask embedding when x=-1
+        # mask = (x == -1).float()
+        x = torch.clamp(x, min=0, max=self.max_value)
         x = self.activation(self.linear1(x))
         # x = self.linear2(x)
         x = self.norm(x)
-        return self.dropout(x)
+        x = self.dropout(x)
+        if mask is not None:
+            x = (1 - mask) * x + mask * self.mask(mask)
+        return x
 
 
 class CategoryValueEncoder(nn.Module):
