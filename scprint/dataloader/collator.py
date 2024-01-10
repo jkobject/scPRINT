@@ -7,11 +7,15 @@ class Collator:
         self.embeddings = embeddings
 
     def __call__(self, batch):
-        # get the embeddings
-        # copy
         # do count selection
         # do encoding of counts
+
+        # find the associated gene ids (given the species)
+        # get the NN cells
+
+        # do encoding / selection a la scGPT
+        
         # do encoding of graph location
-        # find a way to encode all the nodes in some sparse way
+        # encode all the edges in some sparse way
         
     

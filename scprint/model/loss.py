@@ -57,22 +57,32 @@ def multi_masked_nb_loss(
 
 
 def masked_zinb_loss(
-    input: torch.Tensor, target: torch.Tensor, mask: torch.Tensor
+    pi: torch.Tensor,
+    probs: torch.Tensor,
+    total_count: torch.Tensor,
+    mask: torch.Tensor,
+    target: torch.Tensor,
+    use_logits: bool = True,
+    scale=1e3,
 ) -> torch.Tensor:
     """
     Compute the masked zero-inflated negative binomial loss between input and target.
     """
     mask = mask.float()
-    pi = torch.sigmoid(input[:, 0])
-    mu = input[:, 1]
-    theta = torch.softplus(input[:, 2])
-
-    nb = torch.distributions.NegativeBinomial(total_count=theta, probs=mu)
+    pi = torch.sigmoid(pi) * mask
+    if use_logits:
+        nb = torch.distributions.NegativeBinomial(
+            total_count=torch.ReLu(total_count), logits=probs
+        )
+    else:
+        nb = torch.distributions.NegativeBinomial(
+            total_count=torch.ReLu(total_count), probs=probs
+        )
     nb_loss = -nb.log_prob(target) * mask
 
     zero_inflated_loss = -torch.log(pi + (1 - pi) * torch.exp(nb_loss))
 
-    return zero_inflated_loss.sum() / mask.sum()
+    return (zero_inflated_loss.sum() * scale) / (mask.sum() + scale)
 
 
 def classifier_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:

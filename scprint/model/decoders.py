@@ -54,11 +54,11 @@ class ExprDecoder(nn.Module):
         pred_value = self.pred(z).squeeze(-1)  # (batch, seq_len)
         var_value = self.variance(z).squeeze(-1)  # (batch, seq_len)
         if not self.explicit_zero_prob:
-            return dict(pred=pred_value, var=var_value)
+            return dict(counts=pred_value, probs=var_value)
         zero_logits = self.zero_logit(z).squeeze(-1)  # (batch, seq_len)
         # The sigmoid function is used to map the zero_logits to a probability between 0 and 1.
         zero_probs = torch.sigmoid(zero_logits)
-        return dict(pred=pred_value, var=var_value, zero_probs=zero_probs)
+        return dict(counts=pred_value, probs=var_value, zero_probs=zero_probs)
         # TODO: note that the return currently is only for training. Since decoder
         # is not used in the test setting for the integration task, the eval/inference
         # logic is not implemented yet. However, remember to implement it when

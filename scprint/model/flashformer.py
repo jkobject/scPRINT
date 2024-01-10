@@ -3,6 +3,13 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 from typing import Optional
 from functools import partial
+import sys
+import os
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+########
+from flashattention import flash_attn_qkvpacked_func
 
 
 class FlashSelfAttention(nn.Module):
@@ -23,15 +30,20 @@ class FlashSelfAttention(nn.Module):
         use_tritton=True,
     ):
         super().__init__()
-        if use_tritton:
-            from .flashattention import flash_attn_qkvpacked_func
-        else:
-            from flash_attn import flash_attn_qkvpacked_func
+        # if use_tritton:
+        ##TEMP##
+
+        # else:
+        #    from flash_attn import flash_attn_qkvpacked_func
+
+        # self.flash_attn_qkvpacked_func = flash_attn_qkvpacked_func
 
         self.causal = causal
         self.softmax_scale = softmax_scale
 
-    def forward(self, qkv, bias=None, causal=None, cu_seqlens=None):
+    def forward(
+        self, qkv, bias=None, causal=None, cu_seqlens=None, max_seqlen=None, mask=None
+    ):
         """Implements the multihead softmax attention.
         Arguments
         ---------
@@ -53,7 +65,7 @@ class FlashSelfAttention(nn.Module):
         causal = self.causal if causal is None else causal
         return flash_attn_qkvpacked_func(
             qkv,
-            softmax_scale=self.softmax_scale,
-            bias=bias,
-            causal=causal,
+            # softmax_scale=self.softmax_scale,
+            # bias=bias,
+            # causal=causal,
         )

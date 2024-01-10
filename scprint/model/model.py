@@ -4,8 +4,10 @@ from typing import Optional, Dict, Union, Mapping
 from torch import Tensor, optim, nn
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+
 import lightning as L
-import torch.distributed as dist
+
+# import torch.distributed as dist
 import torch
 
 import pandas as pd
@@ -13,17 +15,18 @@ import math
 from functools import partial
 import numpy as np
 
-from flash_attn.modules.mha import MHA, ParallelMHA
-from flash_attn.modules.mlp import Mlp
-from flash_attn.modules.block import Block, ParallelBlock
+# from flash_attn.modules.mha import MHA, ParallelMHA
+# from flash_attn.modules.mlp import Mlp
+# from flash_attn.modules.block import Block, ParallelBlock
 
-from . import encoders
-from . import decoders
-from .linear_transformer import FastTransformerEncoderWrapper
-from .hashformer import Hashformer
-from .EGT import EGT
-from .dsbn import DomainSpecificBatchNorm1d
-from .grad_reverse import grad_reverse
+# from . import encoders
+# from . import decoders
+# from .linear_transformer import FastTransformerEncoderWrapper
+# from .hashformer import Hashformer
+# from .EGT import EGT
+# from .dsbn import DomainSpecificBatchNorm1d
+# from .grad_reverse import grad_reverse
+# from . import loss
 
 
 class TransformerModel(L.LightningModule):
@@ -36,6 +39,7 @@ class TransformerModel(L.LightningModule):
         nlayers: int = 6,
         layers_cls: list[int] = [],
         labels: Optional[Dict[str, int]] = {},
+        cls_hierarchy: Optional[Dict[int, list[int]]] = {},
         dropout: float = 0.5,
         transformer_backend: str = "fast",
         use_precomputed_gene_embbeddings: bool = False,
@@ -49,12 +53,11 @@ class TransformerModel(L.LightningModule):
         mvc_decoder_style: str = "inner product",
         cell_emb_style: str = "cls",
         ecs_threshold: float = 0.3,
-        pre_norm: bool = False,
         similarity: Optional[float] = 0.5,
     ):
         """
         __init__ method for TransformerModel.
-
+        # TODO: add docstrings
         Args:
             d_model (int, optional): The dimension of the model. Defaults to 512.
             nhead (int, optional): The number of heads in the multiheadattention models. Defaults to 8.
@@ -80,7 +83,6 @@ class TransformerModel(L.LightningModule):
         self.d_model = d_model
         self.do_adv = do_adv
         self.expr_emb_style = expr_emb_style
-        self.norm_scheme = "pre" if pre_norm else "post"
         self.transformer_backend = transformer_backend
         self.use_precomputed_gene_embbeddings = use_precomputed_gene_embbeddings
         self.do_gene_pos_enc = do_gene_pos_enc
@@ -95,6 +97,7 @@ class TransformerModel(L.LightningModule):
         self.n_labels = len(self.labels) + len(self.adv_labels)
         self.cell_emb_style = cell_emb_style
         self.simi_temp = similarity
+        self.cls_hierarchy = cls_hierarchy
 
         if self.expr_emb_style not in ["category", "continuous", "none"]:
             raise ValueError(
@@ -137,9 +140,12 @@ class TransformerModel(L.LightningModule):
             self.pos_encoder = encoders.PositionalEncoding(
                 d_model, max_len=max(gene_pos)
             )
+            # TODO: finish pos encoding
+
+        # TODO: add sequencing depth encoding (and decoding with weight tying?)
+        # work on log-depth
 
         # Batch Encoder
-        num_labels = len(self.labels)
         self.label_encoder = encoders.BatchLabelEncoder(len(self.labels), d_model)
         # Mask Encoder
         self.mask_encoder = encoders.CategoryValueEncoder(1, d_model)
@@ -177,8 +183,6 @@ class TransformerModel(L.LightningModule):
                 use_flash_attn=True,
                 sequence_parallel=True,
                 # device?
-                batch_first=True,
-                norm_scheme=self.norm_scheme,
             )
             # or use parallelBlock where attn & MLP are done in parallel
             encoder_layers = Block(
@@ -198,6 +202,14 @@ class TransformerModel(L.LightningModule):
                 nhead,
             )
         # flash EGT
+        # TODO: We found that the results can be further improved by freezing the
+        # node channel layers and training the edge channel layers for a
+        # few additional epochs.
+        # However, its effect on transfer learning has not yet been studied.
+        # That is why we include checkpoints for both tuned and untuned models.
+        # https://github.com/shamim-hussain/egt/blob/master/README.md
+        # https://github.com/shamim-hussain/egt_pytorch
+
         elif transformer_backend == "scprint":
             self.transformer_encoder = EGT(
                 num_layers=nlayers,
@@ -274,20 +286,8 @@ class TransformerModel(L.LightningModule):
         Returns:
             dict of output Tensors.
         """
-        transformer_output = self._encoder(genes, expression, labels)
-
-        output = self.decoder(
-            transformer_output
-            if not self.labels
-            else torch.cat(
-                [
-                    transformer_output,
-                    batch_emb.unsqueeze(1).repeat(1, transformer_output.shape[1], 1),
-                ],
-                dim=2,
-            ),
-            # else transformer_output + batch_emb.unsqueeze(1),
-        )
+        transformer_output = self._encoder(genes, expression)
+        output = self.decoder(transformer_output)
         # if self.explicit_zero_prob and do_sample:
         # bernoulli = Bernoulli(probs=mlm_output["zero_probs"])
         # output["mlm_output"] = bernoulli.sample() * mlm_output["pred"]
@@ -296,8 +296,8 @@ class TransformerModel(L.LightningModule):
         # if self.explicit_zero_prob:
         #    output["mlm_zero_probs"] = mlm_output["zero_probs"]
 
-        output["cell_embs"] = self._get_cell_emb(transformer_output)
-
+        cell_embs = self._get_cell_embs(transformer_output)
+        cell_emb = torch.mean(output["cell_embs"], dim=1)
         if len(self.labels) > 0:
             output.update(
                 {
@@ -311,7 +311,6 @@ class TransformerModel(L.LightningModule):
             # like presented in https://arxiv.org/pdf/2104.08821.pdf
             # TODO: do we really have different dropouts at each pass?
             # TODO: make sure that dropout is set to 0 after training (for inference)
-
             cell_emb2 = self.get_cell_emb(genes, expression)
 
             # Gather embeddings from all devices if distributed training
@@ -334,13 +333,11 @@ class TransformerModel(L.LightningModule):
                 cell_emb = torch.cat(cls1_list, dim=0)
                 cell_emb2 = torch.cat(cls2_list, dim=0)
             # TODO: should detach the second run cls2? Can have a try
-            # TODO: to test, we have a label which I don't get and now cell_emb is larger
+            # TODO: to test, we have a label which I don't get.
             # cell_emb (minibatch, nlabels, embsize)
-            cos_sim = self.sim(
+            output["cce_sim"] = self.sim(
                 cell_emb.unsqueeze(1), cell_emb2.unsqueeze(0)
             )  # (nlabels, minibatch, minibatch)
-            labels = torch.arange(cos_sim.size(0)).long().to(cell_emb.device)
-            output["loss_cce"] = nn.CrossEntropyLoss()(cos_sim, labels)
         if self.do_mvc:
             mvc_output = self.mvc_decoder(
                 cell_emb,
@@ -350,8 +347,8 @@ class TransformerModel(L.LightningModule):
             #    bernoulli = Bernoulli(probs=mvc_output["zero_probs"])
             #    output["mvc_output"] = bernoulli.sample() * mvc_output["pred"]
             # else:
-            output["mvc_mean"] = mvc_output["pred"]  # (minibatch, seq_len)
-            output["mvc_var"] = mvc_output["var"]
+            output["mvc_counts"] = mvc_output["counts"]  # (minibatch, seq_len)
+            output["mvc_probs"] = mvc_output["probs"]
             # if self.explicit_zero_prob:
             output["mvc_zero_probs"] = mvc_output["zero_probs"]
         if do_ecs:
@@ -359,16 +356,7 @@ class TransformerModel(L.LightningModule):
             # to avoid the pytorch issue of similarity larger than 1.0, pytorch # 78064
             # normalize the embedding
             cell_emb_normed = F.normalize(cell_emb, p=2, dim=2)
-            cos_sim = torch.mm(
-                cell_emb_normed, cell_emb_normed.t()
-            )  # TODO: would want it to be (nlabels, minibatch, minibatch)
-
-            # mask out diagnal elements
-            mask = torch.eye(cos_sim.size(0)).bool().to(cos_sim.device)
-            cos_sim = cos_sim.masked_fill(mask, 0.0)
-            # only optimize positive similarities
-            cos_sim = F.relu(cos_sim)
-            output["loss_ecs"] = torch.mean(1 - (cos_sim - self.ecs_threshold) ** 2)
+            output["ecs_sim"] = torch.mm(cell_emb_normed, cell_emb_normed.t())
 
         # if self.do_adv:
         # TODO: implem adv training on the cell embeddings
@@ -386,17 +374,133 @@ class TransformerModel(L.LightningModule):
         optimizer = optim.Adam(self.parameters(), **kwargs)
         return optimizer
 
-    def training_step(self, batch, batch_idx):
-        # training_step defines the train loop.
-        # it is independent of forward
+    def training_step(
+        self, batch, batch_idx, superbatch=None, superbatch_idx=None, **kwargs
+    ):
+        """
+        training_step defines the train loop. It is independent of forward
+
+        Args:
+            batch (list[Tensor]): shape [(minibatch, seq_len)*2, (minibatch, n_labels)]
+                the n_labels should be in the same orders as the labels provided in the model
+                the first Tensor is gene ids, the second is expression of those genes
+            batch_idx (Tensor): shape (minibatch)
+            superbatch (list[Tensor], optional): shape [(neighbors, seq_len)*minibatch | None]
+                gives out additional expression (on the same genes) for the k
+                nearest neighbors of the cell at the same minibatch index in "batch"). Defaults to None.
+            superbatch_idx (Tensor, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         genes = batch[0]
         expression = batch[1]
-        clss = batch[1:]
-        x = x.view(x.size(0), -1)
-        z = self._encoder(x)
-        
-        x_hat = self.decoder(z)
-        loss = nn.functional.mse_loss(x_hat, x)
+        clss = batch[2:]
+        output = self.forward(genes, expression, **kwargs)
+        # TASK 1. reconstruct masked expression
+        loss_expr = loss.masked_zinb_loss(
+            probs=output["probs"],
+            pi=output["zero_probs"],
+            total_count=output["counts"],
+            target=expression,
+            mask=expression == -1,
+        )
+        # TODO: if target_expression doesn't know a specific gene's expression. add it to mask.
+        # THIS is for cases where we have known unknowns. and for things like targeted L1000 seq
+        # kinda like padding
+
+        # TASK 2. predict labels
+        loss_cls = 0
+        loss_adv_cls = 0
+        if len(self.labels) > 0:
+            for labelname, cl in zip(self.labels, clss):
+                if len(self.cls_hierarchy) > 0:
+                    if len(self.cls_hierarchy[labelname]) > 0:
+                        if cl in self.cls_hierarchy[labelname].keys():
+                            # we have to compute the loss by comparing the known
+                            # class to the children probabilities
+                            children = self.cls_hierarchy[labelname][cl]
+                            # make a tensor of the children probabilities
+                            cl = torch.zeros_like(output["cls_output_" + labelname])
+                            for child in children:
+                                cl[:, child] = 1
+                loss_cls += nn.functional.cross_entropy(
+                    output["cls_output_" + labelname], cl
+                )
+                # TASK 2bis. adversarial label prediction
+                if self.do_adv:
+                    for i, (adv_label, acl) in enumerate(zip(self.labels, clss)):
+                        if adv_label != labelname:
+                            if len(self.cls_hierarchy) > 0:
+                                if len(self.cls_hierarchy[adv_label]) > 0:
+                                    if cl in self.cls_hierarchy[adv_label].keys():
+                                        # we have to compute the loss by comparing the known
+                                        # class to the children probabilities
+                                        children = self.cls_hierarchy[adv_label][cl]
+                                        # make a tensor of the children probabilities
+                                        cl = torch.zeros_like(
+                                            output["cls_output_" + adv_label]
+                                        )
+                                        for child in children:
+                                            cl[:, child] = 1
+                            self.output["cell_embs"][i]
+                            loss_adv_cls += nn.functional.cross_entropy(
+                                output["cls_output_" + labelname], acl
+                            )
+        # TASK 2ter. cell KO effect prediction
+        # (just use a novel class, cell state and predict if cell death or not from it)
+        # TODO: add large timepoint and set the KO gene to a KO embedding instead of expression embedding
+
+        # TASK 3. contrastive cell embedding
+        if self.do_cce:
+            labels = (
+                torch.arange(output["cce_sim"].size(0))
+                .long()
+                .to(output["cell_emb"].device)
+            )
+            loss_cce = nn.CrossEntropyLoss()(output["cce_sim"], labels)
+        # TASK 4. elastic cell similarity
+        if self.do_ecs:
+            # mask out diagnal elements
+            mask = (
+                torch.eye(output["ecs_sim"].size(0)).bool().to(output["ecs_sim"].device)
+            )
+            cos_sim = output["cos_sim"].masked_fill(mask, 0.0)
+            # only optimize positive similarities
+            cos_sim = F.relu(cos_sim)
+            loss_ecs = torch.mean(1 - (cos_sim - self.ecs_threshold) ** 2)
+        # TODO: try to require the gene id to still be predictable (with weight tying)
+        # TASK 5. expression generation
+        transformer_output = self.generate(output["cell_embs"], genes)
+        out = self.decoder(transformer_output)
+        loss_expr_gene = loss.masked_zinb_loss(
+            probs=out["probs"],
+            pi=out["zero_probs"],
+            total_count=out["counts"],
+            target=expression,
+            mask=torch.ones_like(expression).bool(),
+        )
+        if self.do_mvc:
+            # TODO: some hidden hyperparams behind this function and maybe other functions
+            loss_expr_mvc = loss.masked_zinb_loss(
+                probs=output["mvc_probs"],
+                pi=output["mvc_zero_probs"],
+                total_count=output["mvc_counts"],
+                target=expression,
+                mask=torch.ones_like(expression).bool(),
+            )
+        # TASK 6. denoising
+
+        # TASK 7. next time point prediction
+
+        # TASK 8. var / dropout expression reconstruction
+        # loss
+
+        # TASK 9. KO profile prediction
+
+        # TASK 10. PDgrapher-drug-like perturbation prediction
+
+        # TODO: add read depth
         # Logging to TensorBoard (if installed) by default
         self.log("train_loss", loss)
         return loss
@@ -477,9 +581,10 @@ class TransformerModel(L.LightningModule):
             genes,
             expression,
         )
-        return self._get_cell_emb_from_layer(layer_output)
+        embs = self._get_cell_embs(layer_output)
+        return torch.mean(embs, dim=1)
 
-    def _get_cell_emb(self, layer_output) -> Tensor:
+    def _get_cell_embs(self, layer_output) -> Tensor:
         if self.cell_emb_style == "cls" and self.labels is not None:
             cell_emb = layer_output[:, : len(self.labels)]  # (minibatch, embsize)
         elif self.cell_emb_style == "avg-pool":
@@ -499,7 +604,7 @@ class TransformerModel(L.LightningModule):
         Returns:
             Tensor: _description_
         """
-        # TODO:
+        # TODO: finish this function
         cell_emb = self.get_cell_emb(genes, expression)
         cell_emb[:, self.labels.index]
 
@@ -524,7 +629,7 @@ class TransformerModel(L.LightningModule):
             output = self._encoder(
                 cell_embs=cell_embs, genes=genes
             )  # (minibatch, seq_len, embsize)
-            cell_embs = self._get_cell_emb_from_layer(output)
+            cell_embs = self._get_cell_embs(output)
         return output  # (minibatch, seq_len)
 
     def encode(

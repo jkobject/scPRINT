@@ -198,7 +198,7 @@ def _fwd_kernel(
                     other=0.0,
                 )
         qk = tl.zeros([BLOCK_M, BLOCK_N], dtype=tl.float32)
-        qk += tl.dot(q, k, trans_b=True)
+        qk += tl.dot(q, tl.trans(k))
         # Trying to combine the two masks seem to make the result wrong
         if not EVEN_N:  # Need to mask out otherwise the softmax is wrong
             qk += tl.where((start_n + offs_n)[None, :] < seqlen_k, 0, float("-inf"))
@@ -523,7 +523,7 @@ def _bwd_kernel_one_col_block(
                     other=0.0,
                 )
         # recompute p = softmax(qk, dim=-1).T
-        qk = tl.dot(q, k, trans_b=True)
+        qk = tl.dot(q, tl.trans(k))
         # Trying to combine the two masks seem to make the result wrong
         if not EVEN_N:  # Need to mask out otherwise the softmax is wrong
             qk = tl.where(offs_n[None, :] < seqlen_k, qk, float("-inf"))
@@ -584,14 +584,14 @@ def _bwd_kernel_one_col_block(
         #     else:
         #         do = tl.load(do_ptrs, mask=(offs_m_curr[:, None] < seqlen_q)
         #                                    & (offs_d[None, :] < headdim), other=0.0)
-        dv += tl.dot(p.to(do.dtype), do, trans_a=True)
+        dv += tl.dot(tl.trans(p.to(do.dtype)), do)
         # compute dp = dot(v, do)
         # There seems to be a race condition when headdim=48/96, and dq, dk are wrong.
         # Also wrong for headdim=128, seqlen=(108, 256), and ATOMIC_ADD=True
         # Also wrong for headdim=64, seqlen=(1023, 1024), and ATOMIC_ADD=False
         if not (EVEN_M & EVEN_HEADDIM):
             tl.debug_barrier()
-        dp = tl.dot(do, v, trans_b=True)
+        dp = tl.dot(do, tl.trans(v))
         # There's a race condition for headdim=48
         if not EVEN_HEADDIM:
             tl.debug_barrier()
@@ -602,7 +602,7 @@ def _bwd_kernel_one_col_block(
         # for BLOCK_HEADDIM=128
         ds = (p * (dp - Di[:, None]) * softmax_scale).to(q.dtype)
         # compute dk = dot(ds.T, q)
-        dk += tl.dot(ds, q, trans_a=True)
+        dk += tl.dot(tl.trans(ds), q)
         # compute dq
         if not (
             EVEN_M & EVEN_HEADDIM
@@ -1100,7 +1100,7 @@ class FlashAttnQKVPackedFunc(torch.autograd.Function):
         )
         ctx.save_for_backward(qkv, o, lse, bias)
         ctx.causal = causal
-        return o
+        return o, lse
 
     @staticmethod
     def backward(ctx, do):
