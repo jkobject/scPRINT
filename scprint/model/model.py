@@ -15,21 +15,18 @@ import math
 from functools import partial
 import numpy as np
 
-# from flash_attn.modules.mha import MHA, ParallelMHA
-# from flash_attn.modules.mlp import Mlp
-# from flash_attn.modules.block import Block, ParallelBlock
+from .flash_attn import MHA, Block
 
-# from . import encoders
-# from . import decoders
-# from .linear_transformer import FastTransformerEncoderWrapper
-# from .hashformer import Hashformer
-# from .EGT import EGT
-# from .dsbn import DomainSpecificBatchNorm1d
-# from .grad_reverse import grad_reverse
-# from . import loss
+from . import encoders
+from . import decoders
+from .linear_transformer import FastTransformerEncoderWrapper
+from .hashformer import Hashformer
+from .EGT import EGT
+from .dsbn import DomainSpecificBatchNorm1d
+from . import loss
 
 
-class TransformerModel(L.LightningModule):
+class scPrint(L.LightningModule):
     def __init__(
         self,
         gene_df: pd.DataFrame,
@@ -263,6 +260,7 @@ class TransformerModel(L.LightningModule):
                 # mup_width_scale=getattr(config, "mup_width_scale", 1.0),
             )
         )
+        self.save_hyperparameters()
 
     def forward(
         self,
@@ -298,6 +296,7 @@ class TransformerModel(L.LightningModule):
 
         cell_embs = self._get_cell_embs(transformer_output)
         cell_emb = torch.mean(output["cell_embs"], dim=1)
+        output["cell_emb"] = cell_emb
         if len(self.labels) > 0:
             output.update(
                 {
@@ -369,34 +368,10 @@ class TransformerModel(L.LightningModule):
 
         return output
 
-    def configure_optimizers(self, **kwargs):
-        # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam
-        optimizer = optim.Adam(self.parameters(), **kwargs)
-        return optimizer
-
-    def training_step(
-        self, batch, batch_idx, superbatch=None, superbatch_idx=None, **kwargs
+    def _compute_loss(
+        self, output, expression, genes, clss, do_denoise=False, do_next_tp=False
     ):
-        """
-        training_step defines the train loop. It is independent of forward
-
-        Args:
-            batch (list[Tensor]): shape [(minibatch, seq_len)*2, (minibatch, n_labels)]
-                the n_labels should be in the same orders as the labels provided in the model
-                the first Tensor is gene ids, the second is expression of those genes
-            batch_idx (Tensor): shape (minibatch)
-            superbatch (list[Tensor], optional): shape [(neighbors, seq_len)*minibatch | None]
-                gives out additional expression (on the same genes) for the k
-                nearest neighbors of the cell at the same minibatch index in "batch"). Defaults to None.
-            superbatch_idx (Tensor, optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
-        """
-        genes = batch[0]
-        expression = batch[1]
-        clss = batch[2:]
-        output = self.forward(genes, expression, **kwargs)
+        # TODO: do masking here.
         # TASK 1. reconstruct masked expression
         loss_expr = loss.masked_zinb_loss(
             probs=output["probs"],
@@ -405,14 +380,16 @@ class TransformerModel(L.LightningModule):
             target=expression,
             mask=expression == -1,
         )
+        total_loss = loss_expr
+        losses = {"loss_expr": loss_expr}
         # TODO: if target_expression doesn't know a specific gene's expression. add it to mask.
         # THIS is for cases where we have known unknowns. and for things like targeted L1000 seq
         # kinda like padding
 
         # TASK 2. predict labels
-        loss_cls = 0
-        loss_adv_cls = 0
         if len(self.labels) > 0:
+            loss_cls = 0
+            loss_adv_cls = 0
             for labelname, cl in zip(self.labels, clss):
                 if len(self.cls_hierarchy) > 0:
                     if len(self.cls_hierarchy[labelname]) > 0:
@@ -447,6 +424,8 @@ class TransformerModel(L.LightningModule):
                             loss_adv_cls += nn.functional.cross_entropy(
                                 output["cls_output_" + labelname], acl
                             )
+            total_loss += loss_adv_cls + loss_cls
+            losses.update({"loss_cls": loss_cls, "loss_adv_cls": loss_adv_cls})
         # TASK 2ter. cell KO effect prediction
         # (just use a novel class, cell state and predict if cell death or not from it)
         # TODO: add large timepoint and set the KO gene to a KO embedding instead of expression embedding
@@ -459,6 +438,16 @@ class TransformerModel(L.LightningModule):
                 .to(output["cell_emb"].device)
             )
             loss_cce = nn.CrossEntropyLoss()(output["cce_sim"], labels)
+            total_loss += loss_cce
+            losses.update({"loss_cce": loss_cce})
+
+        # TASK 3b. contrastive graph embedding
+        if self.do_cce:
+            # TODO: given multiple run with different amount of genes seen
+            # and different amount of masking. We would want the edge and cell embedding to stay the same
+            # create 3 different new masks
+            pass
+
         # TASK 4. elastic cell similarity
         if self.do_ecs:
             # mask out diagnal elements
@@ -469,6 +458,8 @@ class TransformerModel(L.LightningModule):
             # only optimize positive similarities
             cos_sim = F.relu(cos_sim)
             loss_ecs = torch.mean(1 - (cos_sim - self.ecs_threshold) ** 2)
+            total_loss += loss_ecs
+            losses.update({"loss_ecs": loss_ecs})
         # TODO: try to require the gene id to still be predictable (with weight tying)
         # TASK 5. expression generation
         transformer_output = self.generate(output["cell_embs"], genes)
@@ -480,6 +471,9 @@ class TransformerModel(L.LightningModule):
             target=expression,
             mask=torch.ones_like(expression).bool(),
         )
+        total_loss += loss_expr_gene
+        losses.update({"loss_expr_gene": loss_expr_gene})
+
         if self.do_mvc:
             # TODO: some hidden hyperparams behind this function and maybe other functions
             loss_expr_mvc = loss.masked_zinb_loss(
@@ -489,30 +483,127 @@ class TransformerModel(L.LightningModule):
                 target=expression,
                 mask=torch.ones_like(expression).bool(),
             )
+            total_loss += loss_expr_mvc
+            losses.update({"loss_expr_mvc": loss_expr_mvc})
         # TASK 6. denoising
+        if do_denoise:
+            pass
+
+        if self.do_cce:
+            pass
+            # make sure that the cell embedding stay the same even if the expression is decreased
 
         # TASK 7. next time point prediction
+        if do_next_tp:
+            pass
+        # TASK 8. KO profile prediction
+        # if we have that information
 
-        # TASK 8. var / dropout expression reconstruction
-        # loss
-
-        # TASK 9. KO profile prediction
-
-        # TASK 10. PDgrapher-drug-like perturbation prediction
+        # TASK 9. PDgrapher-drug-like perturbation prediction
 
         # TODO: add read depth
-        # Logging to TensorBoard (if installed) by default
-        self.log("train_loss", loss)
-        return loss
+        return losses, total_loss
+
+    def configure_optimizers(self, **kwargs):
+        # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam
+        optimizer = optim.Adam(self.parameters(), **kwargs)
+        return optimizer
+
+    def training_step(
+        self,
+        batch,
+        batch_idx,
+        superbatch=None,
+        superbatch_idx=None,
+        do_denoise=False,
+        do_next_tp=False,
+        **kwargs,
+    ):
+        """
+        training_step defines the train loop. It is independent of forward
+
+        Args:
+            batch (list[Tensor]): shape [Tensor(minibatch, seq_len)*2, Tensor(minibatch, n_labels)]
+                the n_labels should be in the same orders as the labels provided in the model
+                the first Tensor is gene ids, the second is expression of those genes
+            batch_idx (Tensor): shape (minibatch)
+            superbatch (list[Tensor], optional): shape [(neighbors, seq_len)*minibatch | None]
+                gives out additional expression (on the same genes) for the k
+                nearest neighbors of the cell at the same minibatch index in "batch"). Defaults to None.
+            superbatch_idx (Tensor, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+        genes = batch[0]
+        expression = batch[1]
+        clss = batch[2:]
+        output = self.forward(genes, expression, **kwargs)
+        losses, total_loss = self._compute_loss(
+            output, expression, genes, clss, do_denoise, do_next_tp
+        )
+        self.log("train_loss: ", total_loss)
+        self.log_dict(losses)
+
+        return total_loss
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch
-        x = x.view(x.size(0), -1)
-        z = self.gene_encoder(x)
-        x_hat = self.decoder(z)
-        loss = nn.functional.mse_loss(x_hat, x)
-        # Logging to TensorBoard by default
-        self.log("val_loss", loss)
+        """
+        validation_step defines the validation loop. It is independent of forward
+
+        Args:
+            batch (list[Tensor]): shape [Tensor(minibatch, seq_len)*2, Tensor(minibatch, n_labels)]
+                the n_labels should be in the same orders as the labels provided in the model
+                the first Tensor is gene ids, the second is expression of those genes
+            batch_idx (Tensor): shape (minibatch)
+            superbatch (list[Tensor], optional): shape [(neighbors, seq_len)*minibatch | None]
+                gives out additional expression (on the same genes) for the k
+                nearest neighbors of the cell at the same minibatch index in "batch"). Defaults to None.
+            superbatch_idx (Tensor, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+        genes = batch[0]
+        expression = batch[1]
+        # TODO: do masking here.
+        clss = batch[2:]
+        output = self.forward(genes, expression, **kwargs)
+        losses, total_loss = self._compute_loss(output, expression, genes, clss)
+        # Logging to TensorBoard (if installed) by default
+        self.log("val_loss: ", total_loss)
+        # self.validation_step_outputs.append(output[''])
+        self.log_dict(losses)  # Logging to TensorBoard by default
+        return total_loss
+
+    # TODO: compute classification accuracy metrics
+    # def on_validation_epoch_end(self):
+    #     for labelname, cl in zip(self.labels, clss):
+    #         if len(self.cls_hierarchy) > 0:
+    #             if len(self.cls_hierarchy[labelname]) > 0:
+    #                 if cl in self.cls_hierarchy[labelname].keys():
+    #                     # we have to compute the loss by comparing the known
+    #                     # class to the children probabilities
+    #                     children = self.cls_hierarchy[labelname][cl]
+    #                     # make a tensor of the children probabilities
+    #                     cl = torch.zeros_like(output["cls_output_" + labelname])
+    #                     for child in children:
+    #                         cl[:, child] = 1
+    #         loss_cls += nn.functional.cross_entropy(
+    #             output["cls_output_" + labelname], cl
+    #         )
+    #     self.validation_step_outputs.clear()
+
+    def test_step(self, batch, batch_idx):
+        genes = batch[0]
+        expression = batch[1]
+        # TODO: do masking here.
+        clss = batch[2:]
+        output = self.forward(genes, expression, **kwargs)
+        losses, total_loss = self._compute_loss(output, expression, genes, clss)
+        self.log("test_loss: ", total_loss)
+        self.log_dict(losses)
+        return total_loss
 
     def _encoder(
         self,

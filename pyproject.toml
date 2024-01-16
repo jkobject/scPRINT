@@ -45,6 +45,10 @@ torchtext = "*"
 transformers = "*"
 pynndescent = ">=0.5.11"
 scDataLoader = "*"
+pytorch-fast-transformers = "*"
+#packaging = "*"
+#ninja = "*"
+# flash-attn
 # packaging, ninja
 # pip install flash-attn --no-build-isolation
 
