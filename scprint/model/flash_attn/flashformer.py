@@ -42,7 +42,14 @@ class FlashSelfAttention(nn.Module):
         self.softmax_scale = softmax_scale
 
     def forward(
-        self, qkv, bias=None, causal=None, cu_seqlens=None, max_seqlen=None, mask=None
+        self,
+        qkv,
+        bias=None,
+        gates=None,
+        causal=False,
+        cu_seqlens=None,
+        max_seqlen=None,
+        mask=None,
     ):
         """Implements the multihead softmax attention.
         Arguments
@@ -65,7 +72,8 @@ class FlashSelfAttention(nn.Module):
         causal = self.causal if causal is None else causal
         return flash_attn_qkvpacked_func(
             qkv,
-            # softmax_scale=self.softmax_scale,
-            # bias=bias,
-            # causal=causal,
+            bias,
+            gates,
+            causal,
+            self.softmax_scale,
         )
