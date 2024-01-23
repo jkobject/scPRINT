@@ -33,6 +33,11 @@ $ python -m scprint
 $ scprint
 ```
 
+I had to install a specific version of pytorch, triton, torchaudio, torchtext.. for my cuda version.
+My cuda compiler nvcc compiles cuda 11.7. my cuda-smi (api) is currently 12.1.
+
+Please install all of it for your cuda version and it should still work
+
 ## Development
 
 Read the [CONTRIBUTING.md](CONTRIBUTING.md) file.
