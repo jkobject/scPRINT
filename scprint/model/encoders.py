@@ -2,6 +2,7 @@ from torch import nn, Tensor
 import torch
 from typing import Optional
 import math
+import numpy as np
 
 
 class GeneEncoder(nn.Module):
@@ -18,19 +19,28 @@ class GeneEncoder(nn.Module):
         embedding_dim: int,
         padding_idx: Optional[int] = None,
         weights: Optional[Tensor] = None,
+        dropout: float = 0.1,
         freeze: bool = False,
     ):
-        super().__init__()
+        super(GeneEncoder, self).__init__()
         self.embedding = nn.Embedding(
-            num_embeddings, embedding_dim, padding_idx=padding_idx, freeze=freeze
+            num_embeddings, embedding_dim, padding_idx=padding_idx, _freeze=freeze
         )
+
         if weights is not None:
-            self.embedding.weight.data.copy_(weights)
+            # concat a zero vector to the weight
+            # this is to make the embedding of the padding token to be zero
+            # weights = torch.cat(
+            #    [torch.Tensor(weights), torch.zeros(1, embedding_dim)], dim=0
+            # )
+            self.embedding.weight.data.copy_(torch.Tensor(weights))
         self.enc_norm = nn.LayerNorm(embedding_dim)
+        self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.embedding(x)  # (batch, seq_len, embsize)
         x = self.enc_norm(x)
+        x = self.dropout(x)
         return x
 
 
@@ -53,28 +63,35 @@ class PositionalEncoding(nn.Module):
         self,
         d_model: int,
         max_len: int,
+        token_to_pos: dict[str, int],  # [token, pos]
         dropout: float = 0.1,
         maxval=10000.0,
     ):
-        super().__init__()
+        super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
-
         position = torch.arange(max_len).unsqueeze(1)
+
+        # Create a dictionary to convert token to position
+
         div_term = torch.exp(
             torch.arange(0, d_model, 2) * (-math.log(maxval) / d_model)
         )
         pe = torch.zeros(max_len, 1, d_model)
         pe[:, 0, 0::2] = torch.sin(position * div_term)
         pe[:, 0, 1::2] = torch.cos(position * div_term)
+        # we reorder them and map them to gene_id (position) 
+        arr = []
+        for k, v in token_to_pos.items():
+            arr.append(pe[v-1].numpy())
+        pe = torch.Tensor(np.array(arr))
         self.register_buffer("pe", pe)
 
-    def forward(self, x: Tensor, pos_x: Tensor) -> Tensor:
+    def forward(self, gene_pos: Tensor) -> Tensor:
         """
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
-        x = x + self.pe[pos_x]
-        return self.dropout(x)
+        return self.dropout(torch.index_select(self.pe, 0, gene_pos.view(-1)).view(gene_pos.shape + (-1,)))
 
 
 class DPositionalEncoding(nn.Module):
@@ -101,7 +118,7 @@ class DPositionalEncoding(nn.Module):
         maxvalue_y=10000.0,
         dropout: float = 0.1,
     ):
-        super().__init__()
+        super(DPositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
         position2 = torch.arange(max_len_y).unsqueeze(1)
@@ -136,6 +153,7 @@ class DPositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
+        # TODO: try with a continuous value encoder of size 2 (start, end where they are normalized to 0-1)
         x = x + self.pe1[pos_x]
         x = x + self.pe2[pos_y]
         return self.dropout(x)
@@ -146,11 +164,12 @@ class ContinuousValueEncoder(nn.Module):
     Encode real number values to a vector using neural nets projection.
     """
 
-    def __init__(self, d_model: int, dropout: float = 0.1, max_value: int = 512):
-        super().__init__()
+    def __init__(
+        self, d_model: int, dropout: float = 0.1, max_value: int = 1, size: int = 1
+    ):
+        super(ContinuousValueEncoder, self).__init__()
         self.max_value = max_value
-        self.mask = nn.embedding(2, d_model)
-        self.linear1 = nn.Linear(1, d_model)
+        self.linear1 = nn.Linear(size, d_model)
         self.activation = nn.ReLU()
         # self.linear2 = nn.Linear(d_model, d_model)
         self.norm = nn.LayerNorm(d_model)
@@ -173,7 +192,7 @@ class ContinuousValueEncoder(nn.Module):
         x = self.norm(x)
         x = self.dropout(x)
         if mask is not None:
-            x = (1 - mask) * x + mask * self.mask(mask)
+            x = x.masked_fill_(mask.unsqueeze(-1), 0)
         return x
 
 
@@ -190,7 +209,7 @@ class CategoryValueEncoder(nn.Module):
         embedding_dim: int,
         padding_idx: Optional[int] = None,
     ):
-        super().__init__()
+        super(CategoryValueEncoder, self).__init__()
         self.embedding = nn.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
         )
@@ -210,7 +229,7 @@ class BatchLabelEncoder(nn.Module):
         embedding_dim: int,
         padding_idx: Optional[int] = None,
     ):
-        super().__init__()
+        super(BatchLabelEncoder, self).__init__()
         self.embedding = nn.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
         )
@@ -224,7 +243,7 @@ class BatchLabelEncoder(nn.Module):
 
 class EGTEncoder:
     def __init__(self, d_model: int, nhead: int, num_layers: int):
-        super().__init__()
+        super(EGTEncoder, self).__init__()
         self.d_model = d_model
         self.nhead = nhead
         self.num_layers = num_layers

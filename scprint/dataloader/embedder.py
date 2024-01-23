@@ -31,9 +31,7 @@ def embed(
     # subset the gene file
     # embed
     prot_embedder = PROTBERT()
-    import pdb
-
-    pdb.set_trace()
+    # TODO: to redebug
     prot_embeddings = prot_embedder(
         fasta_path + "subset.fa", output_folder=fasta_path + "esm_out/", cache=cache
     )

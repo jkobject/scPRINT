@@ -8,6 +8,7 @@ import lamindb as ln
 from torch.utils.data import DataLoader
 from typing import Optional
 
+
 class DatasetModule(pl.LightningDataModule):
     def __init__(
         self,
@@ -16,7 +17,7 @@ class DatasetModule(pl.LightningDataModule):
         validation_split: float = 0.2,
     ):
         super().__init__()
-        self.dataset = Dataset(ln.Dataset.filter(name="preprocessed dataset").one())
+        self.dataset = Dataset(ln.Collection.filter(name="preprocessed dataset").one())
         self.batch_size = batch_size
         self.transform = transforms.Compose(
             [
@@ -62,11 +63,8 @@ class DatasetModule(pl.LightningDataModule):
     def test_dataloader(self):
         return DataLoader(self.mnist_test, batch_size=self.batch_size)
 
-
     def setup(self, stage: Optional[str] = None):
         return True
-
-
 
     def teardown(self, stage: Optional[str] = None):
         # Used to clean-up when the run is finished

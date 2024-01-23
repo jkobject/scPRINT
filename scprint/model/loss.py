@@ -37,25 +37,6 @@ def masked_nb_loss(
     return -masked_log_probs.sum() / mask.sum()
 
 
-def multi_masked_nb_loss(
-    input: torch.Tensor, targets: torch.Tensor, mask: torch.Tensor
-):
-    """
-    Compute the masked negative binomial loss between input and target.
-    """
-    mask = mask.float()
-    masked_log_probs = torch.tensor(
-        [
-            torch.distributions.NegativeBinomial(
-                total_count=target, probs=input
-            ).log_prob(target)
-            * mask
-            for target in targets
-        ]
-    )
-    return -masked_log_probs.sum() / mask.sum()
-
-
 def masked_zinb_loss(
     pi: torch.Tensor,
     probs: torch.Tensor,
@@ -68,21 +49,124 @@ def masked_zinb_loss(
     """
     Compute the masked zero-inflated negative binomial loss between input and target.
     """
-    mask = mask.float()
-    pi = torch.sigmoid(pi) * mask
+    pi = F.sigmoid(pi).masked_fill_(~mask, 0)
     if use_logits:
         nb = torch.distributions.NegativeBinomial(
-            total_count=torch.ReLu(total_count), logits=probs
+            total_count=F.relu(total_count), logits=probs
         )
     else:
         nb = torch.distributions.NegativeBinomial(
-            total_count=torch.ReLu(total_count), probs=probs
+            total_count=F.relu(total_count), probs=probs
         )
-    nb_loss = -nb.log_prob(target) * mask
-
+    nb_loss = -nb.log_prob(target).masked_fill(~mask, 0)
     zero_inflated_loss = -torch.log(pi + (1 - pi) * torch.exp(nb_loss))
 
     return (zero_inflated_loss.sum() * scale) / (mask.sum() + scale)
+
+
+def nb(x: torch.Tensor, mu: torch.Tensor, theta: torch.Tensor, eps=1e-8):
+    """
+    This negative binomial function was taken from:
+    Title: scvi-tools
+    Authors: Romain Lopez <romain_lopez@gmail.com>,
+             Adam Gayoso <adamgayoso@berkeley.edu>,
+             Galen Xing <gx2113@columbia.edu>
+    Date: 16th November 2020
+    Code version: 0.8.1
+    Availability: https://github.com/YosefLab/scvi-tools/blob/8f5a9cc362325abbb7be1e07f9523cfcf7e55ec0/scvi/core/distributions/_negative_binomial.py
+
+    Computes negative binomial loss.
+    Parameters
+    ----------
+    x: torch.Tensor
+         Torch Tensor of ground truth data.
+    mu: torch.Tensor
+         Torch Tensor of means of the negative binomial (has to be positive support).
+    theta: torch.Tensor
+         Torch Tensor of inverse dispersion parameter (has to be positive support).
+    eps: Float
+         numerical stability constant.
+
+    Returns
+    -------
+    If 'mean' is 'True' NB loss value gets returned, otherwise Torch tensor of losses gets returned.
+    """
+    if theta.ndimension() == 1:
+        theta = theta.view(1, theta.size(0))
+
+    log_theta_mu_eps = torch.log(theta + mu + eps)
+    res = (
+        theta * (torch.log(theta + eps) - log_theta_mu_eps)
+        + x * (torch.log(mu + eps) - log_theta_mu_eps)
+        + torch.lgamma(x + theta)
+        - torch.lgamma(theta)
+        - torch.lgamma(x + 1)
+    )
+
+    return res
+
+
+def nb_dist(x: torch.Tensor, mu: torch.Tensor, theta: torch.Tensor, eps=1e-8):
+    loss = -NegativeBinomial(mu=mu, theta=theta).log_prob(x)
+    return loss
+
+
+def zinb(
+    target: torch.Tensor,
+    mu: torch.Tensor,
+    theta: torch.Tensor,
+    pi: torch.Tensor,
+    eps=1e-8,
+    mask=None,
+):
+    """
+    This zero-inflated negative binomial function was taken from:
+    Title: scvi-tools
+    Authors: Romain Lopez <romain_lopez@gmail.com>,
+             Adam Gayoso <adamgayoso@berkeley.edu>,
+             Galen Xing <gx2113@columbia.edu>
+    Date: 16th November 2020
+    Code version: 0.8.1
+    Availability: https://github.com/YosefLab/scvi-tools/blob/8f5a9cc362325abbb7be1e07f9523cfcf7e55ec0/scvi/core/distributions/_negative_binomial.py
+
+    Computes zero inflated negative binomial loss.
+    Parameters
+    ----------
+    x: torch.Tensor
+         Torch Tensor of ground truth data.
+    mu: torch.Tensor
+         Torch Tensor of means of the negative binomial (has to be positive support).
+    theta: torch.Tensor
+         Torch Tensor of inverses dispersion parameter (has to be positive support).
+    pi: torch.Tensor
+         Torch Tensor of logits of the dropout parameter (real support)
+    eps: Float
+         numerical stability constant.
+
+    Returns
+    -------
+    If 'mean' is 'True' ZINB loss value gets returned, otherwise Torch tensor of losses gets returned.
+    """
+    softplus_pi = F.softplus(-pi)  #  uses log(sigmoid(x)) = -softplus(-x)
+    log_theta_eps = torch.log(theta + eps)
+    log_theta_mu_eps = torch.log(theta + mu + eps)
+    pi_theta_log = -pi + theta * (log_theta_eps - log_theta_mu_eps)
+
+    case_zero = F.softplus(pi_theta_log) - softplus_pi
+    mul_case_zero = torch.mul((target < eps).type(torch.float32), case_zero)
+
+    case_non_zero = (
+        -softplus_pi
+        + pi_theta_log
+        + target * (torch.log(mu + eps) - log_theta_mu_eps)
+        + torch.lgamma(target + theta)
+        - torch.lgamma(theta)
+        - torch.lgamma(target + 1)
+    )
+    mul_case_non_zero = torch.mul((target > eps).type(torch.float32), case_non_zero)
+
+    res = mul_case_zero + mul_case_non_zero
+    return res
 
 
 def classifier_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:

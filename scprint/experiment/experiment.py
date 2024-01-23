@@ -64,9 +64,9 @@ class BaseExperiment:
         if model_config is not None:
             self.init_model(model_config)
 
-    def init_datamodule(self, dataset: Union[ln.Dataset, str]):
+    def init_datamodule(self, dataset: Union[ln.Collection, str]):
         if type(dataset) == str:
-            dataset = ln.Dataset(name=dataset).first()
+            dataset = ln.Collection(name=dataset).first()
         return False
         # self.dataset = Dataset(dataset, lb=lb,# **self.config)
 

@@ -7,7 +7,7 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 import lightning as L
 
-# import torch.distributed as dist
+import torch.distributed as dist
 import torch
 
 import pandas as pd
@@ -24,38 +24,38 @@ from .hashformer import Hashformer
 from .EGT import EGT
 from .dsbn import DomainSpecificBatchNorm1d
 from . import loss
+from ..dataloader import tokenizer
 
 
 class scPrint(L.LightningModule):
     def __init__(
         self,
-        gene_df: pd.DataFrame,
+        genes: list,
         d_model: int = 512,
         nhead: int = 8,
         d_hid: int = 512,
+        edge_dim: int = 12,
         nlayers: int = 6,
         layers_cls: list[int] = [],
-        labels: Optional[Dict[str, int]] = {},
-        cls_hierarchy: Optional[Dict[int, list[int]]] = {},
+        labels: Dict[str, int] = {},
+        cls_hierarchy: Dict[str, Dict[int, list[int]]] = {},
         dropout: float = 0.5,
-        transformer_backend: str = "fast",
-        use_precomputed_gene_embbeddings: bool = False,
-        do_gene_pos_enc: bool = False,
-        do_mvc: bool = False,
-        do_adv: bool = False,
-        explicit_zero_prob: bool = True,
-        domain_spec_batchnorm: Union[bool, str] = False,
+        transformer: str = "fast",
+        use_precpt_gene_emb: Optional[np.array] = None,
+        gene_pos_enc: Optional[list] = None,
+        domain_spec_batchnorm: str = "None",
         expr_emb_style: str = "continuous",  # "binned_pos", "cont_pos"
-        n_input_bins: Optional[int] = 0,
-        mvc_decoder_style: str = "inner product",
+        n_input_bins: int = 0,
+        mvc_decoder: str = "inner product",
         cell_emb_style: str = "cls",
         ecs_threshold: float = 0.3,
-        similarity: Optional[float] = 0.5,
+        similarity: float = 0.5,
     ):
         """
         __init__ method for TransformerModel.
         # TODO: add docstrings
         Args:
+            genedf (pd.DataFrame): the gene dataframe with columns: index (token names), pos (optional), emb_0, emb_1, ... emb_{d_model-1}
             d_model (int, optional): The dimension of the model. Defaults to 512.
             nhead (int, optional): The number of heads in the multiheadattention models. Defaults to 8.
             d_hid (int, optional): The dimension of the feedforward network model. Defaults to 512.
@@ -63,38 +63,33 @@ class scPrint(L.LightningModule):
             nlayers_cls (int, optional): The number of layers in the classifier. Defaults to 3.
             n_cls (int, optional): The number of classes. Defaults to 0.
             dropout (float, optional): The dropout value. Defaults to 0.5.
-            do_mvc (bool, optional): Whether to perform labels + genes based decoding. Defaults to False.
             do_adv (bool, optional): Whether to perform adversarial discrimination. Defaults to False.
             domain_spec_batchnorm (Union[bool, str], optional): Whether to apply domain specific batch normalization. Defaults to False.
             expr_emb_style (str, optional): The style of input embedding (one of "continuous_concat", "binned_pos", "full_pos"). Defaults to "continuous_concat".
-            mvc_decoder_style (str, optional): The style of MVC decoder. Defaults to "inner product".
+            mvc_decoder (str, optional): The style of MVC decoder one of "None", "inner product", "concat query", "sum query". Defaults to "inner product".
             ecs_threshold (float, optional): The threshold for the cell similarity. Defaults to 0.3.
             pre_norm (bool, optional): Whether to apply pre normalization. Defaults to False.
 
         Raises:
             ValueError: If the expr_emb_style is not one of "category", "continuous", "none".
         """
-
         super().__init__()
-        self.model_type = "Transformer"
+
+        # should be stored somehow
         self.d_model = d_model
-        self.do_adv = do_adv
-        self.expr_emb_style = expr_emb_style
-        self.transformer_backend = transformer_backend
-        self.use_precomputed_gene_embbeddings = use_precomputed_gene_embbeddings
-        self.do_gene_pos_enc = do_gene_pos_enc
-        self.mvc_decoder_style = mvc_decoder_style
-        self.n_input_bins = n_input_bins
-        self.do_mvc = do_mvc
+        self.edge_dim = edge_dim
+        self.nlayers = nlayers
+        self.gene_pos_enc = gene_pos_enc
+        self.mvc_decoder = mvc_decoder
         self.domain_spec_batchnorm = domain_spec_batchnorm
         self.ecs_threshold = ecs_threshold
-        self.explicit_zero_prob = explicit_zero_prob
-        self.labels = list(labels.keys())
-        self.adv_labels = list(adv_labels.keys())
-        self.n_labels = len(self.labels) + len(self.adv_labels)
+        # need to store
+        self.n_input_bins = n_input_bins
+        self.transformer = transformer
+        self.labels = labels
         self.cell_emb_style = cell_emb_style
-        self.simi_temp = similarity
         self.cls_hierarchy = cls_hierarchy
+        self.expr_emb_style = expr_emb_style
 
         if self.expr_emb_style not in ["category", "continuous", "none"]:
             raise ValueError(
@@ -104,48 +99,50 @@ class scPrint(L.LightningModule):
         if cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
             raise ValueError(f"Unknown cell_emb_style: {cell_emb_style}")
 
-        self.gene_df = gene_df
-        self.vocab = gene_df["token"].tolist()
-        self.ntoken = len(self.vocab)
+        self.genes = genes
+        self.vocab = {i: n for i, n in enumerate(genes)}
 
         # encoder
         # gene encoder
-        # TODO: add dropout in the GeneEncoder
-        # TODO: move it outside of the model
-        if self.use_precomputed_gene_embbeddings:
-            gene_emb = gene_df[gene_df.columns.str.startswith("emb_")].values
+        # TODO: change the model to encoder() / transformer() / decoder()
+        if use_precpt_gene_emb is not None:
             self.gene_encoder = encoders.GeneEncoder(
-                self.ntoken, d_model, weights=gene_emb, freeze=True
+                len(self.vocab), d_model, weights=use_precpt_gene_emb, freeze=True
             )
+            self.use_precpt_gene_emb = True
         else:
-            self.gene_encoder = encoders.GeneEncoder(self.ntoken, d_model)
+            self.gene_encoder = encoders.GeneEncoder(len(self.vocab), d_model)
+            self.use_precpt_gene_emb = False
 
         # Value Encoder, NOTE: the scaling style is also handled in _encode method
         if expr_emb_style in ["continuous", "full_pos"]:
-            self.value_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
+            self.expr_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
         elif expr_emb_style == "binned_pos":
             assert n_input_bins > 0
-            self.value_encoder = encoders.CategoryValueEncoder(n_input_bins, d_model)
+            self.expr_encoder = encoders.CategoryValueEncoder(n_input_bins, d_model)
         else:
-            self.value_encoder = nn.Identity()  # nn.Softmax(dim=1)
+            self.expr_encoder = nn.Identity()  # nn.Softmax(dim=1)
             # TODO: consider row-wise normalization or softmax
             # TODO: Correct handle the mask_value when using scaling
 
         # Positional Encoding
-        if self.do_gene_pos_enc:
-            gene_pos = gene_df["pos"].values
+        if self.gene_pos_enc is not None:
+            max_len = max(gene_pos_enc)
+            token_to_pos = {token: pos for token, pos in enumerate(self.gene_pos_enc)}
             self.pos_encoder = encoders.PositionalEncoding(
-                d_model, max_len=max(gene_pos)
+                d_model, max_len=max_len, token_to_pos=token_to_pos
             )
             # TODO: finish pos encoding
 
-        # TODO: add sequencing depth encoding (and decoding with weight tying?)
-        # work on log-depth
-
         # Batch Encoder
-        self.label_encoder = encoders.BatchLabelEncoder(len(self.labels), d_model)
-        # Mask Encoder
-        self.mask_encoder = encoders.CategoryValueEncoder(1, d_model)
+        # always have [base_cell_emb, time_embedding, depth_embedding] + any other class info
+        # base cell embedding will store other cell specific information
+        self.label_encoder = encoders.BatchLabelEncoder(len(self.labels) + 3, d_model)
+        self.time_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
+        self.depth_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
+        # self.depth_decoder
+        # TODO: add sequencing depth decoding (with weight tying?)
+
         # Model
         # Batch Norm
         if domain_spec_batchnorm is True or domain_spec_batchnorm == "dsbn":
@@ -161,13 +158,13 @@ class scPrint(L.LightningModule):
         # Faster Model
         # TODO: define them all as a layer type
         # Linear
-        if transformer_backend == "linear":
+        if transformer == "linear":
             # linear transformer using the fast transformer package
-            self.transformer_encoder = FastTransformerEncoderWrapper(
+            self.transformer = FastTransformerEncoderWrapper(
                 d_model, nhead, d_hid, nlayers, dropout, "linear"
             )
         # flash
-        elif transformer_backend == "flash":
+        elif transformer == "flash":
             # NOT flash transformer using the special tritton kernel
             # or parallelMHA (add the process group thing and faster)
             mode = MHA(
@@ -178,7 +175,7 @@ class scPrint(L.LightningModule):
                 # causal?
                 # num_heads_kv?
                 use_flash_attn=True,
-                sequence_parallel=True,
+                # sequence_parallel=True,
                 # device?
             )
             # or use parallelBlock where attn & MLP are done in parallel
@@ -189,10 +186,10 @@ class scPrint(L.LightningModule):
                 # residual_in_fp32=True,
                 # sequence_parallel=True for more parallelism
             )
-            self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+            self.transformer = TransformerEncoder(encoder_layers, nlayers)
         # flashsparse
-        elif transformer_backend == "flashsparse":
-            self.transformer_encoder = Hashformer(
+        elif transformer == "flashsparse":
+            self.transformer = Hashformer(
                 d_model,
                 nlayers,
                 2,
@@ -207,29 +204,29 @@ class scPrint(L.LightningModule):
         # https://github.com/shamim-hussain/egt/blob/master/README.md
         # https://github.com/shamim-hussain/egt_pytorch
 
-        elif transformer_backend == "scprint":
-            self.transformer_encoder = EGT(
+        elif transformer == "scprint":
+            self.transformer = EGT(
                 num_layers=nlayers,
                 feat_size=d_model,
-                edge_feat_size=edge_d,
+                edge_feat_size=edge_dim,
                 num_heads=nhead,
-                num_virtual_nodes=n_virt,
+                num_virtual_nodes=len(self.labels),
             )
         # regular
         else:
             encoder_layers = TransformerEncoderLayer(
                 d_model, nhead, d_hid, dropout, batch_first=True
             )
-            self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+            self.transformer = TransformerEncoder(encoder_layers, nlayers)
 
         # decoders
         # expression
         self.expr_decoder = decoders.ExprDecoder(
             d_model,
-            explicit_zero_prob=explicit_zero_prob,
-            n_labels=len(self.labels),
+            nfirst_labels_to_skip=len(self.labels) + 3,
         )
         # cls decoder
+        self.cls_decoders = nn.ModuleDict()
         # TODO: should make a very simple classifier for most things (maybe scale with the number of classes) should be 1 layer...
         for label, n_cls in labels.items():
             self.cls_decoders[label] = decoders.ClsDecoder(
@@ -237,20 +234,17 @@ class scPrint(L.LightningModule):
             )
 
         # expression decoder from batch embbedding
-        if do_mvc:
+        if mvc_decoder is not None:
             self.mvc_decoder = decoders.MVCDecoder(
                 d_model,
-                arch_style=mvc_decoder_style,
-                explicit_zero_prob=explicit_zero_prob,
-                n_labels=self.n_labels,
+                arch_style=mvc_decoder,
+                n_labels=len(self.labels),
             )
+        else:
+            self.mvc_decoder = None
 
-        if do_adv:
-            # use the other classifiers to adversarially predict labels on the embeddings
-            print("to implem")
-
-        if self.temp is not None:
-            self.sim = Similarity(self.temp)
+        if similarity is not None:
+            self.sim = Similarity(similarity)
 
         self.apply(
             partial(
@@ -262,247 +256,140 @@ class scPrint(L.LightningModule):
         )
         self.save_hyperparameters()
 
+    def _encoder(
+        self,
+        gene_pos: Tensor,
+        expression: Optional[Tensor] = None,
+        mask: Optional[Tensor] = None,
+        # (minibatch,) unormalized total counts
+        depth: Optional[Tensor] = None,
+        # (minibatch,), then will be compared to this timepoint
+        timepoint: Optional[Tensor] = None,
+        cell_embs: Optional[Tensor] = None,  # (minibatch, n_labels, embsize)
+        get_attention: bool = False,
+        attention_layer: Optional[int] = None,
+    ):
+        """
+        _encode given gene expression, encode the gene embedding and cell embedding.
+
+        Args:
+            gene_pos (Tensor): _description_
+            expression (Tensor): _description_
+            mask (Tensor): boolean, same size as gene_pos and has 1 for masked expression locations
+            labels (Optional[Tensor], optional): _description_. Defaults to None.
+
+        Returns:
+            Tensor: _description_
+        """
+        print("encoding")
+        enc = self.gene_encoder(gene_pos)  # (minibatch, seq_len, embsize)
+        self.cur_gene_token_embs = enc.clone()
+        if expression is not None:
+            enc += self.expr_encoder(expression, mask)  # (minibatch, seq_len, embsize)
+        # else:
+        # exp_enc += torch.zeros_like(gene_pos)
+
+        if self.gene_pos_enc:
+            enc += self.pos_encoder(gene_pos)
+        # else:
+        #    total_embs = torch.cat([genc, exp_enc], dim=-1)
+        # if self.expr_emb_style == "scaling":
+        #    exp_enc = exp_enc.unsqueeze(2)
+        #    total_embs = genc * exp_enc
+        # else:
+        # if cell embedding is already provided, we don't compute the default ones
+        cell_embs = (
+            self.label_encoder(
+                torch.Tensor(
+                    [list(range(len(self.labels) + 3))] * gene_pos.shape[0]
+                ).int()
+            )
+            if cell_embs is None
+            else cell_embs
+        )  # (minibatch, embsize)
+
+        # populate
+        if depth is not None:
+            cell_embs[:, 0, :] += self.depth_encoder(depth)
+        if timepoint is not None:
+            cell_embs[:, 1, :] = self.time_encoder(timepoint)
+
+        enc = torch.cat([cell_embs, enc], dim=1)
+
+        # TODO: seems to be a problem here:
+        # if getattr(self, "dsbn", None) is not None and batch_label is not None:
+        #     label = int(labels[0].item())
+        #     total_embs = self.dsbn(total_embs.permute(0, 2, 1), label).permute(
+        #         0, 2, 1
+        #     )  # the batch norm always works on dim 1
+        # elif getattr(self, "bn", None) is not None:
+        #     total_embs = self.bn(total_embs.permute(0, 2, 1)).permute(0, 2, 1)
+
+        output = self.transformer(enc)
+        # TODO: get the attention here
+        return output  # (minibatch, seq_len, embsize)
+
     def forward(
         self,
-        genes: Tensor,
-        expression: Tensor,
-        do_cce: bool = False,
-        do_ecs: bool = False,
+        gene_pos: Tensor,
+        expression: Optional[Tensor] = None,
+        mask: Optional[Tensor] = None,
+        # (minibatch,) unormalized total counts
+        depth: Optional[Tensor] = None,
+        timepoint: Optional[Tensor] = None,  # (new_minibatch_of_nxt_cells,)
         get_gene_emb: bool = False,
         do_sample: bool = False,
-    ) -> Mapping[str, Tensor]:
+    ):
         """
         Args:
-            genes (:obj:`Tensor`): token ids, shape [batch_size, seq_len]
+            gene_pos (:obj:`Tensor`): token ids, shape [batch_size, seq_len]
             expression (:obj:`Tensor`): token values, shape [batch_size, seq_len]
-            do_cce (:obj:`bool`): if True, return the contrastive cell embedding objective
-                (CCE) output
-            do_ecs (:obj:`bool`): if True, return the elastic cell similarity objective
-                (ECS) output.
-            GEB (:obj:`bool`): if True, return the gene embedding output
 
         Returns:
             dict of output Tensors.
         """
-        transformer_output = self._encoder(genes, expression)
-        output = self.decoder(transformer_output)
-        # if self.explicit_zero_prob and do_sample:
+        transformer_output = self._encoder(gene_pos, expression, mask, depth, timepoint)
+        output = self.expr_decoder(transformer_output)
+        if do_sample:
+            pass
         # bernoulli = Bernoulli(probs=mlm_output["zero_probs"])
         # output["mlm_output"] = bernoulli.sample() * mlm_output["pred"]
-        # else:
-        #   output["mlm_output"] = mlm_output["pred"]  # (minibatch, seq_len)
-        # if self.explicit_zero_prob:
-        #    output["mlm_zero_probs"] = mlm_output["zero_probs"]
 
-        cell_embs = self._get_cell_embs(transformer_output)
+        output["cell_embs"] = self._get_cell_embs(transformer_output)
+        print(output["cell_embs"].shape)  # batch * n_labels * d_model
         cell_emb = torch.mean(output["cell_embs"], dim=1)
-        output["cell_emb"] = cell_emb
+        output["cell_emb"] = cell_emb  # batch * d_model
         if len(self.labels) > 0:
             output.update(
                 {
-                    "cls_output_" + labelname: self.cls_decoder[labelname]()
-                    for labelname in self.labels
+                    "cls_output_"
+                    + labelname: self.cls_decoders[labelname](
+                        output["cell_embs"][
+                            :, 1 + i, :
+                        ]  # the first elem is the base cell embedding
+                    )
+                    for i, labelname in enumerate(self.labels.keys())
                 }
             )  # (minibatch, n_cls)
-        if do_cce:
-            # Here the idea is that by running the encoder twice, we will have
-            # the embeddings for different dropout masks. They will act as a regularizer
-            # like presented in https://arxiv.org/pdf/2104.08821.pdf
-            # TODO: do we really have different dropouts at each pass?
-            # TODO: make sure that dropout is set to 0 after training (for inference)
-            cell_emb2 = self.get_cell_emb(genes, expression)
-
-            # Gather embeddings from all devices if distributed training
-            if dist.is_initialized() and self.training:
-                cls1_list = [
-                    torch.zeros_like(cell_emb) for _ in range(dist.get_world_size())
-                ]
-                cls2_list = [
-                    torch.zeros_like(cell_emb2) for _ in range(dist.get_world_size())
-                ]
-                dist.all_gather(tensor_list=cls1_list, tensor=cell_emb.contiguous())
-                dist.all_gather(tensor_list=cls2_list, tensor=cell_emb2.contiguous())
-
-                # NOTE: all_gather results have no gradients, so replace the item
-                # of the current rank with the original tensor to keep gradients.
-                # See https://github.com/princeton-nlp/SimCSE/blob/main/simcse/models.py#L186
-                cls1_list[dist.get_rank()] = cell_emb
-                cls2_list[dist.get_rank()] = cell_emb2
-
-                cell_emb = torch.cat(cls1_list, dim=0)
-                cell_emb2 = torch.cat(cls2_list, dim=0)
-            # TODO: should detach the second run cls2? Can have a try
-            # TODO: to test, we have a label which I don't get.
-            # cell_emb (minibatch, nlabels, embsize)
-            output["cce_sim"] = self.sim(
-                cell_emb.unsqueeze(1), cell_emb2.unsqueeze(0)
-            )  # (nlabels, minibatch, minibatch)
-        if self.do_mvc:
+        if self.mvc_decoder is not None:
             mvc_output = self.mvc_decoder(
                 cell_emb,
                 self.cur_gene_token_embs,
             )
-            # if self.explicit_zero_prob and do_sample:
-            #    bernoulli = Bernoulli(probs=mvc_output["zero_probs"])
-            #    output["mvc_output"] = bernoulli.sample() * mvc_output["pred"]
-            # else:
-            output["mvc_counts"] = mvc_output["counts"]  # (minibatch, seq_len)
-            output["mvc_probs"] = mvc_output["probs"]
-            # if self.explicit_zero_prob:
-            output["mvc_zero_probs"] = mvc_output["zero_probs"]
-        if do_ecs:
-            # Here using customized cosine similarity instead of F.cosine_similarity
-            # to avoid the pytorch issue of similarity larger than 1.0, pytorch # 78064
-            # normalize the embedding
-            cell_emb_normed = F.normalize(cell_emb, p=2, dim=2)
-            output["ecs_sim"] = torch.mm(cell_emb_normed, cell_emb_normed.t())
+            output["mvc_mean"] = mvc_output["mean"]  # (minibatch, seq_len)
+            output["mvc_disp"] = mvc_output["disp"]
+            output["mvc_zero_logits"] = mvc_output["zero_logits"]
 
         # if self.do_adv:
-        # TODO: implem adv training on the cell embeddings
+        # TODO: do DAB
         # output["dab_output"] = self.grad_reverse_discriminator(cell_emb)
 
         if get_gene_emb:
             output["gene_embedding"] = transformer_output[
-                :, :, :
+                :, len(self.labels) + 3 :, :
             ]  # (minibatch, seq_len, embsize)
 
         return output
-
-    def _compute_loss(
-        self, output, expression, genes, clss, do_denoise=False, do_next_tp=False
-    ):
-        # TODO: do masking here.
-        # TASK 1. reconstruct masked expression
-        loss_expr = loss.masked_zinb_loss(
-            probs=output["probs"],
-            pi=output["zero_probs"],
-            total_count=output["counts"],
-            target=expression,
-            mask=expression == -1,
-        )
-        total_loss = loss_expr
-        losses = {"loss_expr": loss_expr}
-        # TODO: if target_expression doesn't know a specific gene's expression. add it to mask.
-        # THIS is for cases where we have known unknowns. and for things like targeted L1000 seq
-        # kinda like padding
-
-        # TASK 2. predict labels
-        if len(self.labels) > 0:
-            loss_cls = 0
-            loss_adv_cls = 0
-            for labelname, cl in zip(self.labels, clss):
-                if len(self.cls_hierarchy) > 0:
-                    if len(self.cls_hierarchy[labelname]) > 0:
-                        if cl in self.cls_hierarchy[labelname].keys():
-                            # we have to compute the loss by comparing the known
-                            # class to the children probabilities
-                            children = self.cls_hierarchy[labelname][cl]
-                            # make a tensor of the children probabilities
-                            cl = torch.zeros_like(output["cls_output_" + labelname])
-                            for child in children:
-                                cl[:, child] = 1
-                loss_cls += nn.functional.cross_entropy(
-                    output["cls_output_" + labelname], cl
-                )
-                # TASK 2bis. adversarial label prediction
-                if self.do_adv:
-                    for i, (adv_label, acl) in enumerate(zip(self.labels, clss)):
-                        if adv_label != labelname:
-                            if len(self.cls_hierarchy) > 0:
-                                if len(self.cls_hierarchy[adv_label]) > 0:
-                                    if cl in self.cls_hierarchy[adv_label].keys():
-                                        # we have to compute the loss by comparing the known
-                                        # class to the children probabilities
-                                        children = self.cls_hierarchy[adv_label][cl]
-                                        # make a tensor of the children probabilities
-                                        cl = torch.zeros_like(
-                                            output["cls_output_" + adv_label]
-                                        )
-                                        for child in children:
-                                            cl[:, child] = 1
-                            self.output["cell_embs"][i]
-                            loss_adv_cls += nn.functional.cross_entropy(
-                                output["cls_output_" + labelname], acl
-                            )
-            total_loss += loss_adv_cls + loss_cls
-            losses.update({"loss_cls": loss_cls, "loss_adv_cls": loss_adv_cls})
-        # TASK 2ter. cell KO effect prediction
-        # (just use a novel class, cell state and predict if cell death or not from it)
-        # TODO: add large timepoint and set the KO gene to a KO embedding instead of expression embedding
-
-        # TASK 3. contrastive cell embedding
-        if self.do_cce:
-            labels = (
-                torch.arange(output["cce_sim"].size(0))
-                .long()
-                .to(output["cell_emb"].device)
-            )
-            loss_cce = nn.CrossEntropyLoss()(output["cce_sim"], labels)
-            total_loss += loss_cce
-            losses.update({"loss_cce": loss_cce})
-
-        # TASK 3b. contrastive graph embedding
-        if self.do_cce:
-            # TODO: given multiple run with different amount of genes seen
-            # and different amount of masking. We would want the edge and cell embedding to stay the same
-            # create 3 different new masks
-            pass
-
-        # TASK 4. elastic cell similarity
-        if self.do_ecs:
-            # mask out diagnal elements
-            mask = (
-                torch.eye(output["ecs_sim"].size(0)).bool().to(output["ecs_sim"].device)
-            )
-            cos_sim = output["cos_sim"].masked_fill(mask, 0.0)
-            # only optimize positive similarities
-            cos_sim = F.relu(cos_sim)
-            loss_ecs = torch.mean(1 - (cos_sim - self.ecs_threshold) ** 2)
-            total_loss += loss_ecs
-            losses.update({"loss_ecs": loss_ecs})
-        # TODO: try to require the gene id to still be predictable (with weight tying)
-        # TASK 5. expression generation
-        transformer_output = self.generate(output["cell_embs"], genes)
-        out = self.decoder(transformer_output)
-        loss_expr_gene = loss.masked_zinb_loss(
-            probs=out["probs"],
-            pi=out["zero_probs"],
-            total_count=out["counts"],
-            target=expression,
-            mask=torch.ones_like(expression).bool(),
-        )
-        total_loss += loss_expr_gene
-        losses.update({"loss_expr_gene": loss_expr_gene})
-
-        if self.do_mvc:
-            # TODO: some hidden hyperparams behind this function and maybe other functions
-            loss_expr_mvc = loss.masked_zinb_loss(
-                probs=output["mvc_probs"],
-                pi=output["mvc_zero_probs"],
-                total_count=output["mvc_counts"],
-                target=expression,
-                mask=torch.ones_like(expression).bool(),
-            )
-            total_loss += loss_expr_mvc
-            losses.update({"loss_expr_mvc": loss_expr_mvc})
-        # TASK 6. denoising
-        if do_denoise:
-            pass
-
-        if self.do_cce:
-            pass
-            # make sure that the cell embedding stay the same even if the expression is decreased
-
-        # TASK 7. next time point prediction
-        if do_next_tp:
-            pass
-        # TASK 8. KO profile prediction
-        # if we have that information
-
-        # TASK 9. PDgrapher-drug-like perturbation prediction
-
-        # TODO: add read depth
-        return losses, total_loss
 
     def configure_optimizers(self, **kwargs):
         # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam
@@ -513,11 +400,13 @@ class scPrint(L.LightningModule):
         self,
         batch,
         batch_idx,
-        superbatch=None,
-        superbatch_idx=None,
         do_denoise=False,
+        noise=[0.3],
         do_next_tp=False,
-        **kwargs,
+        do_cce=False,
+        do_ecs=False,
+        do_adv_cls=False,
+        mask_ratio=[0.15, 0.3],
     ):
         """
         training_step defines the train loop. It is independent of forward
@@ -525,27 +414,258 @@ class scPrint(L.LightningModule):
         Args:
             batch (list[Tensor]): shape [Tensor(minibatch, seq_len)*2, Tensor(minibatch, n_labels)]
                 the n_labels should be in the same orders as the labels provided in the model
-                the first Tensor is gene ids, the second is expression of those genes
+                the first Tensor is gene ids, the second is expression of those gene_pos
             batch_idx (Tensor): shape (minibatch)
             superbatch (list[Tensor], optional): shape [(neighbors, seq_len)*minibatch | None]
-                gives out additional expression (on the same genes) for the k
+                gives out additional expression (on the same gene_pos) for the k
                 nearest neighbors of the cell at the same minibatch index in "batch"). Defaults to None.
             superbatch_idx (Tensor, optional): _description_. Defaults to None.
+            do_cce (:obj:`bool`): if True, return the contrastive cell embedding objective
+                (CCE) output
+            do_ecs (:obj:`bool`): if True, return the elastic cell similarity objective
+                (ECS) output.
 
         Returns:
             _type_: _description_
         """
-        genes = batch[0]
-        expression = batch[1]
-        clss = batch[2:]
-        output = self.forward(genes, expression, **kwargs)
-        losses, total_loss = self._compute_loss(
-            output, expression, genes, clss, do_denoise, do_next_tp
+        # TASK 1 & 2 & 3 (first pass, expression reconstruction, label prediction)
+        if type(mask_ratio) is not list:
+            mask_ratio = [mask_ratio]
+
+        expression = batch[0]
+        gene_pos = batch[1]
+        clss = batch[2]
+        total_count = batch[-1]
+        timepoint = batch[-2]
+
+        total_loss = 0
+        cell_embs = []
+
+        expr = torch.log2(1 + (expression * 10e4) / total_count[:, None])
+        depth = torch.min(
+            torch.tensor(1),
+            torch.log2(torch.max(total_count, torch.tensor(100)) / 100) / 19,
         )
+        for i in mask_ratio:
+            mask = tokenizer.masker(
+                length=gene_pos.shape[1],
+                batch_size=gene_pos.shape[0],
+                mask_ratio=i,
+            )
+            output = self.forward(gene_pos, expr, mask, depth, timepoint)
+            l, tot = self._compute_loss(
+                output, expression, mask, clss, do_ecs, do_adv_cls
+            )
+            cell_embs.append(output["cell_emb"])
+            total_loss += tot
+            losses.update({"mask_" + str(i * 100) + "%_" + k: v for k, v in l.items()})
+        # TASK 3. denoising
+        if do_denoise:
+            for i in noise:
+                # Randomly drop on average N counts to each element of expression using a heavy tail Gaussian distribution
+                # here we try to get the scale of the distribution so as to remove the right number of counts from each gene
+                # TODO: make sure that the scale is correct
+                scale = (2 * total_counts * (1 - i)) / (expression > 0).sum(-1)
+                drop = torch.poisson(
+                    torch.rand(expression.shape) / scale
+                ).int()  # Gaussian distribution
+                expr = torch.max(expression - drop, torch.zeros_like(expression))
+                # TODO: recompute subtotal counts as because of the .max() to keep it to zeros, we might not have removed as much as we thought
+                subtotal_count = (total_count * i).int()
+                expr = torch.log2(1 + (expr * 10e4) / subtotal_count[:, None])
+                mask = tokenizer.masker(
+                    length=gene_pos.shape[1],
+                    batch_size=gene_pos.shape[0],
+                    mask_ratio=mask_ratio,
+                )
+                output = self.forward(gene_pos, expr, mask, depth, timepoint)
+                l, tot = self._compute_loss(
+                    output, expression, mask, clss, do_ecs, do_adv_cls
+                )
+                cell_embs.append(output["cell_emb"])
+                total_loss += tot
+                losses.update(
+                    {"denoise_" + str(i * 100) + "%_" + k: v for k, v in l.items()}
+                )
+                # make sure that the cell embedding stay the same even if the expression is decreased
+
+        # TASK 4. contrastive cell embedding
+        if do_cce:
+            # We would want the edge and cell embedding to stay the same
+            # Here the idea is that by running the encoder twice, we will have
+            # the embeddings for different dropout masks. They will act as a regularizer
+            # like presented in https://arxiv.org/pdf/2104.08821.pdf
+            # TODO: do we really have different dropouts at each pass?
+            # TODO: make sure that dropout is set to 0 after training (for inference)
+            # Gather embeddings from all devices if distributed training
+            # if dist.is_initialized() and self.training:
+            #     cls1_list = [
+            #         torch.zeros_like(cell_emb) for _ in range(dist.get_world_size())
+            #     ]
+            #     cls2_list = [
+            #         torch.zeros_like(cell_emb2) for _ in range(dist.get_world_size())
+            #     ]
+            #     dist.all_gather(tensor_list=cls1_list, tensor=cell_emb.contiguous())
+            #     dist.all_gather(tensor_list=cls2_list, tensor=cell_emb2.contiguous())
+
+            #     # NOTE: all_gather results have no gradients, so replace the item
+            #     # of the current rank with the original tensor to keep gradients.
+            #     # See https://github.com/princeton-nlp/SimCSE/blob/main/simcse/models.py#L186
+            #     cls1_list[dist.get_rank()] = cell_emb
+            #     cls2_list[dist.get_rank()] = cell_emb2
+
+            #     cell_emb = torch.cat(cls1_list, dim=0)
+            #     cell_emb2 = torch.cat(cls2_list, dim=0)
+            # TODO: should detach the second run cls2? Can have a try
+            # TODO: to test, we have a label which I don't get.
+            # cell_emb (minibatch, nlabels, embsize)
+            cell_emb = cell_embs[0]
+            loss_cce = 0
+            for cell_emb2 in cell_embs[1:]:
+                cce_sim = self.sim(
+                    cell_emb.unsqueeze(1), cell_emb2.unsqueeze(0)
+                )  # (nlabels, minibatch, minibatch)
+                labels = (
+                    torch.arange(cce_sim.size(0)).long()
+                    # .to(cell_embs.device)
+                )
+                loss_cce += nn.functional.cross_entropy(cce_sim, labels)
+            total_loss += loss_cce
+            # TASK 3b. contrastive graph embedding
+            losses.update({"cce": loss_cce})
+
+        # TASK 6. expression generation
+        out = self._generate(cell_embs[0], gene_pos)
+        l, total_loss = self._compute_loss(
+            out,
+            expression,
+            mask=torch.ones_like(expression),
+            clss=clss,
+            do_ecs=do_ecs,
+            do_adv_cls=do_adv_cls,
+        )
+        losses.update({"gen_" + k: v for k, v in l.items()})
+        total_loss += loss_expr_gene
+
+        # TASK 7. next time point prediction
+        if do_next_tp:
+            pass
+
+        # TASK 8. KO profile prediction
+
+        # if we have that information
+
+        # TASK 9. PDgrapher-drug-like perturbation prediction
+        #
         self.log("train_loss: ", total_loss)
         self.log_dict(losses)
 
         return total_loss
+
+    def _compute_loss(
+        self, output, expression, mask, clss, do_ecs=False, do_adv_cls=False
+    ):
+        # TASK 1. reconstruct masked expression
+        loss_expr = loss.zinb(
+            theta=output["disp"],
+            pi=output["zero_logits"],
+            mu=output["mean"] * output["depth"],
+            target=expression,
+            mask=mask,
+        )
+        total_loss = loss_expr
+        losses = {"expr": loss_expr}
+        # TODO: if target_expression doesn't know a specific gene's expression. add it to mask.
+        # THIS is for cases where we have known unknowns. and for things like targeted L1000 seq
+        # kinda like padding
+
+        # TASK 2. predict labels
+        if len(self.labels) > 0:
+            loss_cls = 0
+            loss_adv_cls = 0
+            import pdb
+            pdb.set_trace()
+            for j, (labelname, cl) in enumerate(zip(self.labels.keys(), clss.T)):
+                # setting the labels from index to one hot
+                maxsize = self.labels[labelname]
+                newcl = torch.zeros((cl.shape[0], maxsize)) # batchsize * n_labels
+                # if we don't know the label we set the weight to 0 else to 1
+                weight = torch.ones_like(newcl)
+                for i, c in enumerate(cl):
+                    if c != -1:
+                        if c < maxsize:
+                            newcl[i, c] = 1
+                        else:
+                            # we have cls hierarchy value
+                            # we don't know the values below, thus we set them to have 0 effect on the loss
+                            weight[i, self.cls_hierarchy[labelname][c]] = 0
+                    else:
+                        weight[i, :] = 0
+                pred = output["cls_output_" + labelname]
+                if len(self.cls_hierarchy) > 0:
+                    # computin hierarchical labels and adding them to cl
+                    clhier = self.cls_hierarchy.get(labelname, {})
+                    if len(clhier) > 0:
+                        addcl = torch.zeros(
+                            (newcl.shape[0], max(clhier.keys()) - maxsize)
+                        )
+                        addpred = torch.zeros_like(addcl)
+                        addweight = torch.ones_like(addcl)
+                        for k, v in clhier.items():
+                            addcl[:, k - maxsize] = cl[:, v].any(1)
+                            addpred[:, k - maxsize] = torch.logsumexp(pred[:, v], dim=1).unsqueeze(1)
+                        newcl = torch.cat([cl, newcl], dim=1)
+                        pred = torch.cat([pred, addpred], dim=1)
+                        weight = torch.cat([weight, addweight], dim=1)
+
+                loss_cls += nn.functional.binary_cross_entropy_with_logits(pred, newcl, weight=weight)
+                # TASK 2bis. adversarial label prediction
+                if do_adv_cls:
+                    for adv_label in self.labels.keys():
+                        if adv_label != labelname:
+                            adpred = self.cls_decoders[adv_label](
+                                output["cell_embs"][
+                                    :, 1 + j, :
+                                ]
+                            )
+                            loss_adv_cls += nn.functional.binary_cross_entropy_with_logits(adpred, target=newcl, weight=weight)
+            total_loss += -loss_adv_cls + loss_cls
+            losses.update({"cls": loss_cls, "adv_cls": loss_adv_cls})
+        # TASK 2ter. cell KO effect prediction
+        # (just use a novel class, cell state and predict if cell death or not from it)
+        # TODO: add large timepoint and set the KO gene to a KO embedding instead of expression embedding
+        # TODO: try to require the gene id to still be predictable (with weight tying)
+
+        if self.do_mvc:
+            # TODO: some hidden hyperparams behind this function and maybe other functions
+            loss_expr_mvc = loss.zinb(
+                theta=output["mvc_disp"],
+                pi=output["mvc_zero_logits"],
+                mu=output["mvc_mean"] * output["depth"],
+                target=expression,
+                mask=mask,
+            )
+            total_loss += loss_expr_mvc
+            losses.update({"expr_mvc": loss_expr_mvc})
+        # TASK 5. elastic cell similarity
+        if do_ecs:
+            # Here using customized cosine similarity instead of F.cosine_similarity
+            # to avoid the pytorch issue of similarity larger than 1.0, pytorch # 78064
+            # normalize the embedding
+            cell_emb_normed = F.normalize(output["cell_emb"], p=2, dim=2)
+            output["ecs_sim"] = torch.mm(cell_emb_normed, cell_emb_normed.t())
+
+            # mask out diagnal elements
+            mask = (
+                torch.eye(output["ecs_sim"].size(0)).bool().to(output["ecs_sim"].device)
+            )
+            cos_sim = output["cos_sim"].masked_fill(mask, 0.0)
+            # only optimize positive similarities
+            cos_sim = F.relu(cos_sim)
+            loss_ecs = torch.mean(1 - (cos_sim - self.ecs_threshold) ** 2)
+            total_loss += loss_ecs
+            losses.update({"ecs": loss_ecs})
+        return losses, total_loss
 
     def validation_step(self, batch, batch_idx):
         """
@@ -554,22 +674,22 @@ class scPrint(L.LightningModule):
         Args:
             batch (list[Tensor]): shape [Tensor(minibatch, seq_len)*2, Tensor(minibatch, n_labels)]
                 the n_labels should be in the same orders as the labels provided in the model
-                the first Tensor is gene ids, the second is expression of those genes
+                the first Tensor is gene ids, the second is expression of those gene_pos
             batch_idx (Tensor): shape (minibatch)
             superbatch (list[Tensor], optional): shape [(neighbors, seq_len)*minibatch | None]
-                gives out additional expression (on the same genes) for the k
+                gives out additional expression (on the same gene_pos) for the k
                 nearest neighbors of the cell at the same minibatch index in "batch"). Defaults to None.
             superbatch_idx (Tensor, optional): _description_. Defaults to None.
 
         Returns:
             _type_: _description_
         """
-        genes = batch[0]
+        gene_pos = batch[0]
         expression = batch[1]
         # TODO: do masking here.
         clss = batch[2:]
-        output = self.forward(genes, expression, **kwargs)
-        losses, total_loss = self._compute_loss(output, expression, genes, clss)
+        output = self.forward(gene_pos, expression)
+        losses, total_loss = self._compute_loss(output, expression, gene_pos, clss)
         # Logging to TensorBoard (if installed) by default
         self.log("val_loss: ", total_loss)
         # self.validation_step_outputs.append(output[''])
@@ -595,70 +715,17 @@ class scPrint(L.LightningModule):
     #     self.validation_step_outputs.clear()
 
     def test_step(self, batch, batch_idx):
-        genes = batch[0]
+        gene_pos = batch[0]
         expression = batch[1]
         # TODO: do masking here.
         clss = batch[2:]
-        output = self.forward(genes, expression, **kwargs)
-        losses, total_loss = self._compute_loss(output, expression, genes, clss)
+        output = self.forward(gene_pos, expression, **kwargs)
+        losses, total_loss = self._compute_loss(output, expression, gene_pos, clss)
         self.log("test_loss: ", total_loss)
         self.log_dict(losses)
         return total_loss
 
-    def _encoder(
-        self,
-        genes: Tensor,
-        expression: Optional[Tensor] = None,
-        mask: Optional[Tensor] = None,
-        cell_embs: Optional[Tensor] = None,  # (minibatch, n_labels, embsize)
-        get_attention: bool = False,
-        attention_layer: Optional[int] = None,
-    ) -> Tensor:
-        """
-        _encode given gene expression, encode the gene embedding and cell embedding.
-
-        Args:
-            genes (Tensor): _description_
-            expression (Tensor): _description_
-            mask (Tensor): boolean, same size as genes and has 1 for masked expression locations
-            labels (Optional[Tensor], optional): _description_. Defaults to None.
-
-        Returns:
-            Tensor: _description_
-        """
-        genc = self.gene_encoder(genes)  # (minibatch, seq_len, embsize)
-        self.cur_gene_token_embs = genc
-        if expression is None:
-            expression = torch.zeros_like(genes)
-            mask = torch.ones_like(genes)
-        exp_enc = self.value_encoder(expression, mask)  # (minibatch, seq_len, embsize)
-        total_embs = torch.cat([genc, exp_enc], dim=1)
-        # if self.expr_emb_style == "scaling":
-        #    exp_enc = exp_enc.unsqueeze(2)
-        #    total_embs = genc * exp_enc
-        # else:
-        if self.labels and cell_embs is not None:
-            label_emb = self.label_encoder(self.labels)  # (minibatch, embsize)
-            cell_embs = (
-                cell_embs if cell_embs is not None else torch.zeros_like(label_emb)
-            )
-            batch_emb = torch.cat([label_emb, cell_embs], dim=1)
-            total_embs = torch.cat([batch_emb, total_embs], dim=1)
-
-        # TODO: seems to be a problem here:
-        # if getattr(self, "dsbn", None) is not None and batch_label is not None:
-        #     label = int(labels[0].item())
-        #     total_embs = self.dsbn(total_embs.permute(0, 2, 1), label).permute(
-        #         0, 2, 1
-        #     )  # the batch norm always works on dim 1
-        # elif getattr(self, "bn", None) is not None:
-        #     total_embs = self.bn(total_embs.permute(0, 2, 1)).permute(0, 2, 1)
-
-        output = self.transformer_encoder(total_embs)
-        # TODO: get the attention here
-        return output  # (minibatch, seq_len, embsize)
-
-    def get_cell_emb(self, genes, expression) -> Tensor:
+    def get_cell_emb(self, gene_pos, expression):
         """
         Args:
             layer_output(:obj:`Tensor`): shape (minibatch, seq_len, embsize)
@@ -669,43 +736,50 @@ class scPrint(L.LightningModule):
             :obj:`Tensor`: shape (minibatch, embsize)
         """
         layer_output = self._encoder(
-            genes,
+            gene_pos,
             expression,
         )
         embs = self._get_cell_embs(layer_output)
         return torch.mean(embs, dim=1)
 
-    def _get_cell_embs(self, layer_output) -> Tensor:
+    def _get_cell_embs(self, layer_output):
         if self.cell_emb_style == "cls" and self.labels is not None:
-            cell_emb = layer_output[:, : len(self.labels)]  # (minibatch, embsize)
+            # (minibatch, embsize)
+            cell_emb = layer_output[:, 2 : 3 + len(self.labels)]
         elif self.cell_emb_style == "avg-pool":
             cell_emb = torch.mean(layer_output, dim=1)
         else:
             raise ValueError(f"Unknown cell_emb_style: {self.cell_emb_style}")
         return cell_emb
 
-    def get_pseudo_label_emb(self, genes, expression, label) -> Tensor:
+    def get_label_emb(self, label):
         """
-        get_pseudo_label_emb given a set of cell's expression from the same label, will output
+        get_label_emb given a label, will output a set of embeddings
+        that activate this prediction the most in the classifier using LRP.
 
         Args:
-            genes (_type_): _description_
+            gene_pos (_type_): _description_
             expression (_type_): _description_
 
         Returns:
             Tensor: _description_
         """
         # TODO: finish this function
-        cell_emb = self.get_cell_emb(genes, expression)
-        cell_emb[:, self.labels.index]
+        pass
+        # cell_emb[:, self.labels.index]
 
+    # TODO: to finish. should mostly just call forward multiple times
+    # the goal was to iterate multiple times,
+    # to create a trajectory and reach a certain state
+    # should call forward multiple times
     def _generate(
         self,
         cell_embs: Tensor,
-        genes: Tensor,
+        gene_pos: Tensor,
+        depth: Tensor = None,
+        tp: Tensor = None,
         gen_iters: int = 1,
-        labels: Optional[Tensor] = None,  # (batchmini,)
-    ) -> Tensor:
+    ):
         """
         _generate given cell_embeddings, generate an expression profile
 
@@ -716,13 +790,20 @@ class scPrint(L.LightningModule):
             gen_iters(:obj:`int`): number of generation iterations
             labels(:obj:`Tensor`): shape (batch,), optional
         """
-        for _ in range(gen_iters):
-            output = self._encoder(
-                cell_embs=cell_embs, genes=genes
+        if tp is not None:
+            tp = tp / gen_iters
+        for i in range(gen_iters):
+            transformer_output = self._encoder(
+                cell_embs=cell_embs,
+                gene_pos=gene_pos,
+                depth=depth,
+                timepoint=tp * (i + 1) if tp is not None else None,
             )  # (minibatch, seq_len, embsize)
-            cell_embs = self._get_cell_embs(output)
+            cell_embs = self._get_cell_embs(transformer_output)
+        output = self.decoder(transformer_output)
         return output  # (minibatch, seq_len)
 
+    # TODO: to finish
     def encode(
         self,
         src: Tensor,
@@ -732,7 +813,7 @@ class scPrint(L.LightningModule):
         output_to_cpu: bool = True,
         time_step: Optional[int] = None,
         return_np: bool = False,
-    ) -> Tensor:
+    ):
         """
         encode_batch runs _encode on a large dataset (minibatch per minibatch)
 
@@ -782,7 +863,7 @@ class scPrint(L.LightningModule):
         return outputs
 
 
-def generate_square_subsequent_mask(sz: int) -> Tensor:
+def generate_square_subsequent_mask(sz: int):
     """Generates an upper-triangular matrix of -inf, with zeros on diag."""
     return torch.triu(torch.ones(sz, sz) * float("-inf"), diagonal=1)
 
