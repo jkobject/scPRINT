@@ -54,7 +54,7 @@ class ExprDecoder(nn.Module):
             nn.Linear(d_model, d_model),
             nn.LeakyReLU(),
             nn.Linear(d_model, 1),
-            nn.ReLu(),
+            nn.ReLU(),
         )
 
     def forward(self, x: Tensor, depth: Tensor) -> Dict[str, Tensor]:
@@ -67,7 +67,7 @@ class ExprDecoder(nn.Module):
         depth = self.depth_encoder(depth).unsqueeze(1)
         x = self.fc(x[:, self.nfirst_labels_to_skip :, :])
         x = self.finalfc(x + depth)
-        depth_mult = self.depth_fc(depth)
+        depth_mult = self.depth_fc(depth.squeeze(1))
         pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
             1, dim=-1
         )  # (batch, seq_len)
