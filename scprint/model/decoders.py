@@ -30,7 +30,6 @@ class ExprDecoder(nn.Module):
     def __init__(
         self,
         d_model: int,
-        explicit_zero_prob: bool = False,
         nfirst_labels_to_skip: int = 0,
     ):
         super(ExprDecoder, self).__init__()
@@ -72,6 +71,95 @@ class ExprDecoder(nn.Module):
         # to sample from the bernoulli distribution with the zero_probs.
 
 
+class MVCDecoder(nn.Module):
+    """
+    Decoder for the masked value prediction for cell embeddings.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        arch_style: str = "inner product",
+        query_activation: nn.Module = nn.Sigmoid,
+        hidden_activation: nn.Module = nn.PReLU,
+    ) -> None:
+        """
+        Args:
+            d_model (:obj:`int`): dimension of the gene embedding.
+            arch_style (:obj:`str`): architecture style of the decoder, choice from
+                1. "inner product" or 2. "cell product" 3. "concat query" or 4. "sum query".
+            query_activation (:obj:`nn.Module`): activation function for the query
+                vectors.
+            hidden_activation (:obj:`nn.Module`): activation function for the hidden
+                layers.
+        """
+        super(MVCDecoder, self).__init__()
+        if arch_style == "inner product":
+            self.gene2query = nn.Linear(d_model, d_model)
+            self.query_activation = query_activation()
+            self.pred_var_zero = nn.Linear(d_model, d_model * 3, bias=False)
+        elif arch_style == "concat query":
+            self.gene2query = nn.Linear(d_model, 64)
+            self.query_activation = query_activation()
+            self.fc1 = nn.Linear(d_model + 64, 64)
+            self.hidden_activation = hidden_activation()
+            self.fc2 = nn.Linear(64, 3)
+        elif arch_style == "sum query":
+            self.gene2query = nn.Linear(d_model, d_model)
+            self.query_activation = query_activation()
+            self.fc1 = nn.Linear(d_model, 64)
+            self.hidden_activation = hidden_activation()
+            self.fc2 = nn.Linear(64, 3)
+        else:
+            raise ValueError(f"Unknown arch_style: {arch_style}")
+
+        self.arch_style = arch_style
+        self.do_detach = arch_style.endswith("detach")
+        self.d_model = d_model
+
+    def forward(
+        self, cell_emb: Tensor, gene_embs: Tensor
+    ) -> Union[Tensor, Dict[str, Tensor]]:
+        """
+        Args:
+            cell_emb: Tensor, shape (batch, embsize=d_model)
+            gene_embs: Tensor, shape (batch, seq_len, embsize=d_model)
+        """
+        if self.arch_style == "inner product":
+            query_vecs = self.query_activation(self.gene2query(gene_embs))
+            cell_emb = cell_emb.unsqueeze(2)  # (batch, embsize, 1)
+            # the pred gene expr values, # (batch, seq_len)
+            pred, var, zero_logits = self.pred_var_zero(query_vecs).split(
+                self.d_model, dim=-1
+            )
+            pred, var, zero_logits = (
+                torch.bmm(pred, cell_emb).squeeze(2),
+                torch.bmm(var, cell_emb).squeeze(2),
+                torch.bmm(zero_logits, cell_emb).squeeze(2),
+            )
+            # zero logits need to based on the cell_emb, because of input exprs
+        elif self.arch_style == "concat query":
+            query_vecs = self.query_activation(self.gene2query(gene_embs))
+            # expand cell_emb to (batch, seq_len, embsize)
+            cell_emb = cell_emb.unsqueeze(1).expand(-1, gene_embs.shape[1], -1)
+
+            h = self.hidden_activation(
+                self.fc1(torch.cat([cell_emb, query_vecs], dim=2))
+            )
+            pred, var, zero_logits = self.fc2(h).split(1, dim=-1)
+        elif self.arch_style == "sum query":
+            query_vecs = self.query_activation(self.gene2query(gene_embs))
+            cell_emb = cell_emb.unsqueeze(1)
+
+            h = self.hidden_activation(self.fc1(cell_emb + query_vecs))
+            pred, var, zero_logits = self.fc2(h).split(1, dim=-1)
+        return dict(
+            mean=F.softmax(pred, dim=-1),
+            disp=torch.exp(var),
+            zero_logits=zero_logits,
+        )
+
+
 class ClsDecoder(nn.Module):
     """
     Decoder for classification task.
@@ -102,94 +190,3 @@ class ClsDecoder(nn.Module):
         for layer in self._decoder:
             x = layer(x)
         return self.out_layer(x)
-
-
-class MVCDecoder(nn.Module):
-    """
-    Decoder for the masked value prediction for cell embeddings.
-    """
-
-    def __init__(
-        self,
-        d_model: int,
-        d_in: int = 64,
-        arch_style: str = "inner product",
-        query_activation: nn.Module = nn.Sigmoid,
-        hidden_activation: nn.Module = nn.PReLU,
-        n_labels: int = 1,
-    ) -> None:
-        """
-        Args:
-            d_model (:obj:`int`): dimension of the gene embedding.
-            arch_style (:obj:`str`): architecture style of the decoder, choice from
-                1. "inner product" or 2. "cell product" 3. "concat query" or 4. "sum query".
-            query_activation (:obj:`nn.Module`): activation function for the query
-                vectors.
-            hidden_activation (:obj:`nn.Module`): activation function for the hidden
-                layers.
-        """
-        super(MVCDecoder, self).__init__()
-        if arch_style == "inner product":
-            self.gene2query = nn.Linear(d_model, d_in)
-            self.query_activation = query_activation()
-            self.pred_var_zero = nn.Linear(d_model, d_in * 3, bias=False)
-        elif arch_style == "concat query":
-            self.gene2query = nn.Linear(d_model, 64)
-            self.query_activation = query_activation()
-            self.fc1 = nn.Linear(d_model + 64, 64)
-            self.hidden_activation = hidden_activation()
-            self.fc2 = nn.Linear(64, 3)
-        elif arch_style == "sum query":
-            self.gene2query = nn.Linear(d_model, d_model)
-            self.query_activation = query_activation()
-            self.fc1 = nn.Linear(d_model, 64)
-            self.hidden_activation = hidden_activation()
-            self.fc2 = nn.Linear(64, 3)
-        else:
-            raise ValueError(f"Unknown arch_style: {arch_style}")
-
-        self.arch_style = arch_style
-        self.do_detach = arch_style.endswith("detach")
-        self.d_in = d_in
-
-    def forward(
-        self, cell_emb: Tensor, gene_embs: Tensor
-    ) -> Union[Tensor, Dict[str, Tensor]]:
-        """
-        Args:
-            cell_emb: Tensor, shape (batch, embsize=d_model)
-            gene_embs: Tensor, shape (batch, seq_len, embsize=d_model)
-        """
-        if self.arch_style == "inner product":
-            query_vecs = self.query_activation(self.gene2query(gene_embs))
-            cell_emb = cell_emb.unsqueeze(2)  # (batch, embsize, 1)
-            # the pred gene expr values, # (batch, seq_len)
-            pred, var, zero_logits = self.pred_var_zero(query_vecs).split(
-                self.d_in, dim=-1
-            )
-            pred, var, zero_logits = (
-                torch.bmm(pred, cell_emb).squeeze(2),
-                torch.bmm(var, cell_emb).squeeze(2),
-                torch.bmm(zero_logits, cell_emb).squeeze(2),
-            )
-            # zero logits need to based on the cell_emb, because of input exprs
-        elif self.arch_style == "concat query":
-            query_vecs = self.query_activation(self.gene2query(gene_embs))
-            # expand cell_emb to (batch, seq_len, embsize)
-            cell_emb = cell_emb.unsqueeze(1).expand(-1, gene_embs.shape[1], -1)
-
-            h = self.hidden_activation(
-                self.fc1(torch.cat([cell_emb, query_vecs], dim=2))
-            )
-            pred, var, zero_logits = self.fc2(h).split(1, dim=-1)
-        elif self.arch_style == "sum query":
-            query_vecs = self.query_activation(self.gene2query(gene_embs))
-            cell_emb = cell_emb.unsqueeze(1)
-
-            h = self.hidden_activation(self.fc1(cell_emb + query_vecs))
-            pred, var, zero_logits = self.fc2(h).split(1, dim=-1)
-        return dict(
-            mean=F.softmax(pred, dim=-1),
-            disp=torch.exp(var),
-            zero_logits=zero_logits,
-        )

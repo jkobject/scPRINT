@@ -107,6 +107,9 @@ class Block(nn.Module):
         self,
         hidden_states: Tensor,
         residual: Optional[Tensor] = None,
+        src_mask=None,
+        is_causal=None,
+        src_key_padding_mask=None,
         mixer_subset=None,
         mixer_kwargs=None,
     ):

@@ -141,4 +141,7 @@ data/adamson
 data/fasta/*
 data/scGPT_human
 wandb/*
+
 */lightning_logs/*
+*.lock
+data/tensorboard/*

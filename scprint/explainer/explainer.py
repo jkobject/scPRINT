@@ -81,8 +81,11 @@ class BaseExplainer:
 
         head_view([todisp], names)
 
-    def viz_gene_embeddings(self, layer, resolutions=[0.5, 1, 4]):
-        self.get_gene_embeddings(layer=layer)
+    def viz_gene_embeddings(self, adata=None, layer=None, resolutions=[0.5, 1, 4]):
+        if layer is not None:
+            self.get_gene_embeddings(layer=layer)
+        elif adata is None:
+            raise ValueError("Please provide either adata or layer")
         sc.pp.pca(adata, n_comps=50)
         sc.pp.neighbors(adata, n_pcs=50, n_neighbors=20)
         sc.tl.umap(adata, min_dist=0.3)

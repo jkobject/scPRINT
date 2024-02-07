@@ -410,9 +410,11 @@ def masker(
     """
     mask = []
     for _ in range(batch_size):
-        m = np.zeros(length, dtype=int)
-        loc = np.random.choice(a=length, size=int(length*mask_ratio), replace=False, p=mask_prob)
+        m = np.zeros(length)
+        loc = np.random.choice(
+            a=length, size=int(length * mask_ratio), replace=False, p=mask_prob
+        )
         m[loc] = mask_value
         mask.append(m)
 
-    return torch.Tensor(np.array(mask))
+    return torch.Tensor(np.array(mask)).to(torch.bool)

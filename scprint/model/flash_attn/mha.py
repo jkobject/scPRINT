@@ -22,25 +22,6 @@ FusedDense = None
 RotaryEmbedding = None
 
 
-# From https://github.com/ofirpress/attention_with_linear_biases/blob/4b92f28a005ead2567abe2359f633e73e08f3833/fairseq/models/transformer.py#L742
-def get_alibi_slopes(nheads):
-    def get_slopes_power_of_2(nheads):
-        start = 2 ** (-(2 ** -(math.log2(nheads) - 3)))
-        ratio = start
-        return [start * ratio**i for i in range(nheads)]
-
-    if math.log2(nheads).is_integer():
-        return get_slopes_power_of_2(nheads)
-    else:
-        closest_power_of_2 = 2 ** math.floor(math.log2(nheads))
-        return (
-            get_slopes_power_of_2(closest_power_of_2)
-            + get_alibi_slopes(2 * closest_power_of_2)[0::2][
-                : nheads - closest_power_of_2
-            ]
-        )
-
-
 class FlashSelfAttention(nn.Module):
     """Implement the scaled dot product attention with softmax.
     Arguments
@@ -61,17 +42,20 @@ class FlashSelfAttention(nn.Module):
         deterministic=False,
     ):
         super().__init__()
-        assert (
-            flash_attn_varlen_qkvpacked_func is not None
-        ), "FlashAttention is not installed"
+        assert flash_attn_qkvpacked_func is not None, "FlashAttention is not installed"
         assert flash_attn_qkvpacked_func is not None, "FlashAttention is not installed"
         self.causal = causal
         self.softmax_scale = softmax_scale
-        self.drop = nn.Dropout(attention_dropout)
-        self.register_buffer("alibi_slopes", alibi_slopes, persistent=False)
-        self.deterministic = deterministic
 
-    def forward(self, qkv, causal=None, cu_seqlens=None, max_seqlen=None):
+    def forward(
+        self,
+        qkv,
+        causal=None,
+        cu_seqlens=None,
+        max_seqlen=None,
+        cu_seqlens_k=None,
+        max_seqlen_k=None,
+    ):
         """Implements the multihead softmax attention.
         Arguments
         ---------
@@ -91,30 +75,13 @@ class FlashSelfAttention(nn.Module):
         assert qkv.dtype in [torch.float16, torch.bfloat16]
         assert qkv.is_cuda
         causal = self.causal if causal is None else causal
-        unpadded = cu_seqlens is not None
-        if unpadded:
-            assert cu_seqlens.dtype == torch.int32
-            assert max_seqlen is not None
-            assert isinstance(max_seqlen, int)
-            return flash_attn_varlen_qkvpacked_func(
-                qkv,
-                cu_seqlens,
-                max_seqlen,
-                self.drop.p if self.training else 0.0,
-                softmax_scale=self.softmax_scale,
-                causal=causal,
-                alibi_slopes=self.alibi_slopes,
-                deterministic=self.deterministic,
-            )
-        else:
-            return flash_attn_qkvpacked_func(
-                qkv,
-                # self.drop.p if self.training else 0.0,
-                softmax_scale=self.softmax_scale,
-                causal=causal,
-                # alibi_slopes=self.alibi_slopes,
-                # deterministic=self.deterministic,
-            )
+        return flash_attn_qkvpacked_func(
+            qkv,
+            None,
+            # self.drop.p if self.training else 0.0,
+            causal,
+            self.softmax_scale,
+        )
 
 
 class FlashCrossAttention(nn.Module):
@@ -137,9 +104,7 @@ class FlashCrossAttention(nn.Module):
         deterministic=False,
     ):
         super().__init__()
-        assert (
-            flash_attn_varlen_kvpacked_func is not None
-        ), "FlashAttention is not installed"
+        assert flash_attn_kvpacked_func is not None, "FlashAttention is not installed"
         assert flash_attn_kvpacked_func is not None, "FlashAttention is not installed"
         self.causal = causal
         self.softmax_scale = softmax_scale
@@ -173,41 +138,18 @@ class FlashCrossAttention(nn.Module):
         assert q.dtype in [torch.float16, torch.bfloat16]
         assert q.is_cuda and kv.is_cuda
         causal = self.causal if causal is None else causal
-        unpadded = cu_seqlens is not None
-        if unpadded:
-            assert cu_seqlens.dtype == torch.int32
-            assert max_seqlen is not None
-            assert isinstance(max_seqlen, int)
-            assert cu_seqlens_k is not None
-            assert cu_seqlens_k.dtype == torch.int32
-            assert max_seqlen_k is not None
-            assert isinstance(max_seqlen, int)
-            return flash_attn_varlen_kvpacked_func(
-                q,
-                kv,
-                cu_seqlens,
-                cu_seqlens_k,
-                max_seqlen,
-                max_seqlen_k,
-                self.drop.p if self.training else 0.0,
-                softmax_scale=self.softmax_scale,
-                causal=causal,
-                alibi_slopes=self.alibi_slopes,
-                deterministic=self.deterministic,
-            )
-        else:
-            batch_size, seqlen_q = q.shape[0], q.shape[1]
-            seqlen_k = kv.shape[1]
-            assert kv.shape[0] == batch_size and kv.shape[4] == q.shape[3]
-            return flash_attn_kvpacked_func(
-                q,
-                kv,
-                # self.drop.p if self.training else 0.0,
-                causal=causal,
-                softmax_scale=self.softmax_scale,
-                # alibi_slopes=self.alibi_slopes,
-                # deterministic=self.deterministic,
-            )
+        batch_size, seqlen_q = q.shape[0], q.shape[1]
+        assert kv.shape[0] == batch_size and kv.shape[4] == q.shape[3]
+        return flash_attn_kvpacked_func(
+            q,
+            kv,
+            None,
+            # self.drop.p if self.training else 0.0,
+            causal,
+            self.softmax_scale,
+            # alibi_slopes=self.alibi_slopes,
+            # deterministic=self.deterministic,
+        )
 
 
 class SelfAttention(nn.Module):
@@ -649,7 +591,7 @@ class MHA(nn.Module):
         if not self.cross_attn and self.num_heads_kv == self.num_heads:
             assert x_kv is None and mixer_subset is None
             if not self.return_residual:
-                qkv = self.Wqkv(x)
+                qkv = self.Wqkv(x)#.to(torch.float16, device="cuda")
             else:
                 qkv, x = self.Wqkv(x)
             if self.dwconv:

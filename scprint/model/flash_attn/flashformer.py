@@ -9,7 +9,7 @@ import os
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 ########
-from .flashattention import flash_attn_qkvpacked_func
+from .flashEGT import flash_attn_qkvpacked_func
 
 
 class FlashSelfAttention(nn.Module):

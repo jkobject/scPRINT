@@ -13,6 +13,20 @@ using:
 
 ## Install it from PyPI
 
+first have a good version of pytorch installed
+
+you might need to make it match your cuda version etc..
+
+We only support torch>=2.0.0
+
+then install laminDB
+
+```bash
+pip install 'lamindb[jupyter,bionty]'
+```
+
+then install scPrint
+
 ```bash
 pip install scprint
 ```
