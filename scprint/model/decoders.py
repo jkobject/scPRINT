@@ -44,26 +44,36 @@ class ExprDecoder(nn.Module):
             nn.Linear(d_model, d_model),
             nn.LeakyReLU(),
         )
-        self.depth_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
+        self.depth_encoder = nn.Sequential(
+            encoders.ContinuousValueEncoder(d_model, dropout),
+            nn.Dropout(dropout),
+            nn.LeakyReLU(),
+        )
         self.pred_var_zero = nn.Linear(d_model, 3)
         self.depth_fc = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.LeakyReLU(),
+            nn.Linear(d_model, 1),
+            nn.ReLu(),
         )
 
     def forward(self, x: Tensor, depth: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
         # we don't do it on the labels
+        depth = torch.min(
+            torch.tensor(1),
+            torch.log2(torch.max(depth, torch.tensor(100)) / 100) / 19,
+        )
         depth = self.depth_encoder(depth).unsqueeze(1)
-        # depth = self.depth_fc(x[:, 0, :])
         x = self.fc(x[:, self.nfirst_labels_to_skip :, :])
         x = self.finalfc(x + depth)
+        depth_mult = self.depth_fc(depth)
         pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
             1, dim=-1
         )  # (batch, seq_len)
         # The sigmoid function is used to map the zero_logits to a probability between 0 and 1.
         return dict(
-            mean=F.softmax(pred_value.squeeze(-1), dim=-1),
+            mean=F.softmax(pred_value.squeeze(-1), dim=-1) * depth_mult,
             disp=torch.exp(var_value.squeeze(-1)),
             zero_logits=zero_logits.squeeze(-1),
         )

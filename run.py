@@ -135,6 +135,10 @@ datamodule.setup()
 for i in datamodule.train_dataloader():
     break
 
+decoders = {}
+for k, v in mdataset.encoder.items():
+    decoders[k] = {va: ke for ke, va in v.items()}
+
 model = scPrint(
     genes=df.index.tolist(),
     d_model=d_model,
@@ -149,6 +153,7 @@ model = scPrint(
     use_precpt_gene_emb=df.iloc[:, :d_model].values.astype(float),
     gene_pos_enc=df["pos"].tolist(),
     mvc_decoder="inner product",
+    label_decoders=decoders,
 )
 
 model.pred_embedding = [

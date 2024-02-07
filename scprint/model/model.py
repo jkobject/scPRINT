@@ -951,7 +951,7 @@ class scPrint(L.LightningModule):
 
     def log_umap(self, gtclass=None):
         colname = ["pred_" + i for i in self.labels]
-        obs = np.array(self.pred.to(device="cpu", dtype=torch.float32))
+        obs = np.array(self.pred.to(device="cpu", dtype=torch.int32))
         # label decoders is not cls_decoders. one is a dict to map class codes (ints)
         # to class names the other is the module the predict the class
         if self.label_decoders is not None:
@@ -964,7 +964,7 @@ class scPrint(L.LightningModule):
 
         if gtclass is not None:
             colname += self.labels
-            nobs = np.array(gtclass.to(device="cpu", dtype=torch.float32))
+            nobs = np.array(gtclass.to(device="cpu", dtype=torch.int32))
             if self.label_decoders is not None:
                 nobs = np.array(
                     [
@@ -999,7 +999,7 @@ class scPrint(L.LightningModule):
                 sc.pl.umap(
                     adata,
                     color=col,
-                    ax = axs[i//2, i%2],
+                    ax=axs[i // 2, i % 2],
                     show=False,
                 )
         else:
@@ -1009,7 +1009,7 @@ class scPrint(L.LightningModule):
                 sc.pl.umap(
                     adata,
                     color=col,
-                    ax = axs[i],
+                    ax=axs[i],
                     show=False,
                 )
         try:

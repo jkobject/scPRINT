@@ -94,7 +94,7 @@ def zinb(
     mu: torch.Tensor,
     theta: torch.Tensor,
     pi: torch.Tensor,
-    eps=1e-8,
+    eps=1e-7,
     mask=None,
 ):
     """
