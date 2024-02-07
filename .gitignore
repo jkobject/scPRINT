@@ -145,3 +145,4 @@ wandb/*
 */lightning_logs/*
 *.lock
 data/tensorboard/*
+notebooks/assessments/*/
