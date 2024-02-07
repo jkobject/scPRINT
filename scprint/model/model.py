@@ -992,7 +992,7 @@ class scPrint(L.LightningModule):
                 for i in pair
             ]
             fig, axs = plt.subplots(
-                int(len(color) / 2), 2, figsize=(16, len(color) * 4)
+                int(len(color) / 2), 2, figsize=(24, len(color) * 4)
             )
             plt.subplots_adjust(wspace=1)
             for i, col in enumerate(color):
@@ -1004,7 +1004,7 @@ class scPrint(L.LightningModule):
                 )
         else:
             color = ["pred_" + i for i in self.labels]
-            fig, axs = plt.subplots(len(color), 1, figsize=(8, len(color) * 8))
+            fig, axs = plt.subplots(len(color), 1, figsize=(16, len(color) * 8))
             for i, col in enumerate(color):
                 sc.pl.umap(
                     adata,
