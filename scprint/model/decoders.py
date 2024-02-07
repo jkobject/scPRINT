@@ -2,6 +2,7 @@ from typing import Dict, Union
 from torch import Tensor, nn
 from torch.nn import functional as F
 import torch
+from . import encoders
 
 
 class GraphSDEExprDecoder(nn.Module):
@@ -31,29 +32,32 @@ class ExprDecoder(nn.Module):
         self,
         d_model: int,
         nfirst_labels_to_skip: int = 0,
+        dropout: float = 0.1,
     ):
         super(ExprDecoder, self).__init__()
         self.nfirst_labels_to_skip = nfirst_labels_to_skip
         self.fc = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.LeakyReLU(),
+        )
+        self.finalfc = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.LeakyReLU(),
         )
+        self.depth_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
         self.pred_var_zero = nn.Linear(d_model, 3)
         self.depth_fc = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.LeakyReLU(),
-            nn.Linear(d_model, 1),
-            nn.ReLU(),
         )
 
-    def forward(self, x: Tensor) -> Dict[str, Tensor]:
+    def forward(self, x: Tensor, depth: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
         # we don't do it on the labels
-        depth = self.depth_fc(x[:, 0, :])
+        depth = self.depth_encoder(depth).unsqueeze(1)
+        # depth = self.depth_fc(x[:, 0, :])
         x = self.fc(x[:, self.nfirst_labels_to_skip :, :])
-
+        x = self.finalfc(x + depth)
         pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
             1, dim=-1
         )  # (batch, seq_len)
@@ -62,7 +66,6 @@ class ExprDecoder(nn.Module):
             mean=F.softmax(pred_value.squeeze(-1), dim=-1),
             disp=torch.exp(var_value.squeeze(-1)),
             zero_logits=zero_logits.squeeze(-1),
-            depth=depth,
         )
         # TODO: note that the return currently is only for training. Since decoder
         # is not used in the test setting for the integration task, the eval/inference

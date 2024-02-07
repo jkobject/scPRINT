@@ -150,6 +150,14 @@ model = scPrint(
     gene_pos_enc=df["pos"].tolist(),
     mvc_decoder="inner product",
 )
+
+model.pred_embedding = [
+    "cell_type_ontology_term_id",
+    "disease_ontology_term_id",
+    "self_reported_ethnicity_ontology_term_id",
+    "sex_ontology_term_id",
+]
+
 # create a function to transform an scGPT checkpoint to an scPrint's
 # ckpt = torch.load("../../scGPT/save/model_e6.pt")
 # scPrint.load_from_checkpoint("../../scGPT/save/model_e6.pt")

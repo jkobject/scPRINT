@@ -16,6 +16,7 @@ from anndata import AnnData
 import math
 from functools import partial
 import numpy as np
+from matplotlib import pyplot as plt
 
 try:
     from .flash_attn import MHA, Block
@@ -64,6 +65,7 @@ class scPrint(L.LightningModule):
         cell_emb_style: str = "cls",
         ecs_threshold: float = 0.3,
         similarity: float = 0.5,
+        label_decoders: Optional[Dict[str, Dict[int, str]]] = None,
     ):
         """
         __init__ method for TransformerModel.
@@ -107,7 +109,9 @@ class scPrint(L.LightningModule):
         self.labels_counts = labels
         self.labels = list(labels.keys())
         self.cell_emb_style = cell_emb_style
+        self.label_decoders = label_decoders
         self.embs = None
+        self.pred_embedding = None
         # compute tensor for cls_hierarchy
         self.cls_hierarchy = {}
         for k, v in cls_hierarchy.items():
@@ -160,9 +164,8 @@ class scPrint(L.LightningModule):
         # Batch Encoder
         # always have [base_cell_emb, time_embedding, depth_embedding] + any other class info
         # base cell embedding will store other cell specific information
-        self.label_encoder = encoders.BatchLabelEncoder(len(self.labels) + 3, d_model)
+        self.label_encoder = encoders.BatchLabelEncoder(len(self.labels) + 2, d_model)
         self.time_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
-        self.depth_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
         # self.depth_decoder
         # TODO: add sequencing depth decoding (with weight tying?)
 
@@ -248,7 +251,8 @@ class scPrint(L.LightningModule):
         # expression
         self.expr_decoder = decoders.ExprDecoder(
             d_model,
-            nfirst_labels_to_skip=len(self.labels) + 3,
+            nfirst_labels_to_skip=len(self.labels) + 2,
+            dropout=dropout,
         )
         # cls decoder
         self.cls_decoders = nn.ModuleDict()
@@ -291,7 +295,6 @@ class scPrint(L.LightningModule):
         expression: Optional[Tensor] = None,
         mask: Optional[Tensor] = None,
         # (minibatch,) unormalized total counts
-        depth: Optional[Tensor] = None,
         # (minibatch,), then will be compared to this timepoint
         timepoint: Optional[Tensor] = None,
         cell_embs: Optional[Tensor] = None,  # (minibatch, n_labels, embsize)
@@ -328,19 +331,15 @@ class scPrint(L.LightningModule):
         # if cell embedding is already provided, we don't compute the default ones
         cell_embs = (
             self.label_encoder(
-                torch.Tensor([list(range(len(self.labels) + 3))] * gene_pos.shape[0])
+                torch.Tensor([list(range(len(self.labels) + 2))] * gene_pos.shape[0])
                 .int()
                 .to(gene_pos.device)
             )
             if cell_embs is None
             else cell_embs
         )  # (minibatch, embsize)
-
-        # populate
-        if depth is not None:
-            cell_embs[:, 0, :] += self.depth_encoder(depth)
         if timepoint is not None:
-            cell_embs[:, 1, :] = self.time_encoder(timepoint)
+            cell_embs[:, 0, :] = self.time_encoder(timepoint)
 
         enc = torch.cat([cell_embs, enc], dim=1)
 
@@ -356,8 +355,10 @@ class scPrint(L.LightningModule):
         # TODO: get the attention here
         return output  # (minibatch, seq_len, embsize)
 
-    def _decoder(self, transformer_output, get_gene_emb=False, do_sample=False):
-        output = self.expr_decoder(transformer_output)
+    def _decoder(
+        self, transformer_output, depth=None, get_gene_emb=False, do_sample=False
+    ):
+        output = self.expr_decoder(transformer_output, depth)
         if do_sample:
             pass
         # bernoulli = Bernoulli(probs=mlm_output["zero_probs"])
@@ -372,13 +373,13 @@ class scPrint(L.LightningModule):
                     "cls_output_"
                     + labelname: self.cls_decoders[labelname](
                         output["cell_embs"][
-                            :, 3 + i, :
+                            :, 2 + i, :
                         ]  # the first elem is the base cell embedding
                     )
                     for i, labelname in enumerate(self.labels)
                 }
             )  # (minibatch, n_cls)
-        if self.mvc_decoder is not None:
+        if self.mvc_decoder is not None and False:
             mvc_output = self.mvc_decoder(
                 cell_emb,
                 self.cur_gene_token_embs,
@@ -393,7 +394,7 @@ class scPrint(L.LightningModule):
 
         if get_gene_emb:
             output["gene_embedding"] = transformer_output[
-                :, len(self.labels) + 3 :, :
+                :, len(self.labels) + 2 :, :
             ]  # (minibatch, seq_len, embsize)
         return output
 
@@ -416,8 +417,8 @@ class scPrint(L.LightningModule):
         Returns:
             dict of output Tensors.
         """
-        transformer_output = self._encoder(gene_pos, expression, mask, depth, timepoint)
-        return self._decoder(transformer_output, get_gene_emb, do_sample)
+        transformer_output = self._encoder(gene_pos, expression, mask, timepoint)
+        return self._decoder(transformer_output, depth, get_gene_emb, do_sample)
 
     def configure_optimizers(self, **kwargs):
         # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam
@@ -506,17 +507,17 @@ class scPrint(L.LightningModule):
         expr = torch.log2(1 + ((expression * 10e4) / total_count[:, None])).to(
             gene_pos.device
         )
-        depth = torch.min(
-            torch.tensor(1),
-            torch.log2(torch.max(total_count, torch.tensor(100)) / 100) / 19,
-        ).to(gene_pos.device)
+        # depth = torch.min(
+        #    torch.tensor(1),
+        #    torch.log2(torch.max(total_count, torch.tensor(100)) / 100) / 19,
+        # ).to(gene_pos.device)
         for i in mask_ratio:
             mask = tokenizer.masker(
                 length=gene_pos.shape[1],
                 batch_size=gene_pos.shape[0],
                 mask_ratio=i,
             ).to(gene_pos.device)
-            output = self.forward(gene_pos, expr, mask, depth, timepoint)
+            output = self.forward(gene_pos, expr, mask, total_count, timepoint)
             l, tot = self._compute_loss(
                 output, expression, mask, clss, do_ecs, do_adv_cls, do_mvc
             )
@@ -534,9 +535,12 @@ class scPrint(L.LightningModule):
                 # Randomly drop on average N counts to each element of expression using a heavy tail Gaussian distribution
                 # here we try to get the scale of the distribution so as to remove the right number of counts from each gene
                 # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02601-5#:~:text=Zero%20measurements%20in%20scRNA%2Dseq,generation%20of%20scRNA%2Dseq%20data.
+                # TODO: test and look a bit more into it
                 expr = utils.downsample_profile(expression, renoise=i)
                 expr = torch.log2(1 + (expr * 10e4) / (total_count[:, None] * (1 - i)))
-                output = self.forward(gene_pos, expr, depth=depth, timepoint=timepoint)
+                output = self.forward(
+                    gene_pos, expr, depth=total_count, timepoint=timepoint
+                )
                 l, tot = self._compute_loss(
                     output, expression, None, clss, do_ecs, do_adv_cls, do_mvc
                 )
@@ -594,7 +598,7 @@ class scPrint(L.LightningModule):
             losses.update({"cce": loss_cce})
 
         # TASK 6. expression generation
-        out = self._generate(default_embs, gene_pos)
+        out = self._generate(default_embs, gene_pos, depth=total_count)
         l, tloss = self._compute_loss(
             out,
             expression,
@@ -645,7 +649,7 @@ class scPrint(L.LightningModule):
         loss_expr = loss.zinb(
             theta=output["disp"],
             pi=output["zero_logits"],
-            mu=output["mean"] * output["depth"],
+            mu=output["mean"],
             target=expression,
             mask=mask,
         )
@@ -675,7 +679,7 @@ class scPrint(L.LightningModule):
                     for adv_label in self.labels.keys():
                         if adv_label != labelname:
                             advpred = self.cls_decoders[adv_label](
-                                output["cell_embs"][:, 3 + j, :]
+                                output["cell_embs"][:, 2 + j, :]
                             )
                             if len(self.cls_hierarchy) > 0:
                                 # computin hierarchical labels and adding them to cl
@@ -709,7 +713,7 @@ class scPrint(L.LightningModule):
             loss_expr_mvc = loss.zinb(
                 theta=output["mvc_disp"],
                 pi=output["mvc_zero_logits"],
-                mu=output["mvc_mean"] * output["depth"],
+                mu=output["mvc_mean"],
                 target=expression,
                 mask=mask,
             )
@@ -729,7 +733,6 @@ class scPrint(L.LightningModule):
         self,
         batch,
         batch_idx,
-        batch_emb=None,
     ):
         """
         validation_step defines the validation loop. It is independent of forward
@@ -751,27 +754,28 @@ class scPrint(L.LightningModule):
             batch,
             do_cce=True,
             do_ecs=True,
-            do_mvc=True,
+            do_mvc=False,
             do_denoise=True,
             noise=[0.3],
         )
         expression = batch["x"]
         gene_pos = batch["genes"]
-        total_count = batch["depth"]
-        expr = torch.log2(1 + ((expression * 10e4) / total_count[:, None])).to(
+        depth = batch["depth"]
+        expr = torch.log2(1 + ((expression * 10e4) / depth[:, None])).to(
             gene_pos.device
         )
-        depth = torch.min(
-            torch.tensor(1),
-            torch.log2(torch.max(total_count, torch.tensor(100)) / 100) / 19,
-        ).to(gene_pos.device)
-        if self.embs.shape[0] < 10000:
-            self.predict(gene_pos, expr, depth, batch_emb)
-            self.info = (
-                batch["class"]
-                if self.embs is None
-                else torch.cat([self.info, batch["class"]])
-            )
+        # depth = torch.min(
+        #    torch.tensor(1),
+        #    torch.log2(torch.max(depth, torch.tensor(100)) / 100) / 19,
+        # ).to(gene_pos.device)
+        if self.embs is not None:
+            if self.embs.shape[0] < 10000:
+                self._predict(gene_pos, expr, depth)
+                self.info = torch.cat([self.info, batch["class"]])
+        else:
+            self._predict(gene_pos, expr, depth)
+            self.info = batch["class"]
+
         # Logging to TensorBoard (if installed) by default
         self.log("val_loss", total_loss)
         # self.validation_step_outputs.append(output[''])
@@ -779,41 +783,7 @@ class scPrint(L.LightningModule):
         return total_loss
 
     def on_validation_epoch_end(self):
-        self.log_umap()
-
-    def log_umap(self):
-        adata = AnnData(
-            np.array(self.embs.to("cpu")),
-            obs=pd.DataFrame(
-                np.hstack(
-                    [np.array(self.info.to("cpu")), np.array(self.pred.to("cpu"))]
-                ),
-                columns=self.labels + ["pred_" + i for i in self.labels],
-            ),
-        )
-        sc.pp.neighbors(adata)
-        sc.tl.umap(adata)
-        sc.tl.leiden(adata)
-        adata.obs = adata.obs.astype("category")
-
-        fig = sc.pl.umap(
-            adata,
-            color=[
-                i
-                for pair in zip(self.labels, ["pred_" + i for i in self.labels])
-                for i in pair
-            ],
-            show=False,
-            return_fig=True,
-        )
-        try:
-            self.logger.experiment.add_figure(fig)
-        except:
-            print("couldn't log to tensorboard")
-        try:
-            self.logger.log_image(key="umaps", images=[fig])
-        except:
-            print("couldn't log to wandb")
+        self.log_umap(gtclass=self.info)
 
     # TODO: compute classification accuracy metrics
     # def on_validation_epoch_end(self):
@@ -866,7 +836,7 @@ class scPrint(L.LightningModule):
     def _get_cell_embs(self, layer_output):
         if self.cell_emb_style == "cls" and self.labels is not None:
             # (minibatch, embsize)
-            cell_emb = layer_output[:, : 3 + len(self.labels)]
+            cell_emb = layer_output[:, : 2 + len(self.labels)]
         elif self.cell_emb_style == "avg-pool":
             cell_emb = torch.mean(layer_output, dim=1)
         else:
@@ -901,17 +871,16 @@ class scPrint(L.LightningModule):
             transformer_output = self._encoder(
                 cell_embs=cell_embs,
                 gene_pos=gene_pos,
-                depth=depth,
                 timepoint=tp * (i + 1) if tp is not None else None,
             )  # (minibatch, seq_len, embsize)
             cell_embs = self._get_cell_embs(transformer_output)
-        output = self._decoder(transformer_output)
+        output = self._decoder(transformer_output, depth=depth)
         return output  # (minibatch, seq_len)
 
-    def on_prediction_epoch_start(self):
+    def on_predict_epoch_start(self):
         self.embs = None
 
-    def predict_step(self, batch, batch_idx, batch_emb=None):
+    def predict_step(self, batch, batch_idx):
         """
         embed given gene expression, encode the gene embedding and cell embedding.
 
@@ -924,21 +893,22 @@ class scPrint(L.LightningModule):
         """
         expression = batch["x"]
         gene_pos = batch["genes"]
-        total_count = batch["depth"]
-        expression = torch.log2(1 + ((expression * 10e4) / total_count[:, None])).to(
+        depth = batch["depth"]
+        expression = torch.log2(1 + ((expression * 10e4) / depth[:, None])).to(
             gene_pos.device
         )
-        depth = torch.min(
-            torch.tensor(1),
-            torch.log2(torch.max(total_count, torch.tensor(100)) / 100) / 19,
-        ).to(gene_pos.device)
-        self.predict(gene_pos, expression, depth, batch_emb)
+        # depth = torch.min(
+        #    torch.tensor(1),
+        #    torch.log2(torch.max(total_count, torch.tensor(100)) / 100) / 19,
+        # ).to(gene_pos.device)
+        self._predict(gene_pos, expression, depth)
 
-    def predict(self, gene_pos, expression, depth, batch_emb=None):
+    def _predict(self, gene_pos, expression, depth):
         output = self.forward(gene_pos, expression, mask=None, depth=depth)
-        if batch_emb is None:
-            batch_emb = self.labels
-        ind = [self.labels.index(i) for i in batch_emb]
+        if self.pred_embedding is None:
+            ind = [1]
+        else:
+            ind = [1] + [self.labels.index(i) for i in self.pred_embedding]
         if self.embs is None:
             self.embs = torch.mean(output["cell_embs"][:, ind, :], dim=1)
             self.pred = torch.stack(
@@ -947,6 +917,7 @@ class scPrint(L.LightningModule):
                     for labelname in self.labels
                 ]
             ).transpose(0, 1)
+            self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]]
         elif self.embs.shape[0] > 10000:
             pass
         else:
@@ -964,9 +935,104 @@ class scPrint(L.LightningModule):
                     ).transpose(0, 1),
                 ],
             )
+            self.expr_pred = [
+                torch.cat([self.expr_pred[0], output["mean"]]),
+                torch.cat([self.expr_pred[1], output["disp"]]),
+                torch.cat([self.expr_pred[2], output["zero_logits"]]),
+            ]
 
-    def on_prediction_epoch_end(self):
-        self.log_umap()
+    def on_predict_epoch_end(self):
+        self.expr_pred = [
+            i.to(device="cpu", dtype=torch.float32) for i in self.expr_pred
+        ]
+        self.pred = self.pred.to(device="cpu", dtype=torch.float32)
+        self.embs = self.embs.to(device="cpu", dtype=torch.float32)
+        return self.log_umap()
+
+    def log_umap(self, gtclass=None):
+        colname = ["pred_" + i for i in self.labels]
+        obs = np.array(self.pred.to(device="cpu", dtype=torch.float32))
+        # label decoders is not cls_decoders. one is a dict to map class codes (ints)
+        # to class names the other is the module the predict the class
+        if self.label_decoders is not None:
+            obs = np.array(
+                [
+                    [self.label_decoders[self.labels[i]][n] for n in name]
+                    for i, name in enumerate(obs.T)
+                ]
+            ).T
+
+        if gtclass is not None:
+            colname += self.labels
+            nobs = np.array(gtclass.to(device="cpu", dtype=torch.float32))
+            if self.label_decoders is not None:
+                nobs = np.array(
+                    [
+                        [self.label_decoders[self.labels[i]][n] for n in name]
+                        for i, name in enumerate(nobs.T)
+                    ]
+                ).T
+            obs = np.hstack([obs, nobs])
+        adata = AnnData(
+            np.array(self.embs.to(device="cpu", dtype=torch.float32)),
+            obs=pd.DataFrame(
+                obs,
+                columns=colname,
+            ),
+        )
+        sc.pp.neighbors(adata)
+        sc.tl.umap(adata)
+        sc.tl.leiden(adata)
+        adata.obs = adata.obs.astype("category")
+        print(adata)
+        if gtclass is not None:
+            color = [
+                i
+                for pair in zip(self.labels, ["pred_" + i for i in self.labels])
+                for i in pair
+            ]
+            fig, axs = plt.subplots(
+                int(len(color) / 2), 2, figsize=(16, len(color) * 4)
+            )
+            plt.subplots_adjust(wspace=1)
+            for i, col in enumerate(color):
+                sc.pl.umap(
+                    adata,
+                    color=col,
+                    ax = axs[i//2, i%2],
+                    show=False,
+                )
+        else:
+            color = ["pred_" + i for i in self.labels]
+            fig, axs = plt.subplots(len(color), 1, figsize=(8, len(color) * 8))
+            for i, col in enumerate(color):
+                sc.pl.umap(
+                    adata,
+                    color=col,
+                    ax = axs[i],
+                    show=False,
+                )
+        try:
+            self.logger.experiment.add_figure(fig)
+        except:
+            print("couldn't log to tensorboard")
+        try:
+            self.logger.log_image(key="umaps", images=[fig])
+        except:
+            print("couldn't log to wandb")
+        return adata
+
+    def _predict_denoised_expression(self, gene_pos, expression, depth):
+        """
+        Args:
+            gene_pos (:obj:`Tensor`): token ids, shape [batch_size, seq_len]
+            expression (:obj:`Tensor`): token values, shape [batch_size, seq_len]
+
+        Returns:
+            dict of output Tensors.
+        """
+        output = self.forward(gene_pos, expression, depth=depth)
+        return output
 
 
 def _init_weights(
