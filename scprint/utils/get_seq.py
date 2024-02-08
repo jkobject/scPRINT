@@ -17,6 +17,77 @@ from gget.gget_info import info
 
 # Constants
 from gget.constants import ENSEMBL_REST_API, UNIPROT_REST_API
+import ftplib
+import os
+from Bio import SeqIO
+
+
+def list_files(ftp, match=""):
+    files = ftp.nlst()
+    return [file for file in files if file.endswith(match)]
+
+
+def load_fasta_species(
+    species="homo_sapiens", output_path="/tmp/data/fasta/", cache=True
+):
+    ftp = ftplib.FTP("ftp.ensembl.org")
+    ftp.login()
+    ftp.cwd("/pub/release-110/fasta/" + species + "/pep/")
+    file = list_files(ftp, ".all.fa.gz")[0]
+    local_file_path = output_path + file
+    if not os.path.exists(local_file_path) or not cache:
+        os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+        with open(local_file_path, "wb") as local_file:
+            ftp.retrbinary("RETR " + file, local_file.write)
+    ftp.cwd("/pub/release-110/fasta/" + species + "/ncrna/")
+    file = list_files(ftp, ".ncrna.fa.gz")[0]
+    local_file_path = output_path + file
+    if not os.path.exists(local_file_path) or not cache:
+        with open(local_file_path, "wb") as local_file:
+            ftp.retrbinary("RETR " + file, local_file.write)
+    ftp.quit()
+
+
+def subset_fasta(
+    gene_tosubset,
+    fasta_path,
+    subfasta_path="./data/fasta/subset.fa",
+    drop_unknown_seq=True,
+):
+    """
+    subset_fasta: creates a new fasta file with only the sequence which names contain one of gene_names
+    """
+    dup = set()
+    weird = 0
+    genes_found = set()
+    gene_tosubset = set(gene_tosubset)
+    with open(fasta_path, "r") as original_fasta, open(
+        subfasta_path, "w"
+    ) as subset_fasta:
+        for record in SeqIO.parse(original_fasta, "fasta"):
+            gene_name = (
+                record.description.split(" gene:")[1]
+                .split(" transcript")[0]
+                .split(".")[0]
+            )
+            if gene_name in gene_tosubset:
+                if drop_unknown_seq:
+                    if "*" in record.seq:
+                        weird += 1
+
+                        continue
+                if not gene_name.startswith("ENSG"):
+                    raise ValueError("issue", gene_name)
+                if gene_name in genes_found:
+                    dup.add(gene_name)
+                    continue
+                record.description = ""
+                record.id = gene_name
+                SeqIO.write(record, subset_fasta, "fasta")
+                genes_found.add(gene_name)
+    print(len(dup), " genes had duplicates")
+    print("dropped", weird, "weird sequences")
+    return genes_found
 
 
 def seq(
@@ -132,7 +203,9 @@ def seq(
             # If isoforms true, fetch sequences of isoforms instead
             if isoforms == True:
                 # Get ID type (gene, transcript, ...) using gget info
-                info_df = info(ensembl_ID, verbose=False, pdb=False, ncbi=False, uniprot=False)
+                info_df = info(
+                    ensembl_ID, verbose=False, pdb=False, ncbi=False, uniprot=False
+                )
 
                 # Check if Ensembl ID was found
                 if isinstance(info_df, type(None)):
@@ -234,7 +307,9 @@ def seq(
             trans_ids = []
 
             # Get ID type (gene, transcript, ...) using gget info
-            info_df = info(ens_ids_clean, verbose=False, pdb=False, ncbi=False, uniprot=False)
+            info_df = info(
+                ens_ids_clean, verbose=False, pdb=False, ncbi=False, uniprot=False
+            )
 
             # Check that Ensembl ID was found
             missing = set(ens_ids_clean) - set(info_df.index.values)
@@ -295,11 +370,13 @@ def seq(
             df_uniprot = get_uniprot_seqs(UNIPROT_REST_API, trans_ids)
             # Add info_df.loc[ensembl_ID] to df_uniprot by joining on "canonical_transcript" / "gene_name" respectively
             import pdb
+
             pdb.set_trace()
             info_df.set_index("canonical_transcript", inplace=True)
-            
-            df_uniprot.loc[:, "gene_id"] = info_df.loc[df_uniprot["query"], "gene_name"].values
-            
+
+            df_uniprot.loc[:, "gene_id"] = info_df.loc[
+                df_uniprot["query"], "gene_name"
+            ].values
 
         if isoforms is True:
             # List to collect transcript IDs
@@ -307,7 +384,9 @@ def seq(
 
             for ensembl_ID in ens_ids_clean:
                 # Get ID type (gene, transcript, ...) using gget info
-                info_df = info(ensembl_ID, verbose=False, pdb=False, ncbi=False, uniprot=False)
+                info_df = info(
+                    ensembl_ID, verbose=False, pdb=False, ncbi=False, uniprot=False
+                )
 
                 # Check that Ensembl ID was found
                 if isinstance(info_df, type(None)):

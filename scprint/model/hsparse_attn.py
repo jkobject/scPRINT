@@ -187,6 +187,56 @@ def _bwd_kernel(
     BLOCK_M: tl.constexpr, BLOCK_DMODEL: tl.constexpr,
     BLOCK_N: tl.constexpr,
 ):
+    """
+    _bwd_kernel _summary_
+
+    Args:
+        Q (tl.Tensor): The query tensor.
+        K (tl.Tensor): The key tensor.
+        V (tl.Tensor): The value tensor.
+        sm_scale (tl.Tensor): The scale tensor used in softmax calculation.
+        Out (tl.Tensor): The output tensor from the forward pass.
+        DO (tl.Tensor): The gradient tensor from the subsequent layer.
+        DQ (tl.Tensor): The gradient tensor for the query.
+        DK (tl.Tensor): The gradient tensor for the key.
+        DV (tl.Tensor): The gradient tensor for the value.
+        Q_idx (tl.Tensor): The index tensor for the query.
+        K_idx (tl.Tensor): The index tensor for the key.
+        sqiz (int): The size of the query tensor along the Z dimension.
+        sqih (int): The size of the query tensor along the H dimension.
+        sqim (int): The size of the query tensor along the M dimension.
+        skih (int): The size of the key tensor along the H dimension.
+        skin (int): The size of the key tensor along the N dimension.
+        K_hash (tl.Tensor): The hash tensor for the key.
+        sqhz (int): The size of the query hash tensor along the Z dimension.
+        sqhh (int): The size of the query hash tensor along the H dimension.
+        sqhm (int): The size of the query hash tensor along the M dimension.
+        skhh (int): The size of the key hash tensor along the H dimension.
+        skhn (int): The size of the key hash tensor along the N dimension.
+        M (tl.Tensor): The mask tensor.
+        D (tl.Tensor): The dropout tensor.
+        sqz (int): The stride of the query tensor along the Z dimension.
+        sqh (int): The stride of the query tensor along the H dimension.
+        sqm (int): The stride of the query tensor along the M dimension.
+        sqd (int): The stride of the query tensor along the D dimension.
+        skz (int): The stride of the key tensor along the Z dimension.
+        skh (int): The stride of the key tensor along the H dimension.
+        skn (int): The stride of the key tensor along the N dimension.
+        skd (int): The stride of the key tensor along the D dimension.
+        svz (int): The stride of the value tensor along the Z dimension.
+        svh (int): The stride of the value tensor along the H dimension.
+        svn (int): The stride of the value tensor along the N dimension.
+        svd (int): The stride of the value tensor along the D dimension.
+        Z (int): The number of batches.
+        H (int): The number of heads.
+        N_CTX_Q (int): The sequence length of the query.
+        N_CTX_KV (int): The sequence length of the key/value.
+        num_block_q (int): The number of blocks in the query.
+        num_block_kv (int): The number of blocks in the key/value.
+        BLOCK_M (tl.constexpr): The block size along the M dimension.
+        BLOCK_DMODEL (tl.constexpr): The block size along the D dimension.
+        BLOCK_N (tl.constexpr): The block size along the N dimension.
+    """
     
     off_hz = tl.program_id(0)
     off_z = off_hz // H

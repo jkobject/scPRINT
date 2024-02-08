@@ -15,9 +15,9 @@ keywords = [
 ]
 
 [tool.poetry.dependencies]
+lamindb = "*"
 python = "3.10"
-cellxgene_census = "*"
-tiledbsoma = "*"
+cellxgene-census = "*"
 torch = "*"
 anndata = "*"
 matplotlib = "*"
@@ -28,6 +28,30 @@ owlready2 = "*"
 torchdata = "*"
 biomart = "*"
 scib = "*"
+scikit-learn = "*"
+scipy = "*"
+pandas = ">=2.0.0"
+numpy = "*"
+leidenalg = "*"
+decoupler = "*"
+Bio = "*"
+attridict = "*"
+gget = "*"
+torchvision = "*"
+fair-esm = { git = "https://github.com/facebookresearch/esm.git", branch = "main" }
+hydra-core = "*"
+lightning = "*"
+torchtext = "*"
+transformers = "*"
+pynndescent = ">=0.5.11"
+scDataLoader = "*"
+einops = "*"
+#pytorch-fast-transformers = "*"
+#packaging = "*"
+#ninja = "*"
+# flash-attn
+# packaging, ninja
+# pip install flash-attn --no-build-isolation
 
 [tool.poetry.group.cuda.dependencies]
 
