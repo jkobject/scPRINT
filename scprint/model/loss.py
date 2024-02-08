@@ -94,7 +94,7 @@ def zinb(
     mu: torch.Tensor,
     theta: torch.Tensor,
     pi: torch.Tensor,
-    eps=1e-7,
+    eps=1e-6,
     mask=None,
 ):
     """
@@ -229,7 +229,7 @@ def ecs(cell_emb, ecs_threshold=0.5):
     return torch.mean(1 - (cos_sim - ecs_threshold) ** 2)
 
 
-def classification(labelname, pred, cl, maxsize, cls_hierarchy):
+def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
     newcl = torch.zeros(
         (cl.shape[0], maxsize), device=cl.device
     )  # batchsize * n_labels
@@ -261,7 +261,9 @@ def classification(labelname, pred, cl, maxsize, cls_hierarchy):
             npred = torch.masked.masked_tensor(npred, mask)
             nnewcl = torch.masked.masked_tensor(nnewcl, mask)
             nnewcl = torch.amax(nnewcl, dim=-1)
-            npred = torch.amax(npred, dim=-1)
+            amax = torch.amax(npred, dim=-1)
+            npred = torch.log(torch.sum(torch.exp(npred - amax), dim=-1)) + amax
+            # npred = torch.amax(npred, dim=-1)
 
             addweight = torch.ones(nnewcl.shape).to(pred.device)
             addweight[(cl == -1)] = 0

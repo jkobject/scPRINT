@@ -66,6 +66,7 @@ class scPrint(L.LightningModule):
         ecs_threshold: float = 0.3,
         similarity: float = 0.5,
         label_decoders: Optional[Dict[str, Dict[int, str]]] = None,
+        lr=0.001,
     ):
         """
         __init__ method for TransformerModel.
@@ -110,6 +111,7 @@ class scPrint(L.LightningModule):
         self.labels = list(labels.keys())
         self.cell_emb_style = cell_emb_style
         self.label_decoders = label_decoders
+        self.lr = lr
         self.embs = None
         self.pred_embedding = None
         # compute tensor for cls_hierarchy
@@ -285,7 +287,7 @@ class scPrint(L.LightningModule):
         )
         self.save_hyperparameters()
 
-    def on_fit_start(self):
+    def on_train_start(self):
         for k, v in self.cls_hierarchy.items():
             self.cls_hierarchy[k] = v.to(self.device)
 
@@ -422,7 +424,8 @@ class scPrint(L.LightningModule):
 
     def configure_optimizers(self, **kwargs):
         # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam
-        optimizer = optim.Adam(self.parameters(), **kwargs)
+        optimizer = optim.Adam(self.parameters(), lr=self.lr, **kwargs)
+        # optimizer = optim.AdamW(self.parameters(), lr=self.lr, **kwargs)
         return optimizer
 
     def training_step(
@@ -608,8 +611,6 @@ class scPrint(L.LightningModule):
             do_adv_cls,
             do_mvc,
         )
-
-        torch.ones_like(expression)
         losses.update({"gen_" + k: v for k, v in l.items()})
         total_loss += tloss
 
@@ -901,7 +902,7 @@ class scPrint(L.LightningModule):
         #    torch.tensor(1),
         #    torch.log2(torch.max(total_count, torch.tensor(100)) / 100) / 19,
         # ).to(gene_pos.device)
-        self._predict(gene_pos, expression, depth)
+        return self._predict(gene_pos, expression, depth)
 
     def _predict(self, gene_pos, expression, depth):
         output = self.forward(gene_pos, expression, mask=None, depth=depth)
@@ -949,7 +950,7 @@ class scPrint(L.LightningModule):
         self.embs = self.embs.to(device="cpu", dtype=torch.float32)
         return self.log_umap()
 
-    def log_umap(self, gtclass=None):
+    def log_umap(self, gtclass=None, name=""):
         colname = ["pred_" + i for i in self.labels]
         obs = np.array(self.pred.to(device="cpu", dtype=torch.int32))
         # label decoders is not cls_decoders. one is a dict to map class codes (ints)
@@ -1020,6 +1021,14 @@ class scPrint(L.LightningModule):
             self.logger.log_image(key="umaps", images=[fig])
         except:
             print("couldn't log to wandb")
+        adata.write(
+            (self.logger.save_dir if self.logger.save_dir is not None else ".")
+            + "/step_"
+            + str(self.global_step)
+            + "_umap_"
+            + name
+            + ".h5ad"
+        )
         return adata
 
     def _predict_denoised_expression(self, gene_pos, expression, depth):

@@ -18,7 +18,7 @@ class Collator:
         add_zero_genes=200,
         logp1=False,
         norm_to=None,
-        how="most expr",
+        how="all",
         tp_name=None,
         organism_name="organism_ontology_term_id",
         class_names=[],
@@ -109,9 +109,11 @@ class Collator:
                 loc = nnz_loc[
                     np.random.choice(len(nnz_loc), self.max_len, replace=False)
                 ]
+            elif self.how == "all":
+                loc = np.arange(len(expr))
             else:
                 raise ValueError("how must be either most expr or random expr")
-            if self.add_zero_genes > 0:
+            if self.add_zero_genes > 0 and self.how != "all":
                 zero_loc = np.where(expr == 0)[0]
                 zero_loc = [
                     np.random.choice(len(zero_loc), self.add_zero_genes, replace=False)
