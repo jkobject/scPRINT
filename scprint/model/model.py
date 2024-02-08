@@ -9,6 +9,7 @@ import torch
 
 import lightning as L
 
+from matplotlib import pyplot as plt
 
 import pandas as pd
 import scanpy as sc
@@ -64,6 +65,7 @@ class scPrint(L.LightningModule):
         cell_emb_style: str = "cls",
         ecs_threshold: float = 0.3,
         similarity: float = 0.5,
+        label_decoders: Optional[Dict[str, Dict[int, str]]] = None,
     ):
         """
         __init__ method for TransformerModel.
@@ -108,6 +110,8 @@ class scPrint(L.LightningModule):
         self.labels = list(labels.keys())
         self.cell_emb_style = cell_emb_style
         self.embs = None
+        self.label_decoders = label_decoders
+        self.pred_embedding = None
         # compute tensor for cls_hierarchy
         self.cls_hierarchy = {}
         for k, v in cls_hierarchy.items():
@@ -378,7 +382,7 @@ class scPrint(L.LightningModule):
                     for i, labelname in enumerate(self.labels)
                 }
             )  # (minibatch, n_cls)
-        if self.mvc_decoder is not None:
+        if self.mvc_decoder is not None and False:
             mvc_output = self.mvc_decoder(
                 cell_emb,
                 self.cur_gene_token_embs,
@@ -534,6 +538,7 @@ class scPrint(L.LightningModule):
                 # Randomly drop on average N counts to each element of expression using a heavy tail Gaussian distribution
                 # here we try to get the scale of the distribution so as to remove the right number of counts from each gene
                 # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02601-5#:~:text=Zero%20measurements%20in%20scRNA%2Dseq,generation%20of%20scRNA%2Dseq%20data.
+                # TODO: test and look a bit more into it
                 expr = utils.downsample_profile(expression, renoise=i)
                 expr = torch.log2(1 + (expr * 10e4) / (total_count[:, None] * (1 - i)))
                 output = self.forward(gene_pos, expr, depth=depth, timepoint=timepoint)
@@ -729,7 +734,6 @@ class scPrint(L.LightningModule):
         self,
         batch,
         batch_idx,
-        batch_emb=None,
     ):
         """
         validation_step defines the validation loop. It is independent of forward
@@ -751,7 +755,7 @@ class scPrint(L.LightningModule):
             batch,
             do_cce=True,
             do_ecs=True,
-            do_mvc=True,
+            do_mvc=False,
             do_denoise=True,
             noise=[0.3],
         )
@@ -765,13 +769,13 @@ class scPrint(L.LightningModule):
             torch.tensor(1),
             torch.log2(torch.max(total_count, torch.tensor(100)) / 100) / 19,
         ).to(gene_pos.device)
-        if self.embs.shape[0] < 10000:
-            self.predict(gene_pos, expr, depth, batch_emb)
-            self.info = (
-                batch["class"]
-                if self.embs is None
-                else torch.cat([self.info, batch["class"]])
-            )
+        if self.embs is not None:
+            if self.embs.shape[0] < 10000:
+                self._predict(gene_pos, expr, depth)
+                self.info = torch.cat([self.info, batch["class"]])
+        else:
+            self._predict(gene_pos, expr, depth)
+            self.info = batch["class"]
         # Logging to TensorBoard (if installed) by default
         self.log("val_loss", total_loss)
         # self.validation_step_outputs.append(output[''])
@@ -779,41 +783,7 @@ class scPrint(L.LightningModule):
         return total_loss
 
     def on_validation_epoch_end(self):
-        self.log_umap()
-
-    def log_umap(self):
-        adata = AnnData(
-            np.array(self.embs.to("cpu")),
-            obs=pd.DataFrame(
-                np.hstack(
-                    [np.array(self.info.to("cpu")), np.array(self.pred.to("cpu"))]
-                ),
-                columns=self.labels + ["pred_" + i for i in self.labels],
-            ),
-        )
-        sc.pp.neighbors(adata)
-        sc.tl.umap(adata)
-        sc.tl.leiden(adata)
-        adata.obs = adata.obs.astype("category")
-
-        fig = sc.pl.umap(
-            adata,
-            color=[
-                i
-                for pair in zip(self.labels, ["pred_" + i for i in self.labels])
-                for i in pair
-            ],
-            show=False,
-            return_fig=True,
-        )
-        try:
-            self.logger.experiment.add_figure(fig)
-        except:
-            print("couldn't log to tensorboard")
-        try:
-            self.logger.log_image(key="umaps", images=[fig])
-        except:
-            print("couldn't log to wandb")
+        self.log_umap(gtclass=self.info)
 
     # TODO: compute classification accuracy metrics
     # def on_validation_epoch_end(self):
@@ -908,10 +878,10 @@ class scPrint(L.LightningModule):
         output = self._decoder(transformer_output)
         return output  # (minibatch, seq_len)
 
-    def on_prediction_epoch_start(self):
+    def on_predict_epoch_start(self):
         self.embs = None
 
-    def predict_step(self, batch, batch_idx, batch_emb=None):
+    def predict_step(self, batch, batch_idx):
         """
         embed given gene expression, encode the gene embedding and cell embedding.
 
@@ -932,13 +902,14 @@ class scPrint(L.LightningModule):
             torch.tensor(1),
             torch.log2(torch.max(total_count, torch.tensor(100)) / 100) / 19,
         ).to(gene_pos.device)
-        self.predict(gene_pos, expression, depth, batch_emb)
+        self._predict(gene_pos, expression, depth)
 
-    def predict(self, gene_pos, expression, depth, batch_emb=None):
+    def _predict(self, gene_pos, expression, depth):
         output = self.forward(gene_pos, expression, mask=None, depth=depth)
-        if batch_emb is None:
-            batch_emb = self.labels
-        ind = [self.labels.index(i) for i in batch_emb]
+        if self.pred_embedding is None:
+            ind = [1]
+        else:
+            ind = [1] + [self.labels.index(i) for i in self.pred_embedding]
         if self.embs is None:
             self.embs = torch.mean(output["cell_embs"][:, ind, :], dim=1)
             self.pred = torch.stack(
@@ -947,6 +918,7 @@ class scPrint(L.LightningModule):
                     for labelname in self.labels
                 ]
             ).transpose(0, 1)
+            self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]]
         elif self.embs.shape[0] > 10000:
             pass
         else:
@@ -964,9 +936,104 @@ class scPrint(L.LightningModule):
                     ).transpose(0, 1),
                 ],
             )
+            self.expr_pred = [
+                torch.cat([self.expr_pred[0], output["mean"]]),
+                torch.cat([self.expr_pred[1], output["disp"]]),
+                torch.cat([self.expr_pred[2], output["zero_logits"]]),
+            ]
 
-    def on_prediction_epoch_end(self):
-        self.log_umap()
+    def on_predict_epoch_end(self):
+        self.expr_pred = [
+            i.to(device="cpu", dtype=torch.float32) for i in self.expr_pred
+        ]
+        self.pred = self.pred.to(device="cpu", dtype=torch.float32)
+        self.embs = self.embs.to(device="cpu", dtype=torch.float32)
+        return self.log_umap()
+
+    def log_umap(self, gtclass=None):
+        colname = ["pred_" + i for i in self.labels]
+        obs = np.array(self.pred.to(device="cpu", dtype=torch.int32))
+        # label decoders is not cls_decoders. one is a dict to map class codes (ints)
+        # to class names the other is the module the predict the class
+        if self.label_decoders is not None:
+            obs = np.array(
+                [
+                    [self.label_decoders[self.labels[i]][n] for n in name]
+                    for i, name in enumerate(obs.T)
+                ]
+            ).T
+
+        if gtclass is not None:
+            colname += self.labels
+            nobs = np.array(gtclass.to(device="cpu", dtype=torch.int32))
+            if self.label_decoders is not None:
+                nobs = np.array(
+                    [
+                        [self.label_decoders[self.labels[i]][n] for n in name]
+                        for i, name in enumerate(nobs.T)
+                    ]
+                ).T
+            obs = np.hstack([obs, nobs])
+        adata = AnnData(
+            np.array(self.embs.to(device="cpu", dtype=torch.float32)),
+            obs=pd.DataFrame(
+                obs,
+                columns=colname,
+            ),
+        )
+        sc.pp.neighbors(adata)
+        sc.tl.umap(adata)
+        sc.tl.leiden(adata)
+        adata.obs = adata.obs.astype("category")
+        print(adata)
+        if gtclass is not None:
+            color = [
+                i
+                for pair in zip(self.labels, ["pred_" + i for i in self.labels])
+                for i in pair
+            ]
+            fig, axs = plt.subplots(
+                int(len(color) / 2), 2, figsize=(24, len(color) * 4)
+            )
+            plt.subplots_adjust(wspace=1)
+            for i, col in enumerate(color):
+                sc.pl.umap(
+                    adata,
+                    color=col,
+                    ax=axs[i // 2, i % 2],
+                    show=False,
+                )
+        else:
+            color = ["pred_" + i for i in self.labels]
+            fig, axs = plt.subplots(len(color), 1, figsize=(16, len(color) * 8))
+            for i, col in enumerate(color):
+                sc.pl.umap(
+                    adata,
+                    color=col,
+                    ax=axs[i],
+                    show=False,
+                )
+        try:
+            self.logger.experiment.add_figure(fig)
+        except:
+            print("couldn't log to tensorboard")
+        try:
+            self.logger.log_image(key="umaps", images=[fig])
+        except:
+            print("couldn't log to wandb")
+        return adata
+
+    def _predict_denoised_expression(self, gene_pos, expression, depth):
+        """
+        Args:
+            gene_pos (:obj:`Tensor`): token ids, shape [batch_size, seq_len]
+            expression (:obj:`Tensor`): token values, shape [batch_size, seq_len]
+
+        Returns:
+            dict of output Tensors.
+        """
+        output = self.forward(gene_pos, expression, depth=depth)
+        return output
 
 
 def _init_weights(
