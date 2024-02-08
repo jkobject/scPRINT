@@ -2,5 +2,5 @@
 path = scprint/RNABERT
 url = https://github.com/jkobject/RNABERT
 [submodule "scprint/CodonBERT"]
-	path = scprint/CodonBERT
-	url = https://github.com/Sanofi-Public/CodonBERT
+path = scprint/CodonBERT
+url = https://github.com/Sanofi-Public/CodonBERT
