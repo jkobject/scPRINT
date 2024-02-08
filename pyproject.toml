@@ -46,14 +46,11 @@ transformers = "*"
 pynndescent = ">=0.5.11"
 scDataLoader = "*"
 einops = "*"
-#pytorch-fast-transformers = "*"
-#packaging = "*"
-#ninja = "*"
-# flash-attn
-# packaging, ninja
-# pip install flash-attn --no-build-isolation
-
-[tool.poetry.group.cuda.dependencies]
+pytorch-fast-transformers = "*"
+lnschema-bionty = "*"
+bionty = "*"
+[tool.poetry.group.cuda118.dependencies]
+# pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 
 [tool.poetry.group.dev.dependencies]
