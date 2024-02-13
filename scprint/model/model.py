@@ -587,33 +587,27 @@ class scPrint(L.LightningModule):
             cell_emb = cell_embs[0]
             loss_cce = 0
             for cell_emb2 in cell_embs[1:]:
-                res = self.sim(
-                    cell_emb.unsqueeze(1), cell_emb2.unsqueeze(0), sim=cce_sim
+                loss_cce += loss.similarity(
+                    cell_emb.unsqueeze(1), cell_emb2.unsqueeze(0), cce_sim
                 )  # (nlabels, minibatch, minibatch)
-                labels = (
-                    torch.arange(res.size(0))
-                    .long()
-                    .to(device=res.device)
-                    # .to(cell_embs.device)
-                )
-                loss_cce += nn.functional.cross_entropy(res, labels)
             total_loss += loss_cce
             # TASK 3b. contrastive graph embedding
             losses.update({"cce": loss_cce})
 
         # TASK 6. expression generation
-        out = self._generate(default_embs, gene_pos, depth=total_count)
-        l, tloss = self._compute_loss(
-            out,
-            expression,
-            torch.ones_like(expression),
-            clss,
-            do_ecs,
-            do_adv_cls,
-            do_mvc,
-        )
-        losses.update({"gen_" + k: v for k, v in l.items()})
-        total_loss += tloss
+        if default_embs is not None:
+            out = self._generate(default_embs, gene_pos, depth=total_count)
+            l, tloss = self._compute_loss(
+                out,
+                expression,
+                torch.ones_like(expression),
+                clss,
+                do_ecs,
+                do_adv_cls,
+                do_mvc,
+            )
+            losses.update({"gen_" + k: v for k, v in l.items()})
+            total_loss += tloss
 
         # TASK 7. next time point prediction
         if do_next_tp:

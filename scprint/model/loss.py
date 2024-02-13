@@ -199,7 +199,7 @@ def graph_sparsity_loss(input: torch.Tensor, mask: torch.Tensor) -> torch.Tensor
     return loss / mask.sum()
 
 
-class Similarity(torch.nn.Module):
+def similarity():
     """
     Dot product or cosine similarity
     """
@@ -261,8 +261,8 @@ def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
             npred = torch.masked.masked_tensor(npred, mask)
             nnewcl = torch.masked.masked_tensor(nnewcl, mask)
             nnewcl = torch.amax(nnewcl, dim=-1)
-            amax = torch.amax(npred, dim=-1)
-            npred = torch.log(torch.sum(torch.exp(npred - amax), dim=-1)) + amax
+            amax = torch.amax(npred, dim=-1).to_tensor(0)
+            npred = torch.log(torch.sum(torch.exp(npred - amax.unsqueeze(-1)), dim=-1)) + amax
             # npred = torch.amax(npred, dim=-1)
 
             addweight = torch.ones(nnewcl.shape).to(pred.device)
