@@ -2,13 +2,12 @@
 
 from typing import Optional, Dict
 from torch import Tensor, optim, nn
-import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 import torch.distributed as dist
 import torch
 
 import lightning as L
-
+from lightning.pytorch.utilities import grad_norm
 
 import pandas as pd
 import scanpy as sc
@@ -19,7 +18,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 try:
-    from .flash_attn import MHA, Block
+    from .flash_attn import FlashTransformerEncoder
     from .hashformer import Hashformer
 except ModuleNotFoundError as e:
     print(e)
@@ -34,7 +33,7 @@ except ModuleNotFoundError as e:
 
 from . import encoders
 from . import decoders
-from .linear_transformer import FastTransformerEncoderWrapper
+from .linear_transformer import FastTransformerEncoderWrapper as FastTransformerEncoder
 from .EGT import EGT
 from .dsbn import DomainSpecificBatchNorm1d
 from . import loss
@@ -46,7 +45,7 @@ class scPrint(L.LightningModule):
     def __init__(
         self,
         genes: list,
-        use_precpt_gene_emb: Optional[np.array] = None,
+        precpt_gene_emb: Optional[str] = None,
         gene_pos_enc: Optional[list] = None,
         d_model: int = 512,
         nhead: int = 8,
@@ -56,24 +55,24 @@ class scPrint(L.LightningModule):
         layers_cls: list[int] = [],
         labels: Dict[str, int] = {},
         cls_hierarchy: Dict[str, Dict[int, list[int]]] = {},
-        dropout: float = 0.5,
+        dropout: float = 0.2,
         transformer: str = "fast",
-        domain_spec_batchnorm: str = "None",
         expr_emb_style: str = "continuous",  # "binned_pos", "cont_pos"
+        domain_spec_batchnorm: str = "None",
         n_input_bins: int = 0,
         mvc_decoder: str = "inner product",
+        pred_embedding: list[str] = [],
         cell_emb_style: str = "cls",
-        ecs_threshold: float = 0.3,
-        similarity: float = 0.5,
-        label_decoders: Optional[Dict[str, Dict[int, str]]] = None,
         lr=0.001,
+        label_decoders: Optional[Dict[str, Dict[int, str]]] = None,
+        **flash_attention_kwargs,
     ):
         """
         __init__ method for TransformerModel.
         # TODO: add docstrings
         Args:
             genes (list): the genenames with which the model will work
-            use_precpt_gene_emb (np.array, optional): The gene embeddings. should be of size len(genes), d_model.
+            precpt_gene_emb (np.array, optional): The gene embeddings. should be of size len(genes), d_model.
                 it should be in the same order as the genes. Defaults to None.
             gene_pos_enc (list, optional): The gene position encoding. Should be of the same size as genes.
                 for each gene in genes, gives it a location value. Defaults to None.
@@ -95,7 +94,20 @@ class scPrint(L.LightningModule):
             ValueError: If the expr_emb_style is not one of "category", "continuous", "none".
         """
         super().__init__()
-
+        # default
+        self.do_denoise = False
+        self.noise = []
+        self.do_cce = True
+        self.cce_sim = 0.5
+        self.do_ecs = True
+        self.ecs_threshold = 0.3
+        self.ecs_scale = 1.0
+        self.do_mvc = False
+        self.do_adv_cls = False
+        self.do_next_tp = False
+        self.class_scale = 1000
+        self.log_grad = False
+        self.mask_ratio = [0.15]
         # should be stored somehow
         self.d_model = d_model
         self.edge_dim = edge_dim
@@ -103,7 +115,6 @@ class scPrint(L.LightningModule):
         self.gene_pos_enc = gene_pos_enc
         self.mvc_decoder = mvc_decoder
         self.domain_spec_batchnorm = domain_spec_batchnorm
-        self.ecs_threshold = ecs_threshold
         # need to store
         self.n_input_bins = n_input_bins
         self.transformer = transformer
@@ -111,11 +122,12 @@ class scPrint(L.LightningModule):
         self.labels = list(labels.keys())
         self.cell_emb_style = cell_emb_style
         self.label_decoders = label_decoders
+        self.pred_embedding = pred_embedding
         self.lr = lr
         self.embs = None
-        self.pred_embedding = None
         # compute tensor for cls_hierarchy
         self.cls_hierarchy = {}
+
         for k, v in cls_hierarchy.items():
             tens = torch.zeros((len(v), labels[k]))
             for k2, v2 in v.items():
@@ -136,15 +148,25 @@ class scPrint(L.LightningModule):
 
         # encoder
         # gene encoder
-        # TODO: change the model to encoder() / transformer() / decoder()
-        if use_precpt_gene_emb is not None:
-            self.gene_encoder = encoders.GeneEncoder(
-                len(self.vocab), d_model, weights=use_precpt_gene_emb, freeze=True
+        if precpt_gene_emb is not None:
+            embeddings = pd.read_parquet(precpt_gene_emb).loc[self.genes]
+            if len(embeddings) == 0:
+                raise ValueError(
+                    f"the gene embeddings file {precpt_gene_emb} does not contain any of the genes given to the model"
+                )
+            elif len(embeddings) < len(self.genes):
+                print(
+                    "Warning: only a subset of the genes available in the embeddings file."
+                )
+                print("number of genes: ", len(embeddings))
+            sembeddings = torch.nn.AdaptiveAvgPool1d(d_model)(
+                torch.tensor(embeddings.values)
             )
-            self.use_precpt_gene_emb = True
+            self.gene_encoder = encoders.GeneEncoder(
+                len(self.vocab), d_model, weights=sembeddings, freeze=True
+            )
         else:
             self.gene_encoder = encoders.GeneEncoder(len(self.vocab), d_model)
-            self.use_precpt_gene_emb = False
 
         # Value Encoder, NOTE: the scaling style is also handled in _encode method
         if expr_emb_style in ["continuous", "full_pos"]:
@@ -166,10 +188,11 @@ class scPrint(L.LightningModule):
         # Batch Encoder
         # always have [base_cell_emb, time_embedding, depth_embedding] + any other class info
         # base cell embedding will store other cell specific information
-        self.label_encoder = encoders.BatchLabelEncoder(len(self.labels) + 2, d_model)
+        self.label_encoder = encoders.CategoryValueEncoder(
+            len(self.labels) + 2, d_model
+        )
         self.time_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
         # self.depth_decoder
-        # TODO: add sequencing depth decoding (with weight tying?)
 
         # Model
         # Batch Norm
@@ -183,38 +206,23 @@ class scPrint(L.LightningModule):
             print("Using simple batchnorm instead of domain specific batchnorm")
             self.bn = nn.BatchNorm1d(d_model, eps=6.1e-5)
 
-        # Faster Model
-        # TODO: define them all as a layer type
+        # Transformer
         # Linear
         if transformer == "linear":
             # linear transformer using the fast transformer package
-            self.transformer = FastTransformerEncoderWrapper(
+            self.transformer = FastTransformerEncoder(
                 d_model, nhead, d_hid, nlayers, dropout, "linear"
             )
         # flash
         elif transformer == "flash":
-            if MHA is None:
+            if FlashTransformerEncoder is None:
                 raise ValueError("flash transformer requires flash package")
             # NOT flash transformer using the special tritton kernel
             # or parallelMHA (add the process group thing and faster)
-            mode = partial(
-                MHA,
-                num_heads=nhead,
-                dropout=dropout,
-                causal=False,
-                use_flash_attn=True,
+            self.transformer = FlashTransformerEncoder(
+                d_model, nhead, nlayers, dropout=dropout, **flash_attention_kwargs
             )
-            # or use parallelBlock where attn & MLP are done in parallel
-            encoder_layers = Block(
-                dim=d_model,
-                mixer_cls=mode,
-                prenorm=False,
-                # need to set it here for now although it hinders some performances as it returns the residual and I need to see what to do with it
-                # TD [2022-07-30]: Force residual in fp32, seems to make fp16 training more stable
-                # residual_in_fp32=True,
-                # sequence_parallel=True for more parallelism
-            )
-            self.transformer = TransformerEncoder(encoder_layers, nlayers)
+
         # flashsparse
         elif transformer == "flashsparse":
             if Hashformer is None:
@@ -244,10 +252,12 @@ class scPrint(L.LightningModule):
             )
         # regular
         else:
-            encoder_layers = TransformerEncoderLayer(
-                d_model, nhead, d_hid, dropout, batch_first=True
+            self.transformer = TransformerEncoder(
+                TransformerEncoderLayer(
+                    d_model, nhead, d_hid, dropout, batch_first=True
+                ),
+                nlayers,
             )
-            self.transformer = TransformerEncoder(encoder_layers, nlayers)
 
         # decoders
         # expression
@@ -270,12 +280,10 @@ class scPrint(L.LightningModule):
             self.mvc_decoder = decoders.MVCDecoder(
                 d_model,
                 arch_style=mvc_decoder,
+                dropout=dropout,
             )
         else:
             self.mvc_decoder = None
-
-        if similarity is not None:
-            self.sim = loss.Similarity(similarity)
 
         self.apply(
             partial(
@@ -286,10 +294,6 @@ class scPrint(L.LightningModule):
             )
         )
         self.save_hyperparameters()
-
-    def on_train_start(self):
-        for k, v in self.cls_hierarchy.items():
-            self.cls_hierarchy[k] = v.to(self.device)
 
     def _encoder(
         self,
@@ -382,10 +386,7 @@ class scPrint(L.LightningModule):
                 }
             )  # (minibatch, n_cls)
         if self.mvc_decoder is not None and False:
-            mvc_output = self.mvc_decoder(
-                cell_emb,
-                self.cur_gene_token_embs,
-            )
+            mvc_output = self.mvc_decoder(cell_emb, self.cur_gene_token_embs, depth)
             output["mvc_mean"] = mvc_output["mean"]  # (minibatch, seq_len)
             output["mvc_disp"] = mvc_output["disp"]
             output["mvc_zero_logits"] = mvc_output["zero_logits"]
@@ -428,18 +429,16 @@ class scPrint(L.LightningModule):
         # optimizer = optim.AdamW(self.parameters(), lr=self.lr, **kwargs)
         return optimizer
 
+    def on_fit_start(self):
+        if type(self.transformer) is FlashTransformerEncoder:
+            self.transformer.encoder_layers.set_seq_parallel(True)
+        for k, v in self.cls_hierarchy.items():
+            self.cls_hierarchy[k] = v.to(self.device)
+
     def training_step(
         self,
         batch,
         batch_idx,
-        do_denoise=True,
-        noise=[0.3],
-        do_cce=True,
-        do_ecs=True,
-        do_mvc=False,
-        do_adv_cls=False,
-        do_next_tp=False,
-        mask_ratio=[0.15, 0.3],
     ):
         """
         training_step defines the train loop. It is independent of forward
@@ -467,14 +466,15 @@ class scPrint(L.LightningModule):
         # TASK 1 & 2 & 3 (first pass, expression reconstruction, label prediction)
         total_loss, losses = self._full_training(
             batch,
-            do_denoise,
-            noise,
-            do_next_tp,
-            do_cce,
-            do_ecs,
-            do_mvc,
-            do_adv_cls,
-            mask_ratio,
+            self.do_denoise,
+            self.noise,
+            self.do_next_tp,
+            self.do_cce,
+            self.cce_sim,
+            self.do_ecs,
+            self.do_mvc,
+            self.do_adv_cls,
+            self.mask_ratio,
         )
         self.log("train_loss", total_loss, prog_bar=True)
         self.log_dict(losses, prog_bar=True)
@@ -488,6 +488,7 @@ class scPrint(L.LightningModule):
         noise=[],
         do_next_tp=False,
         do_cce=False,
+        cce_sim=0.5,
         do_ecs=False,
         do_mvc=False,
         do_adv_cls=False,
@@ -586,16 +587,16 @@ class scPrint(L.LightningModule):
             cell_emb = cell_embs[0]
             loss_cce = 0
             for cell_emb2 in cell_embs[1:]:
-                cce_sim = self.sim(
-                    cell_emb.unsqueeze(1), cell_emb2.unsqueeze(0)
+                res = self.sim(
+                    cell_emb.unsqueeze(1), cell_emb2.unsqueeze(0), sim=cce_sim
                 )  # (nlabels, minibatch, minibatch)
                 labels = (
-                    torch.arange(cce_sim.size(0))
+                    torch.arange(res.size(0))
                     .long()
-                    .to(device=cce_sim.device)
+                    .to(device=res.device)
                     # .to(cell_embs.device)
                 )
-                loss_cce += nn.functional.cross_entropy(cce_sim, labels)
+                loss_cce += nn.functional.cross_entropy(res, labels)
             total_loss += loss_cce
             # TASK 3b. contrastive graph embedding
             losses.update({"cce": loss_cce})
@@ -666,7 +667,7 @@ class scPrint(L.LightningModule):
             loss_adv_cls = 0
             for j, labelname in enumerate(self.labels):
                 # setting the labels from index to one hot
-                loss_cls += 1000 * loss.classification(
+                loss_cls += self.class_scale * loss.classification(
                     labelname,
                     pred=output["cls_output_" + labelname],
                     cl=clss[:, j],
@@ -695,7 +696,7 @@ class scPrint(L.LightningModule):
                                         )
                                     advpred = torch.cat([advpred, addpred], dim=1)
                             advpred = nn.functional.sigmoid(advpred)
-                            loss_adv_cls += (
+                            loss_adv_cls += self.class_scale * (
                                 nn.functional.binary_cross_entropy_with_logits(
                                     advpred, target=newcl, weight=weight
                                 )
@@ -722,10 +723,19 @@ class scPrint(L.LightningModule):
             losses.update({"expr_mvc": loss_expr_mvc})
         # TASK 5. elastic cell similarity
         if do_ecs:
-            loss_ecs = loss.ecs(output["cell_emb"], ecs_threshold=self.ecs_threshold)
+            loss_ecs = self.ecs_scale * loss.ecs(
+                output["cell_emb"], ecs_threshold=self.ecs_threshold
+            )
             total_loss += loss_ecs
             losses.update({"ecs": loss_ecs})
         return losses, total_loss
+
+    def on_before_optimizer_step(self, optimizer):
+        # Compute the 2-norm for each layer
+        # If using mixed precision, the gradients are already unscaled here
+        if self.log_grad:
+            norms = grad_norm(self.layer, norm_type=2)
+            self.log_dict(norms)
 
     def on_validation_epoch_start(self):
         self.embs = None
@@ -880,6 +890,9 @@ class scPrint(L.LightningModule):
 
     def on_predict_epoch_start(self):
         self.embs = None
+        if type(self.transformer) is FlashTransformerEncoder:
+            for encoder_layers in self.transformer.blocks:
+                encoder_layers.set_seq_parallel(False)
 
     def predict_step(self, batch, batch_idx):
         """
@@ -906,10 +919,7 @@ class scPrint(L.LightningModule):
 
     def _predict(self, gene_pos, expression, depth):
         output = self.forward(gene_pos, expression, mask=None, depth=depth)
-        if self.pred_embedding is None:
-            ind = [1]
-        else:
-            ind = [1] + [self.labels.index(i) for i in self.pred_embedding]
+        ind = [1] + [self.labels.index(i) for i in self.pred_embedding]
         if self.embs is None:
             self.embs = torch.mean(output["cell_embs"][:, ind, :], dim=1)
             self.pred = torch.stack(
@@ -918,6 +928,7 @@ class scPrint(L.LightningModule):
                     for labelname in self.labels
                 ]
             ).transpose(0, 1)
+            self.pos = gene_pos
             self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]]
         elif self.embs.shape[0] > 10000:
             pass
@@ -936,6 +947,7 @@ class scPrint(L.LightningModule):
                     ).transpose(0, 1),
                 ],
             )
+            self.pos = torch.cat([self.pos, gene_pos])
             self.expr_pred = [
                 torch.cat([self.expr_pred[0], output["mean"]]),
                 torch.cat([self.expr_pred[1], output["disp"]]),
@@ -948,6 +960,7 @@ class scPrint(L.LightningModule):
         ]
         self.pred = self.pred.to(device="cpu", dtype=torch.float32)
         self.embs = self.embs.to(device="cpu", dtype=torch.float32)
+        self.pos = self.pos.to(device="cpu", dtype=torch.int32)
         return self.log_umap()
 
     def log_umap(self, gtclass=None, name=""):

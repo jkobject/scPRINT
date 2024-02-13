@@ -46,12 +46,14 @@ transformers = "*"
 pynndescent = ">=0.5.11"
 scDataLoader = "*"
 einops = "*"
-#pytorch-fast-transformers = "*"
-#packaging = "*"
-#ninja = "*"
-# flash-attn
-# packaging, ninja
-# pip install flash-attn --no-build-isolation
+rich = "*"
+pytorch-fast-transformers = "*"
+typeshed-client = "*"
+tensorboardX = "*"
+jsonargparse = "*"
+docstring-parser = "*"
+lnschema-bionty = "*"
+bionty = "*"
 
 [tool.poetry.group.cuda.dependencies]
 

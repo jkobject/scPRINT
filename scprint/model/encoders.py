@@ -79,10 +79,10 @@ class PositionalEncoding(nn.Module):
         pe = torch.zeros(max_len, 1, d_model)
         pe[:, 0, 0::2] = torch.sin(position * div_term)
         pe[:, 0, 1::2] = torch.cos(position * div_term)
-        # we reorder them and map them to gene_id (position) 
+        # we reorder them and map them to gene_id (position)
         arr = []
         for k, v in token_to_pos.items():
-            arr.append(pe[v-1].numpy())
+            arr.append(pe[v - 1].numpy())
         pe = torch.Tensor(np.array(arr))
         self.register_buffer("pe", pe)
 
@@ -91,7 +91,11 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
-        return self.dropout(torch.index_select(self.pe, 0, gene_pos.view(-1)).view(gene_pos.shape + (-1,)))
+        return self.dropout(
+            torch.index_select(self.pe, 0, gene_pos.view(-1)).view(
+                gene_pos.shape + (-1,)
+            )
+        )
 
 
 class DPositionalEncoding(nn.Module):
@@ -165,7 +169,11 @@ class ContinuousValueEncoder(nn.Module):
     """
 
     def __init__(
-        self, d_model: int, dropout: float = 0.1, max_value: int = 1, size: int = 1
+        self,
+        d_model: int,
+        dropout: float = 0.1,
+        max_value: int = 100_000,
+        size: int = 1,
     ):
         super(ContinuousValueEncoder, self).__init__()
         self.max_value = max_value
@@ -187,9 +195,8 @@ class ContinuousValueEncoder(nn.Module):
         # use the mask embedding when x=-1
         # mask = (x == -1).float()
         x = torch.clamp(x, min=0, max=self.max_value)
-        x = self.activation(self.linear1(x))
+        x = self.activation(self.norm(self.linear1(x)))
         # x = self.linear2(x)
-        x = self.norm(x)
         x = self.dropout(x)
         if mask is not None:
             x = x.masked_fill_(mask.unsqueeze(-1), 0)
@@ -220,39 +227,3 @@ class CategoryValueEncoder(nn.Module):
         x = self.embedding(x)  # (batch, seq_len, embsize)
         x = self.enc_norm(x)
         return x
-
-
-class BatchLabelEncoder(nn.Module):
-    def __init__(
-        self,
-        num_embeddings: int,
-        embedding_dim: int,
-        padding_idx: Optional[int] = None,
-    ):
-        super(BatchLabelEncoder, self).__init__()
-        self.embedding = nn.Embedding(
-            num_embeddings, embedding_dim, padding_idx=padding_idx
-        )
-        self.enc_norm = nn.LayerNorm(embedding_dim)
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = self.embedding(x)  # (batch, embsize)
-        x = self.enc_norm(x)
-        return x
-
-
-class EGTEncoder:
-    def __init__(self, d_model: int, nhead: int, num_layers: int):
-        super(EGTEncoder, self).__init__()
-        self.d_model = d_model
-        self.nhead = nhead
-        self.num_layers = num_layers
-        self.transformer = dgl.nn.EGTLayer(
-            feat_size=feat_size,
-            edge_feat_size=edge_feat_size,
-            num_heads=8,
-            num_virtual_nodes=4,
-        )
-
-    def forward(self, x: Tensor) -> Tensor:
-        return self.transformer(x)

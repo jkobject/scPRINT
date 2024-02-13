@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Dict, Union, Callable
 from torch import Tensor, nn
 from torch.nn import functional as F
 import torch
@@ -46,11 +46,13 @@ class ExprDecoder(nn.Module):
         )
         self.depth_encoder = nn.Sequential(
             encoders.ContinuousValueEncoder(d_model, dropout),
-            nn.Dropout(dropout),
+            nn.Linear(d_model, d_model),
             nn.LeakyReLU(),
         )
         self.pred_var_zero = nn.Linear(d_model, 3)
         self.depth_fc = nn.Sequential(
+            nn.Linear(d_model, d_model),
+            nn.LeakyReLU(),
             nn.Linear(d_model, 1),
             nn.ReLU(),
         )
@@ -61,7 +63,7 @@ class ExprDecoder(nn.Module):
         depth = torch.log2(1 + (depth / 100))
         depth = self.depth_encoder(depth).unsqueeze(1)
         x = self.fc(x[:, self.nfirst_labels_to_skip :, :])
-        x = self.finalfc(x)
+        x = self.finalfc(x)  # + depth
         depth_mult = self.depth_fc(depth.squeeze(1))
         pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
             1, dim=-1
@@ -88,6 +90,7 @@ class MVCDecoder(nn.Module):
         self,
         d_model: int,
         arch_style: str = "inner product",
+        dropout: float = 0.1,
         query_activation: nn.Module = nn.Sigmoid,
         hidden_activation: nn.Module = nn.PReLU,
     ) -> None:
@@ -102,6 +105,17 @@ class MVCDecoder(nn.Module):
                 layers.
         """
         super(MVCDecoder, self).__init__()
+        self.depth_encoder = nn.Sequential(
+            encoders.ContinuousValueEncoder(d_model, dropout),
+            nn.Linear(d_model, d_model),
+            nn.LeakyReLU(),
+        )
+        self.depth_fc = nn.Sequential(
+            nn.Linear(d_model, d_model),
+            nn.LeakyReLU(),
+            nn.Linear(d_model, 1),
+            nn.ReLU(),
+        )
         if arch_style == "inner product":
             self.gene2query = nn.Linear(d_model, d_model)
             self.query_activation = query_activation()
@@ -126,16 +140,22 @@ class MVCDecoder(nn.Module):
         self.d_model = d_model
 
     def forward(
-        self, cell_emb: Tensor, gene_embs: Tensor
+        self,
+        cell_emb: Tensor,
+        gene_embs: Tensor,
+        depth: Tensor,
     ) -> Union[Tensor, Dict[str, Tensor]]:
         """
         Args:
             cell_emb: Tensor, shape (batch, embsize=d_model)
             gene_embs: Tensor, shape (batch, seq_len, embsize=d_model)
         """
+        depth = torch.log2(1 + (depth / 100))
+        depth = self.depth_encoder(depth).unsqueeze(1)
+
         if self.arch_style == "inner product":
             query_vecs = self.query_activation(self.gene2query(gene_embs))
-            cell_emb = cell_emb.unsqueeze(2)  # (batch, embsize, 1)
+            cell_emb = cell_emb.unsqueeze(2) + depth  # (batch, embsize, 1)
             # the pred gene expr values, # (batch, seq_len)
             pred, var, zero_logits = self.pred_var_zero(query_vecs).split(
                 self.d_model, dim=-1
@@ -161,8 +181,9 @@ class MVCDecoder(nn.Module):
 
             h = self.hidden_activation(self.fc1(cell_emb + query_vecs))
             pred, var, zero_logits = self.fc2(h).split(1, dim=-1)
+        depth_mult = self.depth_fc(depth.squeeze(1))
         return dict(
-            mean=F.softmax(pred, dim=-1),
+            mean=F.softmax(pred, dim=-1) * depth_mult,
             disp=torch.exp(var),
             zero_logits=zero_logits,
         )
@@ -178,7 +199,7 @@ class ClsDecoder(nn.Module):
         d_model: int,
         n_cls: int,
         layers: list[int] = [256, 128],
-        activation: callable = nn.ReLU,
+        activation: Callable = nn.ReLU,
     ):
         super(ClsDecoder, self).__init__()
         # module list
@@ -186,8 +207,8 @@ class ClsDecoder(nn.Module):
         self._decoder = nn.ModuleList()
         for i, l in enumerate(layers[1:]):
             self._decoder.append(nn.Linear(layers[i - 1], l))
-            self._decoder.append(activation())
             self._decoder.append(nn.LayerNorm(l))
+            self._decoder.append(activation())
         self.out_layer = nn.Linear(layers[-1], n_cls)
 
     def forward(self, x: Tensor) -> Tensor:
