@@ -6,6 +6,7 @@ trainer:
   precision: 16
   profiler: simple
   gradient_clip_val: 10
+  reload_dataloaders_every_n_epochs: 1
   max_time:
     hours: 1
   logger:
@@ -31,7 +32,6 @@ trainer:
         mask_ratio:
           - 0.15
           - 0.3
-        log_grad: True
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
         swa_lrs: 0.01
@@ -46,10 +46,15 @@ trainer:
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: step
+    - class_path: scprint.cli.MySaveConfig
+      init_args:
+        wandblog: all
+        log_freq: 400
+        log_graph: True
 model:
   nhead: 4
   nlayers: 4
-  layers_cls: []
+  layers_cls: [128]
   dropout: 0.2
   transformer: flash
   mvc_decoder: inner product
@@ -77,6 +82,7 @@ data:
   how: most expr
   max_len: 1000
   add_zero_genes: 100
+  train_oversampling: 1.7
   validation_split: 0.2
   test_split: 0.0
   batch_size: 64

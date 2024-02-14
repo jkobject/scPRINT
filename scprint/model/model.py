@@ -106,7 +106,6 @@ class scPrint(L.LightningModule):
         self.do_adv_cls = False
         self.do_next_tp = False
         self.class_scale = 1000
-        self.log_grad = False
         self.mask_ratio = [0.15]
         # should be stored somehow
         self.d_model = d_model
@@ -722,13 +721,6 @@ class scPrint(L.LightningModule):
             total_loss += loss_ecs
             losses.update({"ecs": loss_ecs})
         return losses, total_loss
-
-    def on_before_optimizer_step(self, optimizer):
-        # Compute the 2-norm for each layer
-        # If using mixed precision, the gradients are already unscaled here
-        if self.log_grad:
-            norms = grad_norm(self, 2)
-            self.log_dict(norms)
 
     def on_validation_epoch_start(self):
         self.embs = None

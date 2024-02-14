@@ -16,7 +16,6 @@ class TrainingMode(Callback):
         do_next_tp=False,
         class_scale: float = 1.0,
         mask_ratio=[0.15, 0.3],
-        log_grad=False,
     ):
         super().__init__()
         self.do_denoise = do_denoise
@@ -31,7 +30,6 @@ class TrainingMode(Callback):
         self.do_next_tp = do_next_tp
         self.class_scale = class_scale
         self.mask_ratio = mask_ratio
-        self.log_grad = log_grad
 
     def on_fit_start(self, trainer, model):
         # do something with all training_step outputs, for example:
@@ -47,4 +45,3 @@ class TrainingMode(Callback):
         model.do_next_tp = self.do_next_tp
         model.class_scale = self.class_scale
         model.mask_ratio = self.mask_ratio
-        model.log_grad = self.log_grad
