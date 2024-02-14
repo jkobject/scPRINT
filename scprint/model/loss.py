@@ -199,18 +199,13 @@ def graph_sparsity_loss(input: torch.Tensor, mask: torch.Tensor) -> torch.Tensor
     return loss / mask.sum()
 
 
-def similarity():
+def similarity(x, y, temp):
     """
     Dot product or cosine similarity
     """
-
-    def __init__(self, temp):
-        super().__init__()
-        self.temp = temp
-        self.cos = torch.nn.CosineSimilarity(dim=-1)
-
-    def forward(self, x, y):
-        return self.cos(x, y) / self.temp
+    res = F.cosine_similarity(x, y) / temp
+    labels = torch.arange(res.size(0)).long().to(device=res.device)
+    return F.cross_entropy(res, labels)
 
 
 def ecs(cell_emb, ecs_threshold=0.5):
@@ -262,7 +257,10 @@ def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
             nnewcl = torch.masked.masked_tensor(nnewcl, mask)
             nnewcl = torch.amax(nnewcl, dim=-1)
             amax = torch.amax(npred, dim=-1).to_tensor(0)
-            npred = torch.log(torch.sum(torch.exp(npred - amax.unsqueeze(-1)), dim=-1)) + amax
+            npred = (
+                torch.log(torch.sum(torch.exp(npred - amax.unsqueeze(-1)), dim=-1))
+                + amax
+            )
             # npred = torch.amax(npred, dim=-1)
 
             addweight = torch.ones(nnewcl.shape).to(pred.device)

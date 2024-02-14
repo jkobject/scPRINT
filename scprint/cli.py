@@ -19,7 +19,6 @@ class MyCLI(LightningCLI):
             "data.gene_embeddings", "model.precpt_gene_emb", apply_on="parse"
         )
         parser.add_argument("--set_float32_matmul_precision", type=bool, default=False)
-        # parser.add_argument("--do_commit", type=bool, default=False)
         parser.add_argument("--project", type=str)
 
     def before_instantiate_classes(self):
@@ -27,8 +26,3 @@ class MyCLI(LightningCLI):
             if "set_float32_matmul_precision" in k:
                 if v:
                     torch.set_float32_matmul_precision("medium")
-            if "do_commit" in k:
-                if v:
-                    pass
-                # import os
-                # os.system(f"git add . && git commit -m '{self.config.project}'")

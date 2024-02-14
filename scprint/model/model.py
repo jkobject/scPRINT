@@ -431,7 +431,8 @@ class scPrint(L.LightningModule):
 
     def on_fit_start(self):
         if type(self.transformer) is FlashTransformerEncoder:
-            self.transformer.encoder_layers.set_seq_parallel(True)
+            for encoder_layers in self.transformer.blocks:
+                encoder_layers.set_seq_parallel(True)
         for k, v in self.cls_hierarchy.items():
             self.cls_hierarchy[k] = v.to(self.device)
 
@@ -587,9 +588,7 @@ class scPrint(L.LightningModule):
             cell_emb = cell_embs[0]
             loss_cce = 0
             for cell_emb2 in cell_embs[1:]:
-                loss_cce += loss.similarity(
-                    cell_emb.unsqueeze(1), cell_emb2.unsqueeze(0), cce_sim
-                )  # (nlabels, minibatch, minibatch)
+                loss_cce += loss.similarity(cell_emb.unsqueeze(1), cell_emb2.unsqueeze(0), cce_sim)  # (nlabels, minibatch, minibatch)
             total_loss += loss_cce
             # TASK 3b. contrastive graph embedding
             losses.update({"cce": loss_cce})
@@ -728,7 +727,7 @@ class scPrint(L.LightningModule):
         # Compute the 2-norm for each layer
         # If using mixed precision, the gradients are already unscaled here
         if self.log_grad:
-            norms = grad_norm(self.layer, norm_type=2)
+            norms = grad_norm(self, 2)
             self.log_dict(norms)
 
     def on_validation_epoch_start(self):
@@ -1028,8 +1027,12 @@ class scPrint(L.LightningModule):
             self.logger.log_image(key="umaps", images=[fig])
         except:
             print("couldn't log to wandb")
+        try:
+            dir = self.logger.save_dir if self.logger.save_dir is not None else "."
+        except:
+            dir = "."
         adata.write(
-            (self.logger.save_dir if self.logger.save_dir is not None else ".")
+            (dir)
             + "/step_"
             + str(self.global_step)
             + "_umap_"

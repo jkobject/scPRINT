@@ -6,6 +6,8 @@ trainer:
   precision: 16
   profiler: simple
   gradient_clip_val: 10
+  limit_val_batches: 0
+  limit_train_batches: 1
   max_time:
     hours: 1
   logger:
@@ -29,23 +31,8 @@ trainer:
         do_next_tp: False
         class_scale: 1000.0
         mask_ratio:
-          - 0.15
           - 0.3
         log_grad: True
-    - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
-      init_args:
-        swa_lrs: 0.01
-    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
-      init_args:
-        monitor: val_loss
-        save_top_k: -1
-    - class_path: lightning.pytorch.callbacks.EarlyStopping
-      init_args:
-        monitor: val_loss
-        patience: 10
-    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
-      init_args:
-        logging_interval: step
 model:
   nhead: 4
   nlayers: 4
@@ -79,7 +66,7 @@ data:
   add_zero_genes: 100
   validation_split: 0.2
   test_split: 0.0
-  batch_size: 64
+  batch_size: 16
   num_workers: 8
   # TODO: drop tissue & dev stage until part or is taken in account
   hierarchical_labels:
