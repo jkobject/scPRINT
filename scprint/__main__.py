@@ -5,9 +5,24 @@ from scprint import scPrint
 from scprint.cli import MyCLI
 from scdataloader import DataModule
 
+from lightning.pytorch.cli import SaveConfigCallback
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch import LightningModule, Trainer
+
 from lightning.pytorch.cli import ArgsType
 
-# torch.set_float32_matmul_precision("medium")
+
+class MySaveConfig(SaveConfigCallback):
+    def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
+        if type(trainer.logger) is WandbLogger:
+            if self.config.get("wandblog", "") != "":
+                trainer.logger.watch(
+                    pl_module,
+                    log=self.config.get("wandblog", "all"),
+                    log_freq=self.config.get("wandblog_freq", 500),
+                    log_graph=self.config.get("wandblog_graph", False),
+                )
+        return super().setup(trainer, pl_module, stage)
 
 
 def main(args: ArgsType = None):
@@ -17,6 +32,7 @@ def main(args: ArgsType = None):
         args=args,
         parser_kwargs={"parser_mode": "omegaconf"},
         save_config_kwargs={"overwrite": True},
+        save_config_callback=MySaveConfig,
     )
 
 

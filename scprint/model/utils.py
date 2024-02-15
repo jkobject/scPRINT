@@ -1,4 +1,6 @@
 import torch
+import numpy as np
+from typing import Optional, Union
 
 
 def downsample_profile(mat, renoise):
@@ -42,3 +44,35 @@ def downsample_profile(mat, renoise):
 
     mat = (mat - res) * drop
     return torch.maximum(mat, torch.Tensor([[0]]).to(device=mat.device)).int()
+
+
+def masker(
+    length: int,
+    batch_size: int = 1,
+    mask_ratio: float = 0.15,
+    mask_prob: Optional[Union[torch.Tensor, np.ndarray]] = None,  # n_features
+    mask_value: int = 1,
+) -> torch.Tensor:
+    """
+    Randomly mask a batch of data.
+
+    Args:
+        values (array-like):
+            A batch of tokenized data, with shape (batch_size, n_features).
+        mask_ratio (float): The ratio of genes to mask, default to 0.15.
+        mask_value (int): The value to mask with, default to -1.
+        pad_value (int): The value of padding in the values, will be kept unchanged.
+
+    Returns:
+        torch.Tensor: A tensor of masked data.
+    """
+    mask = []
+    for _ in range(batch_size):
+        m = np.zeros(length)
+        loc = np.random.choice(
+            a=length, size=int(length * mask_ratio), replace=False, p=mask_prob
+        )
+        m[loc] = mask_value
+        mask.append(m)
+
+    return torch.Tensor(np.array(mask)).to(torch.bool)

@@ -1,5 +1,16 @@
 from lightning.pytorch.callbacks import Callback
 
+try:
+    from ..model.flash_attn import FlashTransformerEncoder
+except ModuleNotFoundError as e:
+    print(e)
+    print(
+        "can't use flash attention and triton kernel,\
+        you likely don't have the right hardware or didn't \
+        make the right installation"
+    )
+    FlashTransformerEncoder = None
+
 
 class TrainingMode(Callback):
     def __init__(
@@ -16,6 +27,12 @@ class TrainingMode(Callback):
         do_next_tp=False,
         class_scale: float = 1.0,
         mask_ratio=[0.15, 0.3],
+        warmup_duration=500,
+        weight_decay=0.01,
+        fused_adam=False,
+        lr_patience=3,
+        lr_red_frequency=10_000,
+        lr_red_interval="step",
     ):
         super().__init__()
         self.do_denoise = do_denoise
@@ -30,6 +47,12 @@ class TrainingMode(Callback):
         self.do_next_tp = do_next_tp
         self.class_scale = class_scale
         self.mask_ratio = mask_ratio
+        self.warmup_duration = warmup_duration
+        self.weight_decay = weight_decay
+        self.fused_adam = fused_adam
+        self.lr_patience = lr_patience
+        self.lr_red_frequency = lr_red_frequency
+        self.lr_red_interval = lr_red_interval
 
     def on_fit_start(self, trainer, model):
         # do something with all training_step outputs, for example:
@@ -45,3 +68,9 @@ class TrainingMode(Callback):
         model.do_next_tp = self.do_next_tp
         model.class_scale = self.class_scale
         model.mask_ratio = self.mask_ratio
+        model.warmup_duration = self.warmup_duration
+        model.weight_decay = self.weight_decay
+        model.fused_adam = self.fused_adam
+        model.lr_patience = self.lr_patience
+        model.lr_red_frequency = self.lr_red_frequency
+        model.lr_red_interval = self.lr_red_interval

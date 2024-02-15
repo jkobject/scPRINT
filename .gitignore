@@ -147,3 +147,5 @@ wandb/*
 data/tensorboard/*
 notebooks/assessments/*/
 data/logs/*
+.lr_find_*
+step_*_umap_.*

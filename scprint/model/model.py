@@ -3,11 +3,12 @@
 from typing import Optional, Dict
 from torch import Tensor, optim, nn
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from lightning.pytorch.tuner.lr_finder import _LRCallback
+from lightning.pytorch.callbacks.lr_finder import LearningRateFinder
 import torch.distributed as dist
 import torch
 
 import lightning as L
-from lightning.pytorch.utilities import grad_norm
 
 import pandas as pd
 import scanpy as sc
@@ -37,7 +38,7 @@ from .linear_transformer import FastTransformerEncoderWrapper as FastTransformer
 from .EGT import EGT
 from .dsbn import DomainSpecificBatchNorm1d
 from . import loss
-from ..dataloader import tokenizer
+from .utils import masker
 from . import utils
 
 
@@ -107,6 +108,14 @@ class scPrint(L.LightningModule):
         self.do_next_tp = False
         self.class_scale = 1000
         self.mask_ratio = [0.15]
+        self.warmup_duration = 500
+        self.weight_decay = 0.0
+        self.fused_adam = False
+        self.lr_patience = 3
+        self.lr_red_frequency = 10_000
+        self.lr_red_interval = "step"
+        self.lrfinder_steps = 0
+        self.embs = None
         # should be stored somehow
         self.d_model = d_model
         self.edge_dim = edge_dim
@@ -123,7 +132,6 @@ class scPrint(L.LightningModule):
         self.label_decoders = label_decoders
         self.pred_embedding = pred_embedding
         self.lr = lr
-        self.embs = None
         # compute tensor for cls_hierarchy
         self.cls_hierarchy = {}
 
@@ -422,11 +430,49 @@ class scPrint(L.LightningModule):
         transformer_output = self._encoder(gene_pos, expression, mask, timepoint)
         return self._decoder(transformer_output, depth, get_gene_emb, do_sample)
 
-    def configure_optimizers(self, **kwargs):
+    def configure_optimizers(self):
         # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam
-        optimizer = optim.Adam(self.parameters(), lr=self.lr, **kwargs)
-        # optimizer = optim.AdamW(self.parameters(), lr=self.lr, **kwargs)
-        return optimizer
+        # optimizer = optim.Adam(
+        #    self.parameters(),
+        #    lr=self.hparams.lr,
+        #    betas=(0.9, 0.999),
+        #    eps=1e-08,
+        #    weight_decay=0,
+        #    amsgrad=False,
+        #    fused=False,
+        # )
+        optimizer = optim.AdamW(
+            self.parameters(),
+            lr=self.hparams.lr,
+            betas=(0.9, 0.999),
+            eps=1e-08,
+            weight_decay=self.weight_decay,
+            amsgrad=False,
+            fused=self.fused_adam,
+        )
+        lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode="min", patience=self.lr_patience, factor=0.5
+        )
+        lr_dict = {
+            "scheduler": lr_scheduler,
+            # The unit of the scheduler's step size, could also be 'step'.
+            # 'epoch' updates the scheduler on epoch end whereas 'step'
+            # updates it after a optimizer update.
+            "interval": self.lr_red_interval,
+            # How many epochs/steps should pass between calls to
+            # `scheduler.step()`. 1 corresponds to updating the learning
+            # rate after every epoch/step.
+            "frequency": self.lr_red_frequency,
+            # Metric to to monitor for schedulers like `ReduceLROnPlateau`
+            "monitor": "val_loss",
+        }
+        self.lrfinder_steps = 0
+        for val in self.trainer.callbacks:
+            if type(val) is _LRCallback:
+                self.lrfinder_steps = val.num_training
+            if type(val) is LearningRateFinder:
+                self.lrfinder_steps = val._num_training_steps
+        return [optimizer], [lr_dict]
 
     def on_fit_start(self):
         if type(self.transformer) is FlashTransformerEncoder:
@@ -481,6 +527,25 @@ class scPrint(L.LightningModule):
 
         return total_loss
 
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
+        # update params
+        optimizer.step(closure=optimizer_closure)
+
+        # manually warm up lr without a scheduler
+        # making sure that we don't do this during lrfinder
+        if (
+            self.trainer.global_step < self.warmup_duration + self.lrfinder_steps
+        ) and self.lrfinder_steps < self.trainer.global_step:
+            if self.trainer.global_step == 1:
+                import pdb
+
+                pdb.set_trace()
+            lr_scale = min(
+                1.0, float(self.trainer.global_step + 1) / self.warmup_duration
+            )
+            for pg in optimizer.param_groups:
+                pg["lr"] = lr_scale * self.hparams.lr
+
     def _full_training(
         self,
         batch,
@@ -516,7 +581,7 @@ class scPrint(L.LightningModule):
         #    torch.log2(torch.max(total_count, torch.tensor(100)) / 100) / 19,
         # ).to(gene_pos.device)
         for i in mask_ratio:
-            mask = tokenizer.masker(
+            mask = masker(
                 length=gene_pos.shape[1],
                 batch_size=gene_pos.shape[0],
                 mask_ratio=i,
@@ -587,7 +652,9 @@ class scPrint(L.LightningModule):
             cell_emb = cell_embs[0]
             loss_cce = 0
             for cell_emb2 in cell_embs[1:]:
-                loss_cce += loss.similarity(cell_emb.unsqueeze(1), cell_emb2.unsqueeze(0), cce_sim)  # (nlabels, minibatch, minibatch)
+                loss_cce += loss.similarity(
+                    cell_emb.unsqueeze(1), cell_emb2.unsqueeze(0), cce_sim
+                )  # (nlabels, minibatch, minibatch)
             total_loss += loss_cce
             # TASK 3b. contrastive graph embedding
             losses.update({"cce": loss_cce})
@@ -722,6 +789,10 @@ class scPrint(L.LightningModule):
             losses.update({"ecs": loss_ecs})
         return losses, total_loss
 
+    def on_validation_start(self):
+        for k, v in self.cls_hierarchy.items():
+            self.cls_hierarchy[k] = v.to(self.device)
+
     def on_validation_epoch_start(self):
         self.embs = None
 
@@ -746,7 +817,7 @@ class scPrint(L.LightningModule):
         Returns:
             _type_: _description_
         """
-        total_loss, losses = self._full_training(
+        val_loss, losses = self._full_training(
             batch,
             do_cce=True,
             do_ecs=True,
@@ -773,10 +844,10 @@ class scPrint(L.LightningModule):
             self.info = batch["class"]
 
         # Logging to TensorBoard (if installed) by default
-        self.log("val_loss", total_loss)
+        self.log("val_loss", val_loss)
         # self.validation_step_outputs.append(output[''])
         self.log_dict(losses)  # Logging to TensorBoard by default
-        return total_loss
+        return val_loss
 
     def on_validation_epoch_end(self):
         self.log_umap(gtclass=self.info)
@@ -1024,12 +1095,7 @@ class scPrint(L.LightningModule):
         except:
             dir = "."
         adata.write(
-            (dir)
-            + "/step_"
-            + str(self.global_step)
-            + "_umap_"
-            + name
-            + ".h5ad"
+            (dir) + "/step_" + str(self.global_step) + "_umap_" + name + ".h5ad"
         )
         return adata
 

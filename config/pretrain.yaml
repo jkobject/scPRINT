@@ -2,13 +2,20 @@ project: scprint_test
 seed_everything: 42
 ckpt_path: null
 set_float32_matmul_precision: True
+wandblog: all
+log_freq: 200
+log_graph: True
 trainer:
-  precision: 16
+  precision: 16-mixed
   profiler: simple
   gradient_clip_val: 10
+  log_every_n_steps: 50
+  limit_train_batches: 20000
+  limit_val_batches: 3000
   reload_dataloaders_every_n_epochs: 1
+  accumulate_grad_batches: 2
   max_time:
-    hours: 1
+    hours: 12
   logger:
     - class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
@@ -24,11 +31,17 @@ trainer:
         cce_sim: 0.5
         do_ecs: True
         ecs_threshold: 0.3
-        ecs_scale: 1.0
+        ecs_scale: 10.0
         do_mvc: False
         do_adv_cls: False
         do_next_tp: False
         class_scale: 1000.0
+        warmup_duration: 500
+        weight_decay: 0.01
+        fused_adam: True
+        lr_patience: 3
+        lr_red_frequency: 10_000
+        lr_red_interval: step
         mask_ratio:
           - 0.15
           - 0.3
@@ -46,11 +59,9 @@ trainer:
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: step
-    - class_path: scprint.cli.MySaveConfig
+    - class_path: lightning.pytorch.callbacks.LearningRateFinder
       init_args:
-        wandblog: all
-        log_freq: 400
-        log_graph: True
+        mode: exponential
 model:
   nhead: 4
   nlayers: 4
@@ -86,7 +97,7 @@ data:
   validation_split: 0.2
   test_split: 0.0
   batch_size: 64
-  num_workers: 8
+  num_workers: 16
   # TODO: drop tissue & dev stage until part or is taken in account
   hierarchical_labels:
     - cell_type_ontology_term_id

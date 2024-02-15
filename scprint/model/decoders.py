@@ -63,7 +63,7 @@ class ExprDecoder(nn.Module):
         depth = torch.log2(1 + (depth / 100))
         depth = self.depth_encoder(depth).unsqueeze(1)
         x = self.fc(x[:, self.nfirst_labels_to_skip :, :])
-        x = self.finalfc(x)  # + depth
+        x = self.finalfc(x) + depth
         depth_mult = self.depth_fc(depth.squeeze(1))
         pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
             1, dim=-1
@@ -71,7 +71,7 @@ class ExprDecoder(nn.Module):
         # The sigmoid function is used to map the zero_logits to a probability between 0 and 1.
         return dict(
             mean=F.softmax(pred_value.squeeze(-1), dim=-1) * depth_mult,
-            disp=torch.exp(var_value.squeeze(-1)),
+            disp=torch.exp(torch.clamp(var_value.squeeze(-1), max=20)),
             zero_logits=zero_logits.squeeze(-1),
         )
         # TODO: note that the return currently is only for training. Since decoder
