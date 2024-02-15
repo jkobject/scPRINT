@@ -60,10 +60,10 @@ trainer:
       - 0.3
       warmup_duration: 500
       weight_decay: 0.01
-      fused_adam: true
+      fused_adam: false
       lr_patience: 3
-      lr_red_frequency: 10000
-      lr_red_interval: step
+      lr_red_frequency: 1
+      lr_red_interval: epoch
   - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
     init_args:
       swa_lrs: 0.01
@@ -151,8 +151,7 @@ model:
   d_hid: 128
   edge_dim: 12
   nlayers: 4
-  layers_cls:
-  - 128
+  layers_cls: []
   dropout: 0.2
   transformer: flash
   expr_emb_style: continuous
@@ -184,7 +183,7 @@ data:
   organisms:
   - NCBITaxon:9606
   weight_scaler: 30
-  train_oversampling: 1.7
+  train_oversampling: 1
   label_to_weight:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -200,7 +199,7 @@ data:
   - sex_ontology_term_id
   - organism_ontology_term_id
   validation_split: 0.2
-  test_split: 0.0
+  test_split: 0.1
   use_default_col: true
   all_labels:
   - cell_type_ontology_term_id
