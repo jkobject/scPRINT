@@ -34,7 +34,8 @@ except ModuleNotFoundError as e:
 
 from . import encoders
 from . import decoders
-from .linear_transformer import FastTransformerEncoderWrapper as FastTransformerEncoder
+
+# from .linear_transformer import FastTransformerEncoderWrapper as FastTransformerEncoder
 from .EGT import EGT
 from .dsbn import DomainSpecificBatchNorm1d
 from . import loss

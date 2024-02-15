@@ -2,14 +2,16 @@
 #!/bin/bash -l
 
 # SLURM SUBMIT SCRIPT
-#SBATCH --nodes=4             # This needs to match Trainer(num_nodes=...)
-#SBATCH --gres=gpu:8
-#SBATCH --ntasks-per-node=8   # This needs to match Trainer(devices=...)
-#SBATCH --mem=0
+#SBATCH -q gpu
+#SBATCH -p gpu
+#SBATCH --nodes=1             # This needs to match Trainer(num_nodes=...)
+#SBATCH --gres=gpu:1
+#SBATCH --ntasks-per-node=1   # This needs to match Trainer(devices=...)
+#SBATCH --gmem=20G
 #SBATCH --time=0-02:00:00
 
 # activate conda env
-source activate $1
+# source activate $1
 
 # debugging flags (optional)
 export NCCL_DEBUG=INFO
@@ -23,9 +25,8 @@ export PYTHONFAULTHANDLER=1
 # module load NCCL/2.4.7-1-cuda.10.0
 
 # run script from above
-srun python3 train.py
+srun python3 __main__.py --config config/pretrain.yaml --trainer.devices 1
 
-#SBATCH --signal=SIGUSR1@90
 
 # 90 seconds before training ends
 SBATCH --signal=SIGUSR1@90
