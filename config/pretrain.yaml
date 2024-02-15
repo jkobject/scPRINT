@@ -7,7 +7,7 @@ log_freq: 200
 log_graph: True
 trainer:
   precision: 16-mixed
-  profiler: simple
+  # profiler: simple
   gradient_clip_val: 10
   log_every_n_steps: 50
   limit_train_batches: 20000
@@ -58,7 +58,7 @@ trainer:
         patience: 10
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
-        logging_interval: step
+        logging_interval: epoch
     - class_path: lightning.pytorch.callbacks.LearningRateFinder
       init_args:
         mode: exponential
