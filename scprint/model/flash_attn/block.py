@@ -20,7 +20,7 @@ class Block(nn.Module):
         dim,
         mixer_cls=None,
         mlp_cls=None,
-        norm_cls=nn.LayerNorm,
+        norm_cls=partial(nn.LayerNorm, eps=1e-6),
         dropout_cls=nn.Dropout,
         prenorm=True,
         resid_dropout1=0.0,
@@ -102,6 +102,13 @@ class Block(nn.Module):
         return self.mixer.allocate_inference_cache(
             batch_size, max_seqlen, dtype=dtype, **kwargs
         )
+
+    def set_seq_parallel(self, val: bool):
+        for p in self.norm1.parameters():
+            p._sequence_parallel = val
+        if hasattr(self, "norm2"):
+            for p in self.norm2.parameters():
+                p._sequence_parallel = val
 
     def forward(
         self,

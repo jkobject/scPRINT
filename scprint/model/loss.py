@@ -94,7 +94,7 @@ def zinb(
     mu: torch.Tensor,
     theta: torch.Tensor,
     pi: torch.Tensor,
-    eps=1e-7,
+    eps=1e-6,
     mask=None,
 ):
     """
@@ -199,18 +199,13 @@ def graph_sparsity_loss(input: torch.Tensor, mask: torch.Tensor) -> torch.Tensor
     return loss / mask.sum()
 
 
-class Similarity(torch.nn.Module):
+def similarity(x, y, temp):
     """
     Dot product or cosine similarity
     """
-
-    def __init__(self, temp):
-        super().__init__()
-        self.temp = temp
-        self.cos = torch.nn.CosineSimilarity(dim=-1)
-
-    def forward(self, x, y):
-        return self.cos(x, y) / self.temp
+    res = F.cosine_similarity(x, y) / temp
+    labels = torch.arange(res.size(0)).long().to(device=res.device)
+    return F.cross_entropy(res, labels)
 
 
 def ecs(cell_emb, ecs_threshold=0.5):
@@ -229,7 +224,7 @@ def ecs(cell_emb, ecs_threshold=0.5):
     return torch.mean(1 - (cos_sim - ecs_threshold) ** 2)
 
 
-def classification(labelname, pred, cl, maxsize, cls_hierarchy):
+def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
     newcl = torch.zeros(
         (cl.shape[0], maxsize), device=cl.device
     )  # batchsize * n_labels
@@ -261,7 +256,12 @@ def classification(labelname, pred, cl, maxsize, cls_hierarchy):
             npred = torch.masked.masked_tensor(npred, mask)
             nnewcl = torch.masked.masked_tensor(nnewcl, mask)
             nnewcl = torch.amax(nnewcl, dim=-1)
-            npred = torch.amax(npred, dim=-1)
+            amax = torch.amax(npred, dim=-1).to_tensor(0)
+            npred = (
+                torch.log(torch.sum(torch.exp(npred - amax.unsqueeze(-1)), dim=-1))
+                + amax
+            )
+            # npred = torch.amax(npred, dim=-1)
 
             addweight = torch.ones(nnewcl.shape).to(pred.device)
             addweight[(cl == -1)] = 0

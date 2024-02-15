@@ -1,28 +1,32 @@
-"""CLI interface for scprint project.
+from lightning.pytorch.cli import LightningCLI
 
-Be creative! do whatever you want!
-
-- Install click or typer and create a CLI app
-- Use builtin argparse
-- Start a web application
-- Import things from your .base module
-"""
+import torch
 
 
-def main():  # pragma: no cover
-    """
-    The main function executes on commands:
-    `python -m scprint` and `$ scprint `.
+class MyCLI(LightningCLI):
+    def add_arguments_to_parser(self, parser):
+        parser.link_arguments(
+            "data.gene_pos", "model.gene_pos_enc", apply_on="instantiate"
+        )
+        parser.link_arguments("data.genes", "model.genes", apply_on="instantiate")
+        parser.link_arguments(
+            "data.decoders", "model.label_decoders", apply_on="instantiate"
+        )
+        parser.link_arguments(
+            "data.cls_hierarchy", "model.cls_hierarchy", apply_on="instantiate"
+        )
+        parser.link_arguments("data.labels", "model.labels", apply_on="instantiate")
+        parser.link_arguments(
+            "data.gene_embeddings", "model.precpt_gene_emb", apply_on="parse"
+        )
+        parser.add_argument("--set_float32_matmul_precision", type=bool, default=False)
+        parser.add_argument("--wandblog", type=str, default="")
+        parser.add_argument("--log_freq", type=int, default=500)
+        parser.add_argument("--log_graph", type=bool, default=False)
+        parser.add_argument("--project", type=str)
 
-    This is your program's entry point.
-
-    You can change this function to do whatever you want.
-    Examples:
-        * Run a test suite
-        * Run a server
-        * Do some other stuff
-        * Run a command line application (Click, Typer, ArgParse)
-        * List all available tasks
-        * Run an application (Flask, FastAPI, Django, etc.)
-    """
-    print("This will do something")
+    def before_instantiate_classes(self):
+        for k, v in self.config.items():
+            if "set_float32_matmul_precision" in k:
+                if v:
+                    torch.set_float32_matmul_precision("medium")

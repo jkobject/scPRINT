@@ -1,0 +1,246 @@
+# lightning.pytorch==2.0.9.post0
+seed_everything: 42
+trainer:
+  accelerator: auto
+  strategy: auto
+  devices: auto
+  num_nodes: 1
+  precision: 16-mixed
+  logger:
+  - class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      name: null
+      save_dir: ./data/logs/
+      version: null
+      offline: false
+      dir: null
+      id: null
+      anonymous: null
+      project: scprint_test
+      log_model: false
+      experiment: null
+      prefix: ''
+      checkpoint_name: null
+      job_type: null
+      config: null
+      entity: null
+      reinit: null
+      tags: null
+      group: null
+      notes: null
+      magic: null
+      config_exclude_keys: null
+      config_include_keys: null
+      mode: null
+      allow_val_change: null
+      resume: null
+      force: null
+      tensorboard: null
+      sync_tensorboard: null
+      monitor_gym: null
+      save_code: null
+      settings: null
+  callbacks:
+  - class_path: scprint.trainer.TrainingMode
+    init_args:
+      do_denoise: true
+      noise:
+      - 0.3
+      do_cce: true
+      cce_sim: 0.5
+      do_ecs: true
+      ecs_threshold: 0.3
+      ecs_scale: 10.0
+      do_mvc: false
+      do_adv_cls: false
+      do_next_tp: false
+      class_scale: 1000.0
+      mask_ratio:
+      - 0.15
+      - 0.3
+      warmup_duration: 500
+      weight_decay: 0.01
+      fused_adam: true
+      lr_patience: 3
+      lr_red_frequency: 10000
+      lr_red_interval: step
+  - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
+    init_args:
+      swa_lrs: 0.01
+      swa_epoch_start: 0.8
+      annealing_epochs: 10
+      annealing_strategy: cos
+      avg_fn: null
+      device: cpu
+  - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+    init_args:
+      dirpath: null
+      filename: null
+      monitor: val_loss
+      verbose: false
+      save_last: null
+      save_top_k: -1
+      save_weights_only: false
+      mode: min
+      auto_insert_metric_name: true
+      every_n_train_steps: null
+      train_time_interval: null
+      every_n_epochs: null
+      save_on_train_epoch_end: null
+  - class_path: lightning.pytorch.callbacks.EarlyStopping
+    init_args:
+      monitor: val_loss
+      min_delta: 0.0
+      patience: 10
+      verbose: false
+      mode: min
+      strict: true
+      check_finite: true
+      stopping_threshold: null
+      divergence_threshold: null
+      check_on_train_epoch_end: null
+      log_rank_zero_only: false
+  - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+    init_args:
+      logging_interval: step
+      log_momentum: false
+  - class_path: lightning.pytorch.callbacks.LearningRateFinder
+    init_args:
+      min_lr: 1.0e-08
+      max_lr: 1.0
+      num_training_steps: 100
+      mode: exponential
+      early_stop_threshold: 4.0
+      update_attr: true
+      attr_name: ''
+  fast_dev_run: false
+  max_epochs: null
+  min_epochs: null
+  max_steps: -1
+  min_steps: null
+  max_time: '{''hours'': 12}'
+  limit_train_batches: 20000
+  limit_val_batches: 3000
+  limit_test_batches: null
+  limit_predict_batches: null
+  overfit_batches: 0.0
+  val_check_interval: null
+  check_val_every_n_epoch: 1
+  num_sanity_val_steps: null
+  log_every_n_steps: 50
+  enable_checkpointing: null
+  enable_progress_bar: null
+  enable_model_summary: null
+  accumulate_grad_batches: 2
+  gradient_clip_val: 10
+  gradient_clip_algorithm: null
+  deterministic: null
+  benchmark: null
+  inference_mode: true
+  use_distributed_sampler: true
+  profiler: simple
+  detect_anomaly: false
+  barebones: false
+  plugins: null
+  sync_batchnorm: false
+  reload_dataloaders_every_n_epochs: 1
+  default_root_dir: null
+model:
+  d_model: 128
+  nhead: 4
+  d_hid: 128
+  edge_dim: 12
+  nlayers: 4
+  layers_cls:
+  - 128
+  dropout: 0.2
+  transformer: flash
+  expr_emb_style: continuous
+  domain_spec_batchnorm: None
+  n_input_bins: 0
+  mvc_decoder: inner product
+  pred_embedding:
+  - cell_type_ontology_term_id
+  - disease_ontology_term_id
+  - self_reported_ethnicity_ontology_term_id
+  - sex_ontology_term_id
+  cell_emb_style: cls
+  lr: 0.001
+  residual_in_fp32: true
+  num_heads_kv: null
+  checkpointing: false
+  fused_dropout_add_ln: false
+  return_residual: false
+  prenorm: true
+  mlp_ratio: 4.0
+  fused_mlp: false
+  fused_bias_fc: false
+  sequence_parallel: false
+  drop_path_rate: 0.02
+  weight_init: ''
+data:
+  mdataset: null
+  collection_name: preprocessed dataset
+  organisms:
+  - NCBITaxon:9606
+  weight_scaler: 30
+  train_oversampling: 1.7
+  label_to_weight:
+  - cell_type_ontology_term_id
+  - disease_ontology_term_id
+  - assay_ontology_term_id
+  - self_reported_ethnicity_ontology_term_id
+  - sex_ontology_term_id
+  - organism_ontology_term_id
+  label_to_pred:
+  - cell_type_ontology_term_id
+  - disease_ontology_term_id
+  - assay_ontology_term_id
+  - self_reported_ethnicity_ontology_term_id
+  - sex_ontology_term_id
+  - organism_ontology_term_id
+  validation_split: 0.2
+  test_split: 0.0
+  use_default_col: true
+  all_labels:
+  - cell_type_ontology_term_id
+  - disease_ontology_term_id
+  - assay_ontology_term_id
+  - self_reported_ethnicity_ontology_term_id
+  - sex_ontology_term_id
+  - organism_ontology_term_id
+  - heat_diff
+  - total_counts
+  - nnz
+  - dpt_group
+  hierarchical_labels:
+  - cell_type_ontology_term_id
+  - disease_ontology_term_id
+  - assay_ontology_term_id
+  - self_reported_ethnicity_ontology_term_id
+  how: most expr
+  organism_name: organism_ontology_term_id
+  max_len: 1000
+  add_zero_genes: 100
+  do_gene_pos: true
+  gene_embeddings: ./data/temp/embeddings.parquet
+  gene_position_tolerance: 10000
+  batch_size: 64
+  shuffle: null
+  batch_sampler: null
+  num_workers: 16
+  pin_memory: false
+  drop_last: false
+  timeout: 0.0
+  worker_init_fn: null
+  multiprocessing_context: null
+  generator: null
+  prefetch_factor: null
+  persistent_workers: false
+  pin_memory_device: ''
+set_float32_matmul_precision: true
+wandblog: all
+log_freq: 200
+log_graph: true
+project: scprint_test
+ckpt_path: null

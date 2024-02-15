@@ -46,11 +46,17 @@ transformers = "*"
 pynndescent = ">=0.5.11"
 scDataLoader = "*"
 einops = "*"
+rich = "*"
 pytorch-fast-transformers = "*"
+typeshed-client = "*"
+tensorboardX = "*"
+jsonargparse = "*"
+docstring-parser = "*"
 lnschema-bionty = "*"
 bionty = "*"
-[tool.poetry.group.cuda118.dependencies]
-# pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+triton = "2.0.0.dev20221202"
+
+[tool.poetry.group.cuda.dependencies]
 
 
 [tool.poetry.group.dev.dependencies]
