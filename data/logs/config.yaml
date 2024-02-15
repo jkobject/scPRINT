@@ -102,7 +102,7 @@ trainer:
       log_rank_zero_only: false
   - class_path: lightning.pytorch.callbacks.LearningRateMonitor
     init_args:
-      logging_interval: step
+      logging_interval: epoch
       log_momentum: false
   - class_path: lightning.pytorch.callbacks.LearningRateFinder
     init_args:
@@ -138,7 +138,7 @@ trainer:
   benchmark: null
   inference_mode: true
   use_distributed_sampler: true
-  profiler: simple
+  profiler: null
   detect_anomaly: false
   barebones: false
   plugins: null

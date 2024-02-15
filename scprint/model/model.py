@@ -536,15 +536,14 @@ class scPrint(L.LightningModule):
         if (
             self.trainer.global_step < self.warmup_duration + self.lrfinder_steps
         ) and self.lrfinder_steps < self.trainer.global_step:
-            if self.trainer.global_step == 1:
-                import pdb
-
-                pdb.set_trace()
             lr_scale = min(
                 1.0, float(self.trainer.global_step + 1) / self.warmup_duration
             )
             for pg in optimizer.param_groups:
                 pg["lr"] = lr_scale * self.hparams.lr
+            self.log("lr", lr_scale * self.hparams.lr)
+        else:
+            self.log("lr", self.lr)
 
     def _full_training(
         self,
