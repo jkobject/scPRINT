@@ -18,7 +18,7 @@ keywords = [
 lamindb = "*"
 python = "3.10"
 cellxgene-census = "*"
-torch = "*"
+torch = ">=2.0.0"
 anndata = "*"
 matplotlib = "*"
 seaborn = "*"
