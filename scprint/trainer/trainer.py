@@ -31,8 +31,6 @@ class TrainingMode(Callback):
         weight_decay=0.01,
         fused_adam=False,
         lr_patience=3,
-        lr_red_frequency=10_000,
-        lr_red_interval="step",
     ):
         super().__init__()
         self.do_denoise = do_denoise
@@ -51,8 +49,6 @@ class TrainingMode(Callback):
         self.weight_decay = weight_decay
         self.fused_adam = fused_adam
         self.lr_patience = lr_patience
-        self.lr_red_frequency = lr_red_frequency
-        self.lr_red_interval = lr_red_interval
 
     def on_fit_start(self, trainer, model):
         # do something with all training_step outputs, for example:
@@ -72,5 +68,3 @@ class TrainingMode(Callback):
         model.weight_decay = self.weight_decay
         model.fused_adam = self.fused_adam
         model.lr_patience = self.lr_patience
-        model.lr_red_frequency = self.lr_red_frequency
-        model.lr_red_interval = self.lr_red_interval

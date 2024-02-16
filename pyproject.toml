@@ -57,7 +57,7 @@ bionty = "*"
 triton = "2.0.0.dev20221202"
 
 [tool.poetry.group.cuda.dependencies]
-
+#for k, v in output.items(): print(k, v.sum())
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"
