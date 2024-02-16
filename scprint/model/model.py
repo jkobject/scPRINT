@@ -113,8 +113,6 @@ class scPrint(L.LightningModule):
         self.weight_decay = 0.0
         self.fused_adam = False
         self.lr_patience = 3
-        self.lr_red_frequency = 10_000
-        self.lr_red_interval = "step"
         self.lrfinder_steps = 0
         self.embs = None
         # should be stored somehow
@@ -302,6 +300,7 @@ class scPrint(L.LightningModule):
             )
         )
         self.save_hyperparameters()
+        print(self)
 
     def _encoder(
         self,
@@ -459,11 +458,11 @@ class scPrint(L.LightningModule):
             # The unit of the scheduler's step size, could also be 'step'.
             # 'epoch' updates the scheduler on epoch end whereas 'step'
             # updates it after a optimizer update.
-            "interval": self.lr_red_interval,
+            "interval": "epoch",
             # How many epochs/steps should pass between calls to
             # `scheduler.step()`. 1 corresponds to updating the learning
             # rate after every epoch/step.
-            "frequency": self.lr_red_frequency,
+            "frequency": 1,
             # Metric to to monitor for schedulers like `ReduceLROnPlateau`
             "monitor": "val_loss",
         }

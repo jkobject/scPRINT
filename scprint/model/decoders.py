@@ -51,8 +51,8 @@ class ExprDecoder(nn.Module):
         )
         self.pred_var_zero = nn.Linear(d_model, 3)
         self.depth_fc = nn.Sequential(
-            nn.Linear(d_model, d_model),
-            nn.LeakyReLU(),
+            # nn.Linear(d_model, d_model),
+            # nn.LeakyReLU(),
             nn.Linear(d_model, 1),
             nn.ReLU(),
         )
@@ -60,11 +60,11 @@ class ExprDecoder(nn.Module):
     def forward(self, x: Tensor, depth: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
         # we don't do it on the labels
-        depth = torch.log2(1 + (depth / 100))
+        depth = torch.log2(1 + depth)
         depth = self.depth_encoder(depth).unsqueeze(1)
         x = self.fc(x[:, self.nfirst_labels_to_skip :, :])
         x = self.finalfc(x)  # + depth
-        depth_mult = self.depth_fc(depth.squeeze(1))
+        depth_mult = torch.exp(torch.clamp(self.depth_fc(depth.squeeze(1)), max=20))
         pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
             1, dim=-1
         )  # (batch, seq_len)
