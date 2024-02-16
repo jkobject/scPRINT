@@ -38,10 +38,10 @@ trainer:
         class_scale: 1000.0
         warmup_duration: 500
         weight_decay: 0.01
-        fused_adam: True
+        #fused_adam: True
         lr_patience: 3
-        lr_red_frequency: 10_000
-        lr_red_interval: step
+        lr_red_frequency: 1
+        lr_red_interval: epoch
         mask_ratio:
           - 0.15
           - 0.3
@@ -93,9 +93,9 @@ data:
   how: most expr
   max_len: 1000
   add_zero_genes: 100
-  train_oversampling: 1.7
+  #train_oversampling: 1.7
   validation_split: 0.2
-  test_split: 0.0
+  test_split: 0.1
   batch_size: 64
   num_workers: 16
   # TODO: drop tissue & dev stage until part or is taken in account

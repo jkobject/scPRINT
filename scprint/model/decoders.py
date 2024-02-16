@@ -63,7 +63,7 @@ class ExprDecoder(nn.Module):
         depth = torch.log2(1 + (depth / 100))
         depth = self.depth_encoder(depth).unsqueeze(1)
         x = self.fc(x[:, self.nfirst_labels_to_skip :, :])
-        x = self.finalfc(x) + depth
+        x = self.finalfc(x)  # + depth
         depth_mult = self.depth_fc(depth.squeeze(1))
         pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
             1, dim=-1
