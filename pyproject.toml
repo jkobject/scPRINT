@@ -54,6 +54,7 @@ jsonargparse = "*"
 docstring-parser = "*"
 lnschema-bionty = "*"
 bionty = "*"
+wandb = "*"
 
 [tool.poetry.group.cuda.dependencies]
 # C_INCLUDE_PATH=$CONDA_HOME/envs/scprint/include

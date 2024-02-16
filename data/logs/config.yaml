@@ -1,18 +1,18 @@
-# lightning.pytorch==2.0.9.post0
+# lightning.pytorch==2.2.0.post0
 seed_everything: 42
 trainer:
   accelerator: auto
   strategy: auto
-  devices: auto
+  devices: '1'
   num_nodes: 1
-  precision: 16-mixed
+  precision: 16-true
   logger:
   - class_path: lightning.pytorch.loggers.WandbLogger
     init_args:
       name: null
       save_dir: ./data/logs/
       version: null
-      offline: false
+      offline: true
       dir: null
       id: null
       anonymous: null
@@ -71,7 +71,7 @@ trainer:
       annealing_epochs: 10
       annealing_strategy: cos
       avg_fn: null
-      device: cpu
+      device: Unable to serialize instance cpu
   - class_path: lightning.pytorch.callbacks.ModelCheckpoint
     init_args:
       dirpath: null
@@ -87,6 +87,7 @@ trainer:
       train_time_interval: null
       every_n_epochs: null
       save_on_train_epoch_end: null
+      enable_version_counter: true
   - class_path: lightning.pytorch.callbacks.EarlyStopping
     init_args:
       monitor: val_loss
@@ -104,6 +105,7 @@ trainer:
     init_args:
       logging_interval: epoch
       log_momentum: false
+      log_weight_decay: false
   - class_path: lightning.pytorch.callbacks.LearningRateFinder
     init_args:
       min_lr: 1.0e-08
@@ -151,7 +153,8 @@ model:
   d_hid: 128
   edge_dim: 12
   nlayers: 4
-  layers_cls: []
+  layers_cls:
+  - 128
   dropout: 0.2
   transformer: flash
   expr_emb_style: continuous
@@ -221,16 +224,16 @@ data:
   organism_name: organism_ontology_term_id
   max_len: 1000
   add_zero_genes: 100
-  do_gene_pos: true
-  gene_embeddings: ./data/temp/embeddings.parquet
+  do_gene_pos: ./data/main/biomart.parquet
+  gene_embeddings: ./data/main/embeddings.parquet
   gene_position_tolerance: 10000
   batch_size: 64
   shuffle: null
   batch_sampler: null
-  num_workers: 16
+  num_workers: 1
   pin_memory: false
   drop_last: false
-  timeout: 0.0
+  timeout: 0
   worker_init_fn: null
   multiprocessing_context: null
   generator: null

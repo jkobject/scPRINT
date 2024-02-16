@@ -6,9 +6,10 @@ wandblog: all
 log_freq: 200
 log_graph: True
 trainer:
-  precision: 16-mixed
+  precision: 16-true
   # profiler: simple
   gradient_clip_val: 10
+  #strategy: ddp
   log_every_n_steps: 50
   limit_train_batches: 20000
   limit_val_batches: 3000
@@ -88,10 +89,11 @@ data:
   organisms:
     - NCBITaxon:9606
   gene_position_tolerance: 10_000
-  gene_embeddings: ./data/temp/embeddings.parquet
+  gene_embeddings: ./data/main/embeddings.parquet
   collection_name: preprocessed dataset
   how: most expr
   max_len: 1000
+  do_gene_pos: ./data/main/biomart.parquet
   add_zero_genes: 100
   #train_oversampling: 1.7
   validation_split: 0.2
