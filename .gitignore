@@ -149,3 +149,5 @@ notebooks/assessments/*/
 data/logs/*
 .lr_find_*
 step_*_umap_.*
+data/main/embeddings.parquet
+slurm-*.out

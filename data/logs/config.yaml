@@ -1,9 +1,9 @@
-# lightning.pytorch==2.0.9.post0
-seed_everything: 42
+# lightning.pytorch==2.2.0.post0
+seed_everything: 0
 trainer:
-  accelerator: auto
-  strategy: auto
-  devices: auto
+  accelerator: gpu
+  strategy: ddp_find_unused_parameters_true
+  devices: '2'
   num_nodes: 1
   precision: 16-mixed
   logger:
@@ -12,11 +12,11 @@ trainer:
       name: null
       save_dir: ./data/logs/
       version: null
-      offline: false
+      offline: true
       dir: null
       id: null
       anonymous: null
-      project: scprint_test
+      project: scprint_scale
       log_model: false
       experiment: null
       prefix: ''
@@ -69,7 +69,7 @@ trainer:
       annealing_epochs: 10
       annealing_strategy: cos
       avg_fn: null
-      device: cpu
+      device: Unable to serialize instance cpu
   - class_path: lightning.pytorch.callbacks.ModelCheckpoint
     init_args:
       dirpath: null
@@ -85,6 +85,7 @@ trainer:
       train_time_interval: null
       every_n_epochs: null
       save_on_train_epoch_end: null
+      enable_version_counter: true
   - class_path: lightning.pytorch.callbacks.EarlyStopping
     init_args:
       monitor: val_loss
@@ -102,6 +103,7 @@ trainer:
     init_args:
       logging_interval: epoch
       log_momentum: false
+      log_weight_decay: false
   - class_path: lightning.pytorch.callbacks.LearningRateFinder
     init_args:
       min_lr: 1.0e-08
@@ -129,7 +131,7 @@ trainer:
   enable_checkpointing: null
   enable_progress_bar: null
   enable_model_summary: null
-  accumulate_grad_batches: 2
+  accumulate_grad_batches: 1
   gradient_clip_val: 10
   gradient_clip_algorithm: null
   deterministic: null
@@ -144,13 +146,13 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   default_root_dir: null
 model:
-  d_model: 128
+  d_model: 256
   nhead: 4
-  d_hid: 128
+  d_hid: 256
   edge_dim: 12
   nlayers: 4
   layers_cls:
-  - 128
+  - 256
   - 128
   dropout: 0.2
   transformer: flash
@@ -212,6 +214,7 @@ data:
   - total_counts
   - nnz
   - dpt_group
+  - cell_culture
   hierarchical_labels:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -221,16 +224,16 @@ data:
   organism_name: organism_ontology_term_id
   max_len: 1000
   add_zero_genes: 100
-  do_gene_pos: true
-  gene_embeddings: ./data/temp/embeddings.parquet
+  do_gene_pos: ./data/main/biomart.parquet
+  gene_embeddings: ./data/main/embeddings.parquet
   gene_position_tolerance: 10000
-  batch_size: 64
+  batch_size: 128
   shuffle: null
   batch_sampler: null
-  num_workers: 16
+  num_workers: 8
   pin_memory: false
   drop_last: false
-  timeout: 0.0
+  timeout: 0
   worker_init_fn: null
   multiprocessing_context: null
   generator: null
@@ -241,5 +244,5 @@ set_float32_matmul_precision: true
 wandblog: all
 log_freq: 200
 log_graph: true
-project: scprint_test
+project: scprint_scale
 ckpt_path: null
