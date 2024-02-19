@@ -237,37 +237,32 @@ def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
     weight[cl == -1, :] = 0
     inv = cl >= maxsize
     # if we have non leaf values, we don't know so we don't compute grad and set weight to 0
-    if labelname in cls_hierarchy.keys():
-        invw = weight[inv]
-        invw[cls_hierarchy[labelname][cl[cl >= maxsize] - maxsize]] = 0
-        weight[inv] = invw
-    elif inv.any():
-        raise ValueError("need to use cls_hierarchy for this usecase")
-    # weight[~valid_indices, :] = 0
-
-    if len(cls_hierarchy) > 0:
-        if labelname in cls_hierarchy:
-            # computing hierarchical labels and adding them to cl
+    # and add labels that won't be counted but so that we can still use them
+    if inv.any():
+        if labelname in cls_hierarchy.keys():
             clhier = cls_hierarchy[labelname]
-            npred = pred.unsqueeze(1).expand(-1, clhier.shape[0], -1)
-            nnewcl = newcl.unsqueeze(1).expand(-1, clhier.shape[0], -1)
 
-            mask = clhier.unsqueeze(0).expand(npred.shape)
-            npred = torch.masked.masked_tensor(npred, mask)
-            nnewcl = torch.masked.masked_tensor(nnewcl, mask)
-            nnewcl = torch.amax(nnewcl, dim=-1)
-            amax = torch.amax(npred, dim=-1).to_tensor(0)
-            npred = (
-                torch.log(torch.sum(torch.exp(npred - amax.unsqueeze(-1)), dim=-1))
-                + amax
-            )
-            # npred = torch.amax(npred, dim=-1)
+            invw = weight[inv]
+            invw[clhier[cl[inv] - maxsize]] = 0
+            weight[inv] = invw
+            
+            import pdb
+            pdb.set_trace()
+            addnewcl = torch.ones(clhier.shape[0], device=cl.device) # no need to set the other to 0
+            addweight = torch.zeros(nnewcl.shape[1]).to(pred.device)
+            addweight[inv] = 1
+            # computing hierarchical labels and adding them to cl
+            cpred = pred.clone()
+            cpred[~inv] = torch.finfo(pred.dtype).min
+            cpred = torch.logsumexp(cpred, dim=-1)
 
-            addweight = torch.ones(nnewcl.shape).to(pred.device)
-            addweight[(cl == -1)] = 0
-            newcl = torch.cat([newcl, nnewcl.to_tensor(0)], dim=1)
-            pred = torch.cat([pred, npred.to_tensor(0)], dim=1)
+            newcl = torch.cat([newcl, addnewcl], dim=1)
+            pred = torch.cat([pred, cpred], dim=1)
             weight = torch.cat([weight, addweight], dim=1)
+        else:
+            raise ValueError("need to use cls_hierarchy for this usecase")
+
+        
     myloss = torch.nn.functional.binary_cross_entropy_with_logits(
         pred, target=newcl, weight=weight
     )
