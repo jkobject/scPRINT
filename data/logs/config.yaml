@@ -1,11 +1,11 @@
 # lightning.pytorch==2.2.0.post0
-seed_everything: 42
+seed_everything: 0
 trainer:
-  accelerator: auto
-  strategy: auto
-  devices: '1'
+  accelerator: gpu
+  strategy: ddp_find_unused_parameters_true
+  devices: '2'
   num_nodes: 1
-  precision: 16-true
+  precision: 16-mixed
   logger:
   - class_path: lightning.pytorch.loggers.WandbLogger
     init_args:
@@ -16,7 +16,7 @@ trainer:
       dir: null
       id: null
       anonymous: null
-      project: scprint_test
+      project: scprint_scale
       log_model: false
       experiment: null
       prefix: ''
@@ -131,7 +131,7 @@ trainer:
   enable_checkpointing: null
   enable_progress_bar: null
   enable_model_summary: null
-  accumulate_grad_batches: 2
+  accumulate_grad_batches: 1
   gradient_clip_val: 10
   gradient_clip_algorithm: null
   deterministic: null
@@ -146,13 +146,13 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   default_root_dir: null
 model:
-  d_model: 128
+  d_model: 256
   nhead: 4
-  d_hid: 128
+  d_hid: 256
   edge_dim: 12
   nlayers: 4
   layers_cls:
-  - 128
+  - 256
   - 128
   dropout: 0.2
   transformer: flash
@@ -214,6 +214,7 @@ data:
   - total_counts
   - nnz
   - dpt_group
+  - cell_culture
   hierarchical_labels:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -226,10 +227,10 @@ data:
   do_gene_pos: ./data/main/biomart.parquet
   gene_embeddings: ./data/main/embeddings.parquet
   gene_position_tolerance: 10000
-  batch_size: 64
+  batch_size: 128
   shuffle: null
   batch_sampler: null
-  num_workers: 1
+  num_workers: 8
   pin_memory: false
   drop_last: false
   timeout: 0
@@ -243,5 +244,5 @@ set_float32_matmul_precision: true
 wandblog: all
 log_freq: 200
 log_graph: true
-project: scprint_test
+project: scprint_scale
 ckpt_path: null

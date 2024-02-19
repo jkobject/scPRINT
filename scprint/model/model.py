@@ -843,9 +843,9 @@ class scPrint(L.LightningModule):
             self.info = batch["class"]
 
         # Logging to TensorBoard (if installed) by default
-        self.log("val_loss", val_loss)
+        self.log("val_loss", val_loss, sync_dist=True)
         # self.validation_step_outputs.append(output[''])
-        self.log_dict(losses)  # Logging to TensorBoard by default
+        self.log_dict(losses, sync_dist=True)  # Logging to TensorBoard by default
         return val_loss
 
     def on_validation_epoch_end(self):
@@ -878,8 +878,8 @@ class scPrint(L.LightningModule):
             do_denoise=True,
             noise=[0.3],
         )
-        self.log("test_loss: ", total_loss)
-        self.log_dict(losses)
+        self.log("test_loss: ", total_loss, sync_dist=True)
+        self.log_dict(losses, sync_dist=True)
         return total_loss
 
     def get_cell_embs(self, gene_pos, expression):

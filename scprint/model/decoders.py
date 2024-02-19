@@ -206,7 +206,7 @@ class ClsDecoder(nn.Module):
         layers = [d_model] + layers
         self._decoder = nn.ModuleList()
         for i, l in enumerate(layers[1:]):
-            self._decoder.append(nn.Linear(layers[i - 1], l))
+            self._decoder.append(nn.Linear(layers[i], l))
             self._decoder.append(nn.LayerNorm(l))
             self._decoder.append(activation())
         self.out_layer = nn.Linear(layers[-1], n_cls)

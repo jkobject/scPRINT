@@ -25,7 +25,7 @@ seaborn = "*"
 gseapy = "*"
 ipykernel = "*"
 owlready2 = "*"
-# torchdata = "*"
+torchdata = "*"
 biomart = "*"
 scib = "*"
 scikit-learn = "*"
@@ -41,7 +41,7 @@ torchvision = "*"
 fair-esm = { git = "https://github.com/facebookresearch/esm.git", branch = "main" }
 hydra-core = "*"
 lightning = "*"
-# torchtext = "*"
+torchtext = "*"
 transformers = "*"
 pynndescent = ">=0.5.11"
 scDataLoader = "*"
@@ -55,10 +55,14 @@ docstring-parser = "*"
 lnschema-bionty = "*"
 bionty = "*"
 wandb = "*"
-
-[tool.poetry.group.cuda.dependencies]
+wandb-core = "*"
+# pip install anndata matplotlib seaborn gseapy ipykernel owlready2 biomart scib scipy pandas numpy leidenalg decoupler Bio attridict gget pynndescent einops rich tensorboardX jsonargparse bionty wandb scikit-learn hydra-core typeshed-client docstring-parser lnschema-bionty
+# pip install pytorch-fast-transformers transformers lightning torchtext==0.15.1
+# pip install git+https://github.com/facebookresearch/esm.git
+# pip install triton==2.0.0.dev20221202 --no-deps
+[tool.poetry.group.flashattention.dependencies]
 # C_INCLUDE_PATH=$CONDA_HOME/envs/scprint/include
-torchtext = "0.15.0"
+torchtext = "0.15.1"
 triton = "2.0.0.dev20221202"
 torch = "2.0.0"
 torchvision = "0.15.0"
