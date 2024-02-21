@@ -244,11 +244,23 @@ def classification(
         if labelname in cls_hierarchy.keys():
             clhier = cls_hierarchy[labelname]
             if geert:
-                a = torch.amax(pred / eps, dim=1)
+                resc = torch.amax(pred / eps, dim=1)
                 mask = torch.zeros_like(pred, device=pred.device)
-                mask[inv, clhier[cl[inv] - maxsize]] = 1
-                lse = eps * (
-                    a + torch.log(torch.sum(mask * torch.exp(pred / eps - a), dim=1))
+                invmask = mask[inv]
+                invmask[clhier[cl[inv] - maxsize]] = 1
+                mask[inv] = invmask
+
+                lse = torch.nan_to_num(
+                    eps
+                    * (
+                        resc
+                        + torch.log(
+                            torch.sum(
+                                mask * torch.exp(pred / eps - resc.unsqueeze(1)), dim=1
+                            )
+                        )
+                    ),
+                    neginf=0,
                 )
                 pred = lse.view(-1, 1) * mask + (1 - mask) * pred
                 weight[inv, clhier[cl[inv] - maxsize]] = 1 / clhier[
