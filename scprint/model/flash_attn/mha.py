@@ -55,6 +55,7 @@ class FlashSelfAttention(nn.Module):
         max_seqlen=None,
         cu_seqlens_k=None,
         max_seqlen_k=None,
+        **kwargs,
     ):
         """Implements the multihead softmax attention.
         Arguments
@@ -488,9 +489,9 @@ class MHA(nn.Module):
             cache_seqlens=cache_seqlens,
             softmax_scale=self.inner_cross_attn.softmax_scale,
             causal=self.inner_cross_attn.causal,
-            rotary_interleaved=self.rotary_emb.interleaved
-            if self.rotary_emb_dim > 0
-            else False,
+            rotary_interleaved=(
+                self.rotary_emb.interleaved if self.rotary_emb_dim > 0 else False
+            ),
             alibi_slopes=alibi_slopes,
         )
         return context
@@ -591,7 +592,7 @@ class MHA(nn.Module):
         if not self.cross_attn and self.num_heads_kv == self.num_heads:
             assert x_kv is None and mixer_subset is None
             if not self.return_residual:
-                qkv = self.Wqkv(x)#.to(torch.float16, device="cuda")
+                qkv = self.Wqkv(x)  # .to(torch.float16, device="cuda")
             else:
                 qkv, x = self.Wqkv(x)
             if self.dwconv:
@@ -617,7 +618,7 @@ class MHA(nn.Module):
                         context = self.inner_attn(qkv, **kwargs)
                     else:
                         context = torch.utils.checkpoint.checkpoint(
-                            self.inner_attn, qkv, **kwargs
+                            self.inner_attn, qkv
                         )
                 else:
                     context = self._update_kvcache_attention(

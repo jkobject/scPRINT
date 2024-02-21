@@ -39,6 +39,7 @@ class ExprDecoder(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.LeakyReLU(),
+            nn.Dropout(dropout),
         )
         self.finalfc = nn.Sequential(
             nn.Linear(d_model, d_model),
@@ -47,7 +48,9 @@ class ExprDecoder(nn.Module):
         self.depth_encoder = nn.Sequential(
             encoders.ContinuousValueEncoder(d_model, dropout),
             nn.Linear(d_model, d_model),
+            nn.LayerNorm(d_model),
             nn.LeakyReLU(),
+            nn.Dropout(dropout),
         )
         self.pred_var_zero = nn.Linear(d_model, 3)
         self.depth_fc = nn.Sequential(
@@ -63,7 +66,7 @@ class ExprDecoder(nn.Module):
         depth = torch.log2(1 + depth)
         depth = self.depth_encoder(depth).unsqueeze(1)
         x = self.fc(x[:, self.nfirst_labels_to_skip :, :])
-        x = self.finalfc(x)  # + depth
+        x = self.finalfc(x) + depth
         depth_mult = torch.exp(torch.clamp(self.depth_fc(depth.squeeze(1)), max=20))
         pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
             1, dim=-1
@@ -200,15 +203,17 @@ class ClsDecoder(nn.Module):
         n_cls: int,
         layers: list[int] = [256, 128],
         activation: Callable = nn.ReLU,
+        dropout: float = 0.1,
     ):
         super(ClsDecoder, self).__init__()
         # module list
         layers = [d_model] + layers
-        self._decoder = nn.ModuleList()
+        self.decoder = nn.Sequential()
         for i, l in enumerate(layers[1:]):
-            self._decoder.append(nn.Linear(layers[i], l))
-            self._decoder.append(nn.LayerNorm(l))
-            self._decoder.append(activation())
+            self.decoder.append(nn.Linear(layers[i], l))
+            self.decoder.append(nn.LayerNorm(l))
+            self.decoder.append(activation())
+            self.decoder.append(nn.Dropout(dropout))
         self.out_layer = nn.Linear(layers[-1], n_cls)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -216,6 +221,6 @@ class ClsDecoder(nn.Module):
         Args:
             x: Tensor, shape [batch_size, embsize]
         """
-        for layer in self._decoder:
+        for layer in self.decoder:
             x = layer(x)
         return self.out_layer(x)

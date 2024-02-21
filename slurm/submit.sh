@@ -6,7 +6,7 @@
 #SBATCH --nodes=1             # This needs to match Trainer(num_nodes=...)
 #SBATCH --gres=gpu:A100:2,gmem:30G
 #SBATCH --time=0-02:00:00
-#SBATCH --cpus-per-gpu=8
+#SBATCH --cpus-per-task=8
 #SBATCH --mem-per-gpu=32G
 #SBATCH --tasks-per-node=2
 
