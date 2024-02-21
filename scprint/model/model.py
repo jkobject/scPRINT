@@ -67,6 +67,7 @@ class scPrint(L.LightningModule):
         cell_emb_style: str = "cls",
         lr=0.001,
         label_decoders: Optional[Dict[str, Dict[int, str]]] = None,
+        strict_loading: bool = True,
         **flash_attention_kwargs,
     ):
         """
@@ -131,6 +132,7 @@ class scPrint(L.LightningModule):
         self.label_decoders = label_decoders
         self.pred_embedding = pred_embedding
         self.lr = lr
+        self.strict_loading = strict_loading
         # compute tensor for cls_hierarchy
         self.cls_hierarchy = {}
 
@@ -278,7 +280,7 @@ class scPrint(L.LightningModule):
         # (maybe scale with the number of classes) should be 1 layer...
         for label, n_cls in labels.items():
             self.cls_decoders[label] = decoders.ClsDecoder(
-                d_model, n_cls, layers=layers_cls
+                d_model, n_cls, layers=layers_cls, dropout=dropout
             )
 
         # expression decoder from batch embbedding
@@ -849,6 +851,9 @@ class scPrint(L.LightningModule):
         return val_loss
 
     def on_validation_epoch_end(self):
+        if not self.trainer.is_global_zero:
+            print("you are not on the main node. cancelling logging step")
+            return
         self.log_umap(gtclass=self.info)
 
     # TODO: compute classification accuracy metrics
@@ -973,6 +978,9 @@ class scPrint(L.LightningModule):
         return self._predict(gene_pos, expression, depth)
 
     def _predict(self, gene_pos, expression, depth):
+        if not self.trainer.is_global_zero:
+            print("you are not on the main node. cancelling predict step")
+            return
         output = self.forward(gene_pos, expression, mask=None, depth=depth)
         ind = [1] + [self.labels.index(i) for i in self.pred_embedding]
         if self.embs is None:
@@ -1010,6 +1018,9 @@ class scPrint(L.LightningModule):
             ]
 
     def on_predict_epoch_end(self):
+        if not self.trainer.is_global_zero:
+            print("you are not on the main node. cancelling logging step")
+            return
         self.expr_pred = [
             i.to(device="cpu", dtype=torch.float32) for i in self.expr_pred
         ]

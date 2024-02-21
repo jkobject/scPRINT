@@ -14,7 +14,7 @@ trainer:
   limit_train_batches: 5000
   limit_val_batches: 1000
   reload_dataloaders_every_n_epochs: 1
-  accumulate_grad_batches: 1
+  accumulate_grad_batches: 2
   max_time:
     hours: 12
   logger:
@@ -36,7 +36,7 @@ trainer:
         do_mvc: False
         do_adv_cls: False
         do_next_tp: False
-        class_scale: 1000.0
+        class_scale: 500.0
         warmup_duration: 500
         weight_decay: 0.01
         fused_adam: True
@@ -58,18 +58,18 @@ trainer:
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: epoch
-    - class_path: lightning.pytorch.callbacks.LearningRateFinder
-      init_args:
-        mode: exponential
+    #- class_path: lightning.pytorch.callbacks.LearningRateFinder
+      #init_args:
+      #  mode: exponential
 model:
   nhead: 4
   nlayers: 4
-  layers_cls: [256, 128]
+  layers_cls: [128, 128]
   dropout: 0.2
   transformer: flash
   mvc_decoder: inner product
-  d_model: 256
-  d_hid: 256
+  d_model: 128
+  d_hid: 128
   residual_in_fp32: True
   num_heads_kv: null
   fused_dropout_add_ln: False
@@ -96,7 +96,7 @@ data:
   train_oversampling: 1.7
   validation_split: 0.2
   test_split: 0.1
-  batch_size: 128
+  batch_size: 64
   num_workers: 16
   # TODO: drop tissue & dev stage until part or is taken in account
   hierarchical_labels:
@@ -130,4 +130,4 @@ data:
     - nnz
     - dpt_group
     # - dataset_id
-    - cell_culture
+    # - cell_culture
