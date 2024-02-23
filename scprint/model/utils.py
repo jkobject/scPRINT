@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from typing import Optional, Union
+from torch.distributions import Poisson, Gamma
 
 
 def downsample_profile(mat, renoise):
@@ -76,3 +77,19 @@ def masker(
         mask.append(m)
 
     return torch.Tensor(np.array(mask)).to(torch.bool)
+
+
+def zinb_sample(mu, theta, zi_probs, sample_shape=torch.Size([])):
+    concentration = theta
+    rate = theta / mu
+    # Important remark: Gamma is parametrized by the rate = 1/scale!
+    gamma_d = Gamma(concentration=concentration, rate=rate)
+    p_means = gamma_d.sample(sample_shape)
+
+    # Clamping as distributions objects can have buggy behaviors when
+    # their parameters are too high
+    l_train = torch.clamp(p_means, max=1e8)
+    samp = Poisson(l_train).sample()  # Shape : (n_samples, n_cells_batch, n_vars)
+    is_zero = torch.rand_like(samp) <= zi_probs
+    samp_ = torch.where(is_zero, torch.zeros_like(samp), samp)
+    return samp_

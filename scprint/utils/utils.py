@@ -20,7 +20,6 @@ from matplotlib import axes
 from IPython import get_ipython
 import urllib.request
 
-from .. import logger
 import io
 from biomart import BiomartServer
 

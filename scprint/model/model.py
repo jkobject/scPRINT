@@ -42,6 +42,8 @@ from . import loss
 from .utils import masker
 from . import utils
 
+import time
+
 
 class scPrint(L.LightningModule):
     def __init__(
@@ -466,7 +468,7 @@ class scPrint(L.LightningModule):
             # rate after every epoch/step.
             "frequency": 1,
             # Metric to to monitor for schedulers like `ReduceLROnPlateau`
-            "monitor": "val_loss",
+            "monitor": "val_loss" if self.trainer.val_dataloaders else "train_loss",
         }
         self.lrfinder_steps = 0
         for val in self.trainer.callbacks:
@@ -512,6 +514,7 @@ class scPrint(L.LightningModule):
             _type_: _description_
         """
         # TASK 1 & 2 & 3 (first pass, expression reconstruction, label prediction)
+        start = time.time()
         total_loss, losses = self._full_training(
             batch,
             self.do_denoise,
@@ -526,6 +529,9 @@ class scPrint(L.LightningModule):
         )
         self.log("train_loss", total_loss, prog_bar=True)
         self.log_dict(losses, prog_bar=True)
+        end = time.time()
+        with open("training_time_log.txt", "a") as file:
+            file.write(f"\n{start}, {end} ")
 
         return total_loss
 
@@ -546,6 +552,9 @@ class scPrint(L.LightningModule):
             self.log("lr", lr_scale * self.hparams.lr)
         else:
             self.log("lr", self.lr)
+        end = time.time()
+        with open("training_time_log.txt", "a") as file:
+            file.write(f",{end}")
 
     def _full_training(
         self,
@@ -993,8 +1002,6 @@ class scPrint(L.LightningModule):
             ).transpose(0, 1)
             self.pos = gene_pos
             self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]]
-        elif self.embs.shape[0] > 10000:
-            pass
         else:
             self.embs = torch.cat(
                 [self.embs, torch.mean(output["cell_embs"][:, ind, :], dim=1)]
@@ -1101,12 +1108,10 @@ class scPrint(L.LightningModule):
         except:
             print("couldn't log to wandb")
         try:
-            dir = self.logger.save_dir if self.logger.save_dir is not None else "."
+            mdir = self.logger.save_dir if self.logger.save_dir is not None else "/tmp"
         except:
-            dir = "."
-        adata.write(
-            (dir) + "/step_" + str(self.global_step) + "_umap_" + name + ".h5ad"
-        )
+            mdir = "/tmp"
+        adata.write(mdir + "/step_" + str(self.global_step) + "_" + name + ".h5ad")
         return adata
 
     def _predict_denoised_expression(self, gene_pos, expression, depth):
