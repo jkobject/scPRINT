@@ -1,2 +1,2 @@
-from .grn import GeneEmbedding
-from .cell_emb import Embedder
+from .grn import *
+from .cell_emb import *
