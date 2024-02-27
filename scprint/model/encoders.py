@@ -173,15 +173,17 @@ class ContinuousValueEncoder(nn.Module):
         d_model: int,
         dropout: float = 0.1,
         max_value: int = 100_000,
+        layers: int = 1,
         size: int = 1,
     ):
         super(ContinuousValueEncoder, self).__init__()
         self.max_value = max_value
-        self.linear1 = nn.Linear(size, d_model)
-        self.activation = nn.ReLU()
-        # self.linear2 = nn.Linear(d_model, d_model)
-        self.norm = nn.LayerNorm(d_model)
-        self.dropout = nn.Dropout(p=dropout)
+        self.encoder = nn.ModuleList()
+        for i in range(layers):
+            self.encoder.append(nn.Linear(size if i == 0 else d_model, d_model))
+            self.encoder.append(nn.LayerNorm(d_model))
+            self.encoder.append(nn.ReLU())
+            self.encoder.append(nn.Dropout(p=dropout))
 
     def forward(self, x: Tensor, mask: Tensor = None) -> Tensor:
         """
@@ -195,9 +197,8 @@ class ContinuousValueEncoder(nn.Module):
         # use the mask embedding when x=-1
         # mask = (x == -1).float()
         x = torch.clamp(x, min=0, max=self.max_value)
-        x = self.activation(self.norm(self.linear1(x)))
-        # x = self.linear2(x)
-        x = self.dropout(x)
+        for val in self.encoder:
+            x = val(x)
         if mask is not None:
             x = x.masked_fill_(mask.unsqueeze(-1), 0)
         return x
