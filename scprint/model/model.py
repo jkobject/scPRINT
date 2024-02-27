@@ -1006,6 +1006,8 @@ class scPrint(L.LightningModule):
             self.embs = torch.cat(
                 [self.embs, torch.mean(output["cell_embs"][:, ind, :], dim=1)]
             )
+            #import pdb
+            #pdb.set_trace()
             self.pred = torch.cat(
                 [
                     self.pred,

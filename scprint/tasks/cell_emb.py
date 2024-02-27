@@ -1,4 +1,7 @@
 import scanpy as sc
+import numpy as np
+import matplotlib.pyplot as plt
+import torch
 
 from scdataloader.data import SimpleAnnDataset
 from scdataloader import Collator
@@ -32,6 +35,7 @@ class Embedder:
         ],
         model_name="scprint",
         output_expression="sample",  # one of "all" "sample" "none"
+        plot_corr_size=64,
     ):
         self.model = model
         self.batch_size = batch_size
@@ -43,6 +47,7 @@ class Embedder:
         self.model.pred_embedding = pred_embedding
         self.model_name = model_name
         self.output_expression = output_expression
+        self.plot_corr_size = plot_corr_size
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
@@ -75,7 +80,7 @@ class Embedder:
             mdir = "/tmp"
 
         pred_adata = sc.read_h5ad(
-            mdir + "/step_" + str(self.model.global_step) + "_umap_" + ".h5ad"
+            mdir + "/step_" + str(self.model.global_step) + "_" + ".h5ad"
         )
         if self.output_expression == "all":
             adata.obsm["scprint_mu"] = self.model.expr_pred[0]
@@ -87,11 +92,47 @@ class Embedder:
                 self.model.expr_pred[1],
                 self.model.expr_pred[2],
             )
-            adata.obsm["scprint_pos"] = self.model.pos
+        elif self.output_expression == "old":
+            expr = np.array(self.model.expr_pred[0])
+            expr[
+                np.random.binomial(
+                    1,
+                    p=np.array(
+                        torch.nn.functional.sigmoid(
+                            self.model.expr_pred[2].to(torch.float32)
+                        )
+                    ),
+                ).astype(bool)
+            ] = 0
+            expr[expr <= 0.3] = 0
+            expr[(expr >= 0.3) & (expr <= 1)] = 1
+            adata.obsm["scprint_expr"] = expr.astype(int)
+        adata.obsm["scprint_pos"] = self.model.pos
 
         pred_adata.obs.index = adata.obs.index
         adata.obsm["scprint_umap"] = pred_adata.obsm["X_umap"]
         adata.obsm[self.model_name] = pred_adata.X
         pred_adata.obs.index = adata.obs.index
         adata.obs = pd.concat([adata.obs, pred_adata.obs], axis=1)
+
+        # Compute correlation coefficient
+        if self.plot_corr_size > 0:
+            random_indices = np.random.randint(
+                low=0, high=adata.shape[0], size=self.plot_corr_size
+            )
+            pos = adata.obsm["scprint_pos"][random_indices]
+            X = adata.X[:, adata.var.index.isin(self.model.genes)][random_indices]
+            corr_coef = np.corrcoef(
+                adata.obsm["scprint_expr"][random_indices].numpy(),
+                X[
+                    np.array(list(range(self.plot_corr_size)))[:, None], pos.numpy()
+                ].toarray(),
+            )[:, :]
+
+            # Plot correlation coefficient
+            plt.figure(figsize=(10, 5))
+            plt.imshow(corr_coef, cmap="coolwarm", interpolation="none")
+            plt.colorbar()
+            plt.title('Correlation Coefficient of expr and i["x"]')
+            plt.show()
         return adata
