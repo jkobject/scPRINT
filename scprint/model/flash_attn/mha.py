@@ -618,7 +618,7 @@ class MHA(nn.Module):
                         context = self.inner_attn(qkv, **kwargs)
                     else:
                         context = torch.utils.checkpoint.checkpoint(
-                            self.inner_attn, qkv
+                            self.inner_attn, qkv, **kwargs
                         )
                 else:
                     context = self._update_kvcache_attention(

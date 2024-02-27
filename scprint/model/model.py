@@ -998,8 +998,6 @@ class scPrint(L.LightningModule):
             self.embs = torch.cat(
                 [self.embs, torch.mean(output["cell_embs"][:, ind, :], dim=1)]
             )
-            #import pdb
-            #pdb.set_trace()
             self.pred = torch.cat(
                 [
                     self.pred,
@@ -1137,7 +1135,7 @@ def _init_weights(
         if module.bias is not None:
             nn.init.zeros_(module.bias)
     elif isinstance(module, nn.Embedding):
-        nn.init.normal_(module.weight, std=initializer_range)
+        pass
 
     if rescale_prenorm_residual:
         # Reinitialize selected weights subject to the OpenAI GPT-2 Paper Scheme:
