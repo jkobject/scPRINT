@@ -514,7 +514,6 @@ class scPrint(L.LightningModule):
             _type_: _description_
         """
         # TASK 1 & 2 & 3 (first pass, expression reconstruction, label prediction)
-        start = time.time()
         total_loss, losses = self._full_training(
             batch,
             self.do_denoise,
@@ -529,10 +528,6 @@ class scPrint(L.LightningModule):
         )
         self.log("train_loss", total_loss, prog_bar=True)
         self.log_dict(losses, prog_bar=True)
-        end = time.time()
-        with open("training_time_log.txt", "a") as file:
-            file.write(f"\n{start}, {end} ")
-
         return total_loss
 
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
@@ -552,9 +547,6 @@ class scPrint(L.LightningModule):
             self.log("lr", lr_scale * self.hparams.lr)
         else:
             self.log("lr", self.lr)
-        end = time.time()
-        with open("training_time_log.txt", "a") as file:
-            file.write(f",{end}")
 
     def _full_training(
         self,
