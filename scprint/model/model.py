@@ -334,7 +334,9 @@ class scPrint(L.LightningModule):
         enc = self.gene_encoder(gene_pos)  # (minibatch, seq_len, embsize)
         self.cur_gene_token_embs = enc.clone()
         if expression is not None:
-            enc += self.expr_encoder(torch.log2(1 + expression), mask)  # (minibatch, seq_len, embsize)
+            enc += self.expr_encoder(
+                torch.log2(1 + expression), mask
+            )  # (minibatch, seq_len, embsize)
 
         if self.gene_pos_enc:
             enc += self.pos_encoder(gene_pos)
@@ -359,7 +361,7 @@ class scPrint(L.LightningModule):
             # cell_embs[:, 2, :] = self.time_encoder(timepoint)
         if full_depth is not None:
             cell_embs[:, 1, :] = self.depth_decoder(torch.log2(1 + full_depth))
-        
+
         enc = torch.cat([cell_embs, enc], dim=1)
 
         # TODO: seems to be a problem here:
@@ -401,7 +403,7 @@ class scPrint(L.LightningModule):
             )  # (minibatch, n_cls)
         if self.mvc_decoder is not None:
             mvc_output = self.mvc_decoder(cell_emb, self.cur_gene_token_embs)
-            output["mvc_mean"] = mvc_output["mean"]*depth_mult  # (minibatch, seq_len)
+            output["mvc_mean"] = mvc_output["mean"] * depth_mult  # (minibatch, seq_len)
             output["mvc_disp"] = mvc_output["disp"]
             output["mvc_zero_logits"] = mvc_output["zero_logits"]
 
@@ -435,7 +437,9 @@ class scPrint(L.LightningModule):
         Returns:
             dict of output Tensors.
         """
-        transformer_output = self._encoder(gene_pos, expression, mask, full_depth, timepoint)
+        transformer_output = self._encoder(
+            gene_pos, expression, mask, full_depth, timepoint
+        )
         return self._decoder(transformer_output, depth_mult, get_gene_emb, do_sample)
 
     def configure_optimizers(self):
@@ -588,7 +592,9 @@ class scPrint(L.LightningModule):
                 batch_size=gene_pos.shape[0],
                 mask_ratio=i,
             ).to(gene_pos.device)
-            output = self.forward(gene_pos, expression.sum(1), expression, mask, full_depth=total_count, timepoint)
+            output = self.forward(
+                gene_pos, expression.sum(1), expression, mask, total_count, timepoint
+            )
             l, tot = self._compute_loss(
                 output, expression, mask, clss, do_ecs, do_adv_cls, do_mvc
             )
@@ -609,7 +615,11 @@ class scPrint(L.LightningModule):
                 # TODO: test and look a bit more into it
                 expr = utils.downsample_profile(expression, renoise=i)
                 output = self.forward(
-                    gene_pos, expression.sum(1), expr, full_depth=total_count, timepoint=timepoint
+                    gene_pos,
+                    expression.sum(1),
+                    expr,
+                    full_depth=total_count,
+                    timepoint=timepoint,
                 )
                 l, tot = self._compute_loss(
                     output, expression, None, clss, do_ecs, do_adv_cls, do_mvc
@@ -662,7 +672,12 @@ class scPrint(L.LightningModule):
 
         # TASK 6. expression generation
         if default_embs is not None:
-            out = self._generate(default_embs, gene_pos, full_depth=total_count, depth_mult=expression.sum(1))
+            out = self._generate(
+                default_embs,
+                gene_pos,
+                full_depth=total_count,
+                depth_mult=expression.sum(0),
+            )
             l, tloss = self._compute_loss(
                 out,
                 expression,
@@ -974,9 +989,6 @@ class scPrint(L.LightningModule):
         expression = batch["x"]
         gene_pos = batch["genes"]
         depth = batch["depth"]
-        expression = torch.log2(1 + ((expression * 10e4) / depth[:, None])).to(
-            gene_pos.device
-        )
         # depth = torch.min(
         #    torch.tensor(1),
         #    torch.log2(torch.max(total_count, torch.tensor(100)) / 100) / 19,
@@ -987,10 +999,12 @@ class scPrint(L.LightningModule):
         if not self.trainer.is_global_zero:
             print("you are not on the main node. cancelling predict step")
             return
-        output = self.forward(gene_pos, expression, mask=None, depth=depth)
+        output = self.forward(gene_pos, expression.sum(1), expression, full_depth=depth)
         cell_embs = output["cell_embs"]
-        output = self._generate(cell_embs, gene_pos, depth=depth)
-        ind = [self.labels.index(i)+2 for i in self.pred_embedding]
+        output = self._generate(
+            cell_embs, gene_pos, depth_mult=expression.sum(1), full_depth=depth
+        )
+        ind = [self.labels.index(i) + 2 for i in self.pred_embedding]
         if not keep_output:
             return {
                 "embs": torch.mean(cell_embs[:, ind, :], dim=1),
@@ -1132,7 +1146,7 @@ class scPrint(L.LightningModule):
         Returns:
             dict of output Tensors.
         """
-        output = self.forward(gene_pos, expression, depth=depth)
+        output = self.forward(gene_pos, expression.sum(1), expression, full_depth=depth)
         return output
 
 

@@ -58,7 +58,7 @@ trainer:
       mask_ratio:
       - 0.3
       warmup_duration: 500
-      weight_decay: 0.5
+      weight_decay: 0.1
       fused_adam: true
       lr_patience: 1
   - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
@@ -108,7 +108,7 @@ trainer:
   min_epochs: null
   max_steps: -1
   min_steps: null
-  max_time: '{''hours'': 12}'
+  max_time: '{''hours'': 4}'
   limit_train_batches: 5000
   limit_val_batches: 1000
   limit_test_batches: null
@@ -121,7 +121,7 @@ trainer:
   enable_checkpointing: null
   enable_progress_bar: null
   enable_model_summary: null
-  accumulate_grad_batches: 2
+  accumulate_grad_batches: 1
   gradient_clip_val: 10
   gradient_clip_algorithm: null
   deterministic: null
@@ -136,13 +136,13 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   default_root_dir: null
 model:
-  d_model: 512
+  d_model: 64
   nhead: 4
   d_hid: 512
   edge_dim: 12
-  nlayers: 8
+  nlayers: 4
   layers_cls: []
-  dropout: 0.2
+  dropout: 0.1
   transformer: flash
   expr_emb_style: continuous
   domain_spec_batchnorm: None
@@ -174,7 +174,7 @@ data:
   organisms:
   - NCBITaxon:9606
   weight_scaler: 4
-  train_oversampling: 2
+  train_oversampling: 5
   label_to_weight:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -215,6 +215,7 @@ data:
   do_gene_pos: ./data/main/biomart.parquet
   gene_embeddings: ./data/main/embeddings.parquet
   gene_position_tolerance: 10000
+  tp_name: heat_diff
   batch_size: 64
   shuffle: null
   batch_sampler: null

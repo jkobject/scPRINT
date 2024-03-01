@@ -10,7 +10,7 @@
 #SBATCH --mem-per-gpu=8G
 #SBATCH --tasks-per-node=1
 
-conda activate scprint17
+# conda activate scprint17
 # debugging flags (optional)
 export NCCL_DEBUG=INFO
 export PYTHONFAULTHANDLER=1
@@ -20,13 +20,13 @@ export PYTHONFAULTHANDLER=1
 # export NCCL_SOCKET_IFNAME=^docker0,lo
 #      # This needs to match Trainer(devices=...)
 
-module load cuda/11.7
-module load cudnn/11.x-v8.7.0.84
+#module load cuda/11.7
+#module load cudnn/11.x-v8.7.0.84
 
-lamin load scprint
+#lamin load scprint
 
 # run script from above
-srun python3 scprint/__main__.py fit --trainer.logger.offline True --data.num_workers 16 $0 #--trainer.lr 0.002 --config config/pretrain.yaml
+srun python3 scprint/__main__.py fit --trainer.logger.offline True --data.num_workers 16 --trainer.lr 0.002 --config config/pretrain_small.yaml 
 
 # 90 seconds before training ends
 SBATCH --signal=SIGUSR1@90

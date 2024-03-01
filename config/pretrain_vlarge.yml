@@ -16,7 +16,7 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 2
   max_time:
-    hours: 12
+    hours: 72
   logger:
     - class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
@@ -64,14 +64,13 @@ trainer:
       #init_args:
       #  mode: exponential
 model:
-  nhead: 16
+  nhead: 8
   nlayers: 8
   layers_cls: []
   dropout: 0.2
   transformer: flash
   mvc_decoder: inner product
   d_model: 512
-  d_hid: 512
   residual_in_fp32: True
   num_heads_kv: null
   fused_dropout_add_ln: False
@@ -92,14 +91,14 @@ data:
   gene_embeddings: ./data/main/embeddings.parquet
   collection_name: preprocessed dataset
   how: most expr
-  max_len: 1000
+  max_len: 2500
   do_gene_pos: ./data/main/biomart.parquet
   add_zero_genes: 100
   weight_scaler: 4
   train_oversampling: 2
   validation_split: 0.2
   test_split: 0.1
-  batch_size: 64
+  batch_size: 32
   num_workers: 8
   # TODO: drop tissue & dev stage until part or is taken in account
   hierarchical_labels:

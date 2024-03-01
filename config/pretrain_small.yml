@@ -67,11 +67,10 @@ model:
   nhead: 4
   nlayers: 4
   layers_cls: []
-  dropout: 0.2
+  dropout: 0.1
   transformer: flash
   mvc_decoder: inner product
-  d_model: 128
-  d_hid: 256
+  d_model: 64
   residual_in_fp32: True
   num_heads_kv: null
   fused_dropout_add_ln: False

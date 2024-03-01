@@ -60,9 +60,9 @@ trainer:
     #- class_path: lightning.pytorch.callbacks.LearningRateFinder
       #init_args:
       #  mode: exponential
-  #plugins:
-  #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
-  #    requeue_signal: signal.SIGHUP
+  plugins:
+    - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
+      requeue_signal: signal.SIGHUP
 model:
   nhead: 4
   nlayers: 4

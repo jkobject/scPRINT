@@ -46,7 +46,7 @@ class ExprDecoder(nn.Module):
         )
         self.pred_var_zero = nn.Linear(d_model, 3)
 
-    def forward(self, x: Tensor, depth_mult: Tensor) -> Dict[str, Tensor]:
+    def forward(self, x: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
         # we don't do it on the labels
         x = self.fc(x[:, self.nfirst_labels_to_skip :, :])
@@ -55,7 +55,7 @@ class ExprDecoder(nn.Module):
         )  # (batch, seq_len)
         # The sigmoid function is used to map the zero_logits to a probability between 0 and 1.
         return dict(
-            mean=F.softmax(pred_value.squeeze(-1), dim=-1) * depth_mult,
+            mean=F.softmax(pred_value.squeeze(-1), dim=-1),
             disp=torch.exp(torch.clamp(var_value.squeeze(-1), max=15)),
             zero_logits=zero_logits.squeeze(-1),
         )
@@ -145,9 +145,8 @@ class MVCDecoder(nn.Module):
 
             h = self.hidden_activation(self.fc1(cell_emb + query_vecs))
             pred, var, zero_logits = self.fc2(h).split(1, dim=-1)
-        depth_mult = self.depth_fc(depth.squeeze(1))
         return dict(
-            mean=F.softmax(pred, dim=-1) * depth_mult,
+            mean=F.softmax(pred, dim=-1),
             disp=torch.exp(torch.clamp(var, max=17)),
             zero_logits=zero_logits,
         )
