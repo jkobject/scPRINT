@@ -38,50 +38,27 @@ class ExprDecoder(nn.Module):
         self.nfirst_labels_to_skip = nfirst_labels_to_skip
         self.fc = nn.Sequential(
             nn.Linear(d_model, d_model),
-            nn.LeakyReLU(),
-            nn.Dropout(dropout),
-        )
-        self.finalfc = nn.Sequential(
-            nn.Linear(d_model, d_model),
-            nn.LeakyReLU(),
-        )
-        self.depth_encoder = nn.Sequential(
-            encoders.ContinuousValueEncoder(d_model, dropout),
-            nn.Linear(d_model, d_model),
             nn.LayerNorm(d_model),
             nn.LeakyReLU(),
             nn.Dropout(dropout),
+            nn.Linear(d_model, d_model),
+            nn.LeakyReLU(),
         )
         self.pred_var_zero = nn.Linear(d_model, 3)
-        self.depth_fc = nn.Sequential(
-            # nn.Linear(d_model, d_model),
-            # nn.LeakyReLU(),
-            nn.Linear(d_model, 1),
-            nn.ReLU(),
-        )
 
-    def forward(self, x: Tensor, depth: Tensor) -> Dict[str, Tensor]:
+    def forward(self, x: Tensor, depth_mult: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
         # we don't do it on the labels
-        depth = torch.log2(1 + depth)
-        depth = self.depth_encoder(depth).unsqueeze(1)
         x = self.fc(x[:, self.nfirst_labels_to_skip :, :])
-        x = self.finalfc(x) + depth
-        depth_mult = torch.exp(torch.clamp(self.depth_fc(depth.squeeze(1)), max=17))
         pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
             1, dim=-1
         )  # (batch, seq_len)
         # The sigmoid function is used to map the zero_logits to a probability between 0 and 1.
         return dict(
             mean=F.softmax(pred_value.squeeze(-1), dim=-1) * depth_mult,
-            disp=torch.exp(torch.clamp(var_value.squeeze(-1), max=10)),
+            disp=torch.exp(torch.clamp(var_value.squeeze(-1), max=15)),
             zero_logits=zero_logits.squeeze(-1),
         )
-        # TODO: note that the return currently is only for training. Since decoder
-        # is not used in the test setting for the integration task, the eval/inference
-        # logic is not implemented yet. However, remember to implement it when
-        # the decoder is used in any test setting. The inference logic will need
-        # to sample from the bernoulli distribution with the zero_probs.
 
 
 class MVCDecoder(nn.Module):
@@ -108,17 +85,6 @@ class MVCDecoder(nn.Module):
                 layers.
         """
         super(MVCDecoder, self).__init__()
-        self.depth_encoder = nn.Sequential(
-            encoders.ContinuousValueEncoder(d_model, dropout),
-            nn.Linear(d_model, d_model),
-            nn.LeakyReLU(),
-        )
-        self.depth_fc = nn.Sequential(
-            nn.Linear(d_model, d_model),
-            nn.LeakyReLU(),
-            nn.Linear(d_model, 1),
-            nn.ReLU(),
-        )
         if arch_style == "inner product":
             self.gene2query = nn.Linear(d_model, d_model)
             self.query_activation = query_activation()
@@ -146,27 +112,22 @@ class MVCDecoder(nn.Module):
         self,
         cell_emb: Tensor,
         gene_embs: Tensor,
-        depth: Tensor,
+        depth_scale: Tensor,
     ) -> Union[Tensor, Dict[str, Tensor]]:
         """
         Args:
             cell_emb: Tensor, shape (batch, embsize=d_model)
             gene_embs: Tensor, shape (batch, seq_len, embsize=d_model)
         """
-        depth = torch.log2(1 + (depth / 100))
-        depth = self.depth_encoder(depth).unsqueeze(1)
-
         if self.arch_style == "inner product":
             query_vecs = self.query_activation(self.gene2query(gene_embs))
-            cell_emb = cell_emb.unsqueeze(2) + depth  # (batch, embsize, 1)
+            pred_var_zero_logits = self.pred_var_zero(query_vecs)
+            cell_emb = cell_emb.unsqueeze(2)  # (batch, embsize, 1)
             # the pred gene expr values, # (batch, seq_len)
-            pred, var, zero_logits = self.pred_var_zero(query_vecs).split(
-                self.d_model, dim=-1
-            )
-            pred, var, zero_logits = (
-                torch.bmm(pred, cell_emb).squeeze(2),
-                torch.bmm(var, cell_emb).squeeze(2),
-                torch.bmm(zero_logits, cell_emb).squeeze(2),
+            pred, var, zero_logits = torch.split(
+                torch.bmm(pred_var_zero_logits, cell_emb).squeeze(2),
+                self.d_model,
+                dim=-1,
             )
             # zero logits need to based on the cell_emb, because of input exprs
         elif self.arch_style == "concat query":
@@ -187,7 +148,7 @@ class MVCDecoder(nn.Module):
         depth_mult = self.depth_fc(depth.squeeze(1))
         return dict(
             mean=F.softmax(pred, dim=-1) * depth_mult,
-            disp=torch.exp(var),
+            disp=torch.exp(torch.clamp(var, max=17)),
             zero_logits=zero_logits,
         )
 
