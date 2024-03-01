@@ -38,11 +38,11 @@ trainer:
         do_next_tp: False
         class_scale: 500.0
         warmup_duration: 500
-        weight_decay: 0.1
+        weight_decay: 0.9
         fused_adam: True
-        lr_patience: 1
+        lr_patience: 3
         mask_ratio:
-          - 0.3
+          - 0.15
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
         swa_lrs: 0.01
@@ -65,13 +65,14 @@ trainer:
   #    requeue_signal: signal.SIGHUP
 model:
   nhead: 4
-  nlayers: 4
-  layers_cls: [256]
+  nlayers: 12
+  layers_cls: []
   dropout: 0.2
+  lr: 0.0001
   transformer: flash
   mvc_decoder: inner product
-  d_model: 256
-  d_hid: 256
+  d_model: 512
+  d_hid: 512
   residual_in_fp32: True
   num_heads_kv: null
   fused_dropout_add_ln: False
@@ -92,13 +93,13 @@ data:
   gene_embeddings: ./data/main/embeddings.parquet
   collection_name: preprocessed dataset
   how: most expr
-  max_len: 2000
+  max_len: 1200
   weight_scaler: 4
   do_gene_pos: ./data/main/biomart.parquet
-  add_zero_genes: 100
+  add_zero_genes: 0
   train_oversampling: 5
-  validation_split: 0.2
-  test_split: 0.1
+  validation_split: 0.03
+  test_split: 0
   batch_size: 64
   num_workers: 16
   # TODO: drop tissue & dev stage until part or is taken in account
