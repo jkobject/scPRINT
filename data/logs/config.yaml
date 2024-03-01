@@ -2,7 +2,7 @@
 seed_everything: 0
 trainer:
   accelerator: auto
-  strategy: ddp_find_unused_parameters_true
+  strategy: auto
   devices: auto
   num_nodes: 1
   precision: 16-mixed
@@ -47,19 +47,20 @@ trainer:
       noise:
       - 0.3
       do_cce: true
-      cce_sim: 0.5
+      cce_sim: 0.4
       do_ecs: true
-      ecs_threshold: 0.3
+      ecs_threshold: 0.6
       ecs_scale: 10.0
       do_mvc: false
       do_adv_cls: false
       do_next_tp: false
       class_scale: 500.0
-      mask_ratio: []
-      warmup_duration: 300
-      weight_decay: 0.01
+      mask_ratio:
+      - 0.3
+      warmup_duration: 500
+      weight_decay: 0.5
       fused_adam: true
-      lr_patience: 3
+      lr_patience: 1
   - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
     init_args:
       swa_lrs: 0.01
@@ -140,9 +141,7 @@ model:
   d_hid: 512
   edge_dim: 12
   nlayers: 8
-  layers_cls:
-  - 128
-  - 128
+  layers_cls: []
   dropout: 0.2
   transformer: flash
   expr_emb_style: continuous
@@ -174,8 +173,8 @@ data:
   collection_name: preprocessed dataset
   organisms:
   - NCBITaxon:9606
-  weight_scaler: 30
-  train_oversampling: 1.7
+  weight_scaler: 4
+  train_oversampling: 2
   label_to_weight:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -211,8 +210,8 @@ data:
   - self_reported_ethnicity_ontology_term_id
   how: most expr
   organism_name: organism_ontology_term_id
-  max_len: 2000
-  add_zero_genes: 200
+  max_len: 1000
+  add_zero_genes: 100
   do_gene_pos: ./data/main/biomart.parquet
   gene_embeddings: ./data/main/embeddings.parquet
   gene_position_tolerance: 10000

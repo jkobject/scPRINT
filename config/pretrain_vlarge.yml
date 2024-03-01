@@ -14,7 +14,7 @@ trainer:
   limit_train_batches: 5000
   limit_val_batches: 1000
   reload_dataloaders_every_n_epochs: 1
-  accumulate_grad_batches: 1
+  accumulate_grad_batches: 2
   max_time:
     hours: 12
   logger:
@@ -38,7 +38,7 @@ trainer:
         do_next_tp: False
         class_scale: 500.0
         warmup_duration: 500
-        weight_decay: 0.1
+        weight_decay: 0.5
         fused_adam: True
         lr_patience: 1
         mask_ratio:
@@ -57,21 +57,21 @@ trainer:
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: epoch
-    #- class_path: lightning.pytorch.callbacks.LearningRateFinder
-      #init_args:
-      #  mode: exponential
   #plugins:
   #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
   #    requeue_signal: signal.SIGHUP
+    #- class_path: lightning.pytorch.callbacks.LearningRateFinder
+      #init_args:
+      #  mode: exponential
 model:
-  nhead: 4
-  nlayers: 4
-  layers_cls: [256]
+  nhead: 16
+  nlayers: 8
+  layers_cls: []
   dropout: 0.2
   transformer: flash
   mvc_decoder: inner product
-  d_model: 256
-  d_hid: 256
+  d_model: 512
+  d_hid: 512
   residual_in_fp32: True
   num_heads_kv: null
   fused_dropout_add_ln: False
@@ -92,15 +92,15 @@ data:
   gene_embeddings: ./data/main/embeddings.parquet
   collection_name: preprocessed dataset
   how: most expr
-  max_len: 2000
-  weight_scaler: 4
+  max_len: 1000
   do_gene_pos: ./data/main/biomart.parquet
   add_zero_genes: 100
-  train_oversampling: 5
+  weight_scaler: 4
+  train_oversampling: 2
   validation_split: 0.2
   test_split: 0.1
   batch_size: 64
-  num_workers: 16
+  num_workers: 8
   # TODO: drop tissue & dev stage until part or is taken in account
   hierarchical_labels:
     - cell_type_ontology_term_id

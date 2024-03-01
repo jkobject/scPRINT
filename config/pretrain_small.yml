@@ -16,7 +16,7 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 1
   max_time:
-    hours: 12
+    hours: 4
   logger:
     - class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
@@ -66,11 +66,11 @@ trainer:
 model:
   nhead: 4
   nlayers: 4
-  layers_cls: [256]
+  layers_cls: []
   dropout: 0.2
   transformer: flash
   mvc_decoder: inner product
-  d_model: 256
+  d_model: 128
   d_hid: 256
   residual_in_fp32: True
   num_heads_kv: null
@@ -92,7 +92,7 @@ data:
   gene_embeddings: ./data/main/embeddings.parquet
   collection_name: preprocessed dataset
   how: most expr
-  max_len: 2000
+  max_len: 1000
   weight_scaler: 4
   do_gene_pos: ./data/main/biomart.parquet
   add_zero_genes: 100
