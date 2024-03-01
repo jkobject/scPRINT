@@ -13,6 +13,8 @@ import pandas as pd
 
 from lightning.pytorch import Trainer
 
+from scipy.stats import spearmanr
+
 
 class Embedder:
     def __init__(
@@ -117,17 +119,56 @@ class Embedder:
 
         # Compute correlation coefficient
         if self.plot_corr_size > 0:
+            import pdb
+
+            pdb.set_trace()
+            sc.pp.highly_variable_genes(
+                adata, n_top_genes=self.max_len, flavor="seurat_v3"
+            )
+            highly_variable = adata.var.index[adata.var.highly_variable].tolist()
             random_indices = np.random.randint(
                 low=0, high=adata.shape[0], size=self.plot_corr_size
             )
-            pos = adata.obsm["scprint_pos"][random_indices]
-            X = adata.X[:, adata.var.index.isin(self.model.genes)][random_indices]
-            corr_coef = np.corrcoef(
-                adata.obsm["scprint_expr"][random_indices].numpy(),
+            adataset = SimpleAnnDataset(
+                adata[random_indices], obs_to_output=["organism_ontology_term_id"]
+            )
+            col = Collator(
+                organisms=self.organisms,
+                valid_genes=list(set(self.model.genes) & set(highly_variable)),
+                how="all",
+            )
+            dataloader = DataLoader(
+                adataset,
+                collate_fn=col,
+                batch_size=self.plot_corr_size,
+                num_workers=self.num_workers,
+                shuffle=False,
+            )
+            for i in dataloader:
+                expression = torch.log2(1 + ((batch["x"] * 10e4) / depth[:, None]))
+                res = self.model._predict(
+                    expression.to(self.model.device),
+                    batch["genes"].to(self.model.device),
+                    batch["depth"].to(self.model.device),
+                )
+                break
+            # pos = adata.obsm["scprint_pos"][random_indices]
+
+            X = batch["x"]
+            out = utils.zinb_sample(
+                res["expr"][0],
+                res["expr"][0],
+                res["expr"][0],
+            )numpy()
+            corr_coef, p_value = spearmanr(
+                adata.obsm[name][random_indices].
                 X[
                     np.array(list(range(self.plot_corr_size)))[:, None], pos.numpy()
                 ].toarray(),
             )[:, :]
+            # corr_coef[]
+            # only on non zero values,
+            # compare a1-b1 corr with a1-b(n) corr. should be higher
 
             # Plot correlation coefficient
             plt.figure(figsize=(10, 5))

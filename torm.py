@@ -85,11 +85,11 @@ def reprocess(adata):
 
 files = os.listdir("/home/ml4ig1/scprint/.lamindb/")
 
-for i, f in enumerate(files[51:]):
+for i, f in enumerate(files[75:]):
     print(" ")
     print(" ")
+    print(i + 75)
     adata = reprocess(sc.read_h5ad("/home/ml4ig1/scprint/.lamindb/" + f))
-    print(i)
     print(adata)
     sc.write("/home/ml4ig1/scprint/.lamindb/" + f, adata)
     del adata
