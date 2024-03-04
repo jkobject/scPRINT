@@ -381,7 +381,7 @@ class scPrint(L.LightningModule):
     ):
         output = self.expr_decoder(transformer_output)
 
-        output["mean"] *= depth_mult.unsqueeze(1)
+        output["mean"] = depth_mult.unsqueeze(1) * output["mean"]
         if do_sample:
             pass
         # bernoulli = Bernoulli(probs=mlm_output["zero_probs"])
@@ -404,7 +404,9 @@ class scPrint(L.LightningModule):
             )  # (minibatch, n_cls)
         if self.mvc_decoder is not None:
             output.update(self.mvc_decoder(cell_emb, self.cur_gene_token_embs))
-            output["mvc_mean"] *= depth_mult.unsqueeze(1)  # (minibatch, seq_len)
+            output["mvc_mean"] = (
+                depth_mult.unsqueeze(1) * output["mvc_mean"]
+            )  # (minibatch, seq_len)
 
         # if self.do_adv:
         # TODO: do DAB
@@ -598,9 +600,9 @@ class scPrint(L.LightningModule):
                 output, expression, mask, clss, do_ecs, do_adv_cls, do_mvc
             )
 
-            cell_embs.append(output["cell_emb"])
+            cell_embs.append(output["cell_emb"].clone())
             if default_embs is None:
-                default_embs = output["cell_embs"]
+                default_embs = output["cell_embs"].clone()
             total_loss += tot
             losses.update(
                 {"mask_" + str(int(i * 100)) + "%_" + k: v for k, v in l.items()}
@@ -617,13 +619,13 @@ class scPrint(L.LightningModule):
                     gene_pos,
                     expression.sum(1),
                     expr,
-                    full_depth=total_count,
+                    full_depth=total_count * i,  # TODO: add rescaled count
                     timepoint=timepoint,
                 )
                 l, tot = self._compute_loss(
                     output, expression, None, clss, do_ecs, do_adv_cls, do_mvc
                 )
-                cell_embs.append(output["cell_emb"])
+                cell_embs.append(output["cell_emb"].clone())
                 total_loss += tot
                 losses.update(
                     {"denoise_" + str(int(i * 100)) + "%_" + k: v for k, v in l.items()}
@@ -847,19 +849,16 @@ class scPrint(L.LightningModule):
         expression = batch["x"]
         gene_pos = batch["genes"]
         depth = batch["depth"]
-        expr = torch.log2(1 + ((expression * 10e4) / depth[:, None])).to(
-            gene_pos.device
-        )
         # depth = torch.min(
         #    torch.tensor(1),
         #    torch.log2(torch.max(depth, torch.tensor(100)) / 100) / 19,
         # ).to(gene_pos.device)
         if self.embs is not None:
             if self.embs.shape[0] < 10000:
-                self._predict(gene_pos, expr, depth)
+                self._predict(gene_pos, expression, depth)
                 self.info = torch.cat([self.info, batch["class"]])
         else:
-            self._predict(gene_pos, expr, depth)
+            self._predict(gene_pos, expression, depth)
             self.info = batch["class"]
 
         # Logging to TensorBoard (if installed) by default

@@ -120,14 +120,15 @@ class MVCDecoder(nn.Module):
         """
         if self.arch_style == "inner product":
             query_vecs = self.query_activation(self.gene2query(gene_embs))
-            pred, var, zero_logits = torch.split(
-                self.pred_var_zero(query_vecs), self.d_model, dim=-1
+            pred, var, zero_logits = self.pred_var_zero(query_vecs).split(
+                self.d_model, dim=-1
             )
-            # the pred gene expr values, # (batch, seq_len)
             cell_emb = cell_emb.unsqueeze(2)
-            pred = torch.bmm(pred, cell_emb).squeeze(2)
-            var = torch.bmm(var, cell_emb).squeeze(2)
-            zero_logits = torch.bmm(zero_logits, cell_emb).squeeze(2)
+            pred, var, zero_logits = (
+                torch.bmm(pred, cell_emb).squeeze(2),
+                torch.bmm(var, cell_emb).squeeze(2),
+                torch.bmm(zero_logits, cell_emb).squeeze(2),
+            )
             # zero logits need to based on the cell_emb, because of input exprs
         elif self.arch_style == "concat query":
             query_vecs = self.query_activation(self.gene2query(gene_embs))
