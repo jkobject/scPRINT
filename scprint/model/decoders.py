@@ -112,7 +112,6 @@ class MVCDecoder(nn.Module):
         self,
         cell_emb: Tensor,
         gene_embs: Tensor,
-        depth_scale: Tensor,
     ) -> Union[Tensor, Dict[str, Tensor]]:
         """
         Args:
@@ -121,14 +120,14 @@ class MVCDecoder(nn.Module):
         """
         if self.arch_style == "inner product":
             query_vecs = self.query_activation(self.gene2query(gene_embs))
-            pred_var_zero_logits = self.pred_var_zero(query_vecs)
-            cell_emb = cell_emb.unsqueeze(2)  # (batch, embsize, 1)
-            # the pred gene expr values, # (batch, seq_len)
             pred, var, zero_logits = torch.split(
-                torch.bmm(pred_var_zero_logits, cell_emb).squeeze(2),
-                self.d_model,
-                dim=-1,
+                self.pred_var_zero(query_vecs), self.d_model, dim=-1
             )
+            # the pred gene expr values, # (batch, seq_len)
+            cell_emb = cell_emb.unsqueeze(2)
+            pred = torch.bmm(pred, cell_emb).squeeze(2)
+            var = torch.bmm(var, cell_emb).squeeze(2)
+            zero_logits = torch.bmm(zero_logits, cell_emb).squeeze(2)
             # zero logits need to based on the cell_emb, because of input exprs
         elif self.arch_style == "concat query":
             query_vecs = self.query_activation(self.gene2query(gene_embs))
@@ -146,9 +145,9 @@ class MVCDecoder(nn.Module):
             h = self.hidden_activation(self.fc1(cell_emb + query_vecs))
             pred, var, zero_logits = self.fc2(h).split(1, dim=-1)
         return dict(
-            mean=F.softmax(pred, dim=-1),
-            disp=torch.exp(torch.clamp(var, max=17)),
-            zero_logits=zero_logits,
+            mvc_mean=F.softmax(pred, dim=-1),
+            mvc_disp=torch.exp(torch.clamp(var, max=15)),
+            mvc_zero_logits=zero_logits,
         )
 
 
@@ -181,6 +180,5 @@ class ClsDecoder(nn.Module):
         Args:
             x: Tensor, shape [batch_size, embsize]
         """
-        for layer in self.decoder:
-            x = layer(x)
+        x = self.decoder(x)
         return self.out_layer(x)

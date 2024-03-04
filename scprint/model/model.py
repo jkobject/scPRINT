@@ -380,7 +380,8 @@ class scPrint(L.LightningModule):
         self, transformer_output, depth_mult, get_gene_emb=False, do_sample=False
     ):
         output = self.expr_decoder(transformer_output)
-        output["mean"] *= depth_mult
+
+        output["mean"] *= depth_mult.unsqueeze(1)
         if do_sample:
             pass
         # bernoulli = Bernoulli(probs=mlm_output["zero_probs"])
@@ -402,10 +403,8 @@ class scPrint(L.LightningModule):
                 }
             )  # (minibatch, n_cls)
         if self.mvc_decoder is not None:
-            mvc_output = self.mvc_decoder(cell_emb, self.cur_gene_token_embs)
-            output["mvc_mean"] = mvc_output["mean"] * depth_mult  # (minibatch, seq_len)
-            output["mvc_disp"] = mvc_output["disp"]
-            output["mvc_zero_logits"] = mvc_output["zero_logits"]
+            output.update(self.mvc_decoder(cell_emb, self.cur_gene_token_embs))
+            output["mvc_mean"] *= depth_mult.unsqueeze(1)  # (minibatch, seq_len)
 
         # if self.do_adv:
         # TODO: do DAB
@@ -676,7 +675,7 @@ class scPrint(L.LightningModule):
                 default_embs,
                 gene_pos,
                 full_depth=total_count,
-                depth_mult=expression.sum(0),
+                depth_mult=expression.sum(1),
             )
             l, tloss = self._compute_loss(
                 out,
