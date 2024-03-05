@@ -26,7 +26,7 @@ export PYTHONFAULTHANDLER=1
 #lamin load scprint
 
 # run script from above
-srun python3 scprint/__main__.py fit --trainer.logger.offline True --data.num_workers 16 --trainer.lr 0.002 --config config/pretrain_small.yaml 
+srun python3 scprint/__main__.py fit --trainer.logger.offline True --data.num_workers 16 --model.lr 0.002 --config config/pretrain_small.yaml 
 
 # 90 seconds before training ends
 SBATCH --signal=SIGUSR1@90

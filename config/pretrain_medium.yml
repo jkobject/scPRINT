@@ -16,7 +16,7 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 1
   max_time:
-    hours: 4
+    hours: 12
   logger:
     - class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
@@ -53,7 +53,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.EarlyStopping
       init_args:
         monitor: val_loss
-        patience: 10
+        patience: 3
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: epoch
@@ -91,7 +91,7 @@ data:
   gene_embeddings: ./data/main/embeddings.parquet
   collection_name: preprocessed dataset
   how: most expr
-  max_len: 1000
+  max_len: 2000
   weight_scaler: 4
   do_gene_pos: ./data/main/biomart.parquet
   add_zero_genes: 100

@@ -25,6 +25,7 @@ class TrainingMode(Callback):
         do_mvc=False,
         do_adv_cls=False,
         do_next_tp=False,
+        do_generate=False,
         class_scale: float = 1.0,
         mask_ratio=[0.15, 0.3],
         warmup_duration=500,
@@ -43,6 +44,7 @@ class TrainingMode(Callback):
         self.do_mvc = do_mvc
         self.do_adv_cls = do_adv_cls
         self.do_next_tp = do_next_tp
+        self.do_generate = do_generate
         self.class_scale = class_scale
         self.mask_ratio = mask_ratio
         self.warmup_duration = warmup_duration
@@ -68,3 +70,4 @@ class TrainingMode(Callback):
         model.weight_decay = self.weight_decay
         model.fused_adam = self.fused_adam
         model.lr_patience = self.lr_patience
+        model.do_generate = self.do_generate

@@ -33,9 +33,10 @@ trainer:
         do_ecs: True
         ecs_threshold: 0.6
         ecs_scale: 10.0
-        do_mvc: False
+        do_mvc: True
         do_adv_cls: False
         do_next_tp: False
+        do_generate: False
         class_scale: 500.0
         warmup_duration: 500
         weight_decay: 0.1

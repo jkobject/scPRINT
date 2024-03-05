@@ -25,9 +25,8 @@ trainer:
   callbacks:
     - class_path: scprint.trainer.TrainingMode
       init_args:
-        do_denoise: True
-        noise:
-          - 0.3
+        do_denoise: False
+        noise: []
         do_cce: True
         cce_sim: 0.4
         do_ecs: True
@@ -36,12 +35,13 @@ trainer:
         do_mvc: False
         do_adv_cls: False
         do_next_tp: False
+        do_generate: False
         class_scale: 500.0
         warmup_duration: 500
         weight_decay: 0.1
         fused_adam: True
         lr_patience: 1
-        mask_ratio:
+        mask_ratio: 
           - 0.3
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:

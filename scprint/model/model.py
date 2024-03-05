@@ -110,6 +110,7 @@ class scPrint(L.LightningModule):
         self.do_mvc = False
         self.do_adv_cls = False
         self.do_next_tp = False
+        self.do_generate = False
         self.class_scale = 1000
         self.mask_ratio = [0.15]
         self.warmup_duration = 500
@@ -202,7 +203,7 @@ class scPrint(L.LightningModule):
             len(self.labels) + 2, d_model
         )
         # self.time_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
-        self.depth_decoder = encoders.ContinuousValueEncoder(d_model, dropout)
+        self.depth_coder = encoders.ContinuousValueEncoder(d_model, dropout)
 
         # Model
         # Batch Norm
@@ -360,7 +361,7 @@ class scPrint(L.LightningModule):
             pass
             # cell_embs[:, 2, :] = self.time_encoder(timepoint)
         if full_depth is not None:
-            cell_embs[:, 1, :] = self.depth_decoder(torch.log2(1 + full_depth))
+            cell_embs[:, 1, :] = self.depth_encoder(torch.log2(1 + full_depth))
 
         enc = torch.cat([cell_embs, enc], dim=1)
 
@@ -533,6 +534,7 @@ class scPrint(L.LightningModule):
             self.do_ecs,
             self.do_mvc,
             self.do_adv_cls,
+            self.do_generate,
             self.mask_ratio,
         )
         self.log("train_loss", total_loss, prog_bar=True)
@@ -568,6 +570,7 @@ class scPrint(L.LightningModule):
         do_ecs=False,
         do_mvc=False,
         do_adv_cls=False,
+        do_generate=False,
         mask_ratio=[0.15],
     ):
         if type(mask_ratio) is not list:
@@ -615,11 +618,12 @@ class scPrint(L.LightningModule):
                 # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02601-5#:~:text=Zero%20measurements%20in%20scRNA%2Dseq,generation%20of%20scRNA%2Dseq%20data.
                 # TODO: test and look a bit more into it
                 expr = utils.downsample_profile(expression, renoise=i)
+                true_rescale = expr.sum(1) / expression.sum(1)
                 output = self.forward(
                     gene_pos,
                     expression.sum(1),
                     expr,
-                    full_depth=total_count * i,  # TODO: add rescaled count
+                    full_depth=total_count * true_rescale,  # TODO: add rescaled count
                     timepoint=timepoint,
                 )
                 l, tot = self._compute_loss(
@@ -672,7 +676,7 @@ class scPrint(L.LightningModule):
             losses.update({"cce": loss_cce})
 
         # TASK 6. expression generation
-        if default_embs is not None:
+        if default_embs is not None and do_generate:
             out = self._generate(
                 default_embs,
                 gene_pos,
@@ -993,7 +997,7 @@ class scPrint(L.LightningModule):
         # ).to(gene_pos.device)
         return self._predict(gene_pos, expression, depth, keep_output=True)
 
-    def _predict(self, gene_pos, expression, depth, keep_output=False):
+    def _predict(self, gene_pos, expression, depth, keep_output=True):
         if not self.trainer.is_global_zero:
             print("you are not on the main node. cancelling predict step")
             return
