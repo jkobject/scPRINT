@@ -1029,6 +1029,7 @@ class scPrint(L.LightningModule):
             ).transpose(0, 1)
             self.pos = gene_pos
             self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]]
+            return self.expr_pred
         else:
             self.embs = torch.cat([self.embs, torch.mean(cell_embs[:, ind, :], dim=1)])
             self.pred = torch.cat(
@@ -1085,6 +1086,7 @@ class scPrint(L.LightningModule):
                     ]
                 ).T
             obs = np.hstack([obs, nobs])
+
         adata = AnnData(
             np.array(self.embs.to(device="cpu", dtype=torch.float32)),
             obs=pd.DataFrame(
@@ -1092,6 +1094,14 @@ class scPrint(L.LightningModule):
                 columns=colname,
             ),
         )
+        for n in self.labels:
+            if gtclass is not None:
+                tr = utils.translate(adata.obs[n].tolist(), n)
+                if tr is not None:
+                    adata.obs["conv_" + n] = adata.obs[n].replace(tr)
+            tr = utils.translate(adata.obs["pred_" + n].tolist(), n)
+            if tr is not None:
+                adata.obs["conv_pred_" + n] = adata.obs["pred_" + n].replace(tr)
         sc.pp.neighbors(adata)
         sc.tl.umap(adata)
         sc.tl.leiden(adata)
@@ -1100,7 +1110,18 @@ class scPrint(L.LightningModule):
         if gtclass is not None:
             color = [
                 i
-                for pair in zip(self.labels, ["pred_" + i for i in self.labels])
+                for pair in zip(
+                    [
+                        "conv_" + i if "conv_" + i in adata.obs.columns else i
+                        for i in self.labels
+                    ],
+                    [
+                        "conv_pred_" + i
+                        if "conv_pred_" + i in adata.obs.columns
+                        else "pred_" + i
+                        for i in self.labels
+                    ],
+                )
                 for i in pair
             ]
             fig, axs = plt.subplots(
@@ -1115,7 +1136,12 @@ class scPrint(L.LightningModule):
                     show=False,
                 )
         else:
-            color = ["pred_" + i for i in self.labels]
+            color = [
+                "conv_pred_" + i
+                if "conv_pred_" + i in adata.obs.columns
+                else "pred_" + i
+                for i in self.labels
+            ]
             fig, axs = plt.subplots(len(color), 1, figsize=(16, len(color) * 8))
             for i, col in enumerate(color):
                 sc.pl.umap(

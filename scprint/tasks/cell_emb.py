@@ -50,6 +50,7 @@ class Embedder:
         self.model_name = model_name
         self.output_expression = output_expression
         self.plot_corr_size = plot_corr_size
+        self.precision = precision
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
@@ -110,7 +111,6 @@ class Embedder:
             expr[(expr >= 0.3) & (expr <= 1)] = 1
             adata.obsm["scprint_expr"] = expr.astype(int)
         adata.obsm["scprint_pos"] = self.model.pos
-
         pred_adata.obs.index = adata.obs.index
         adata.obsm["scprint_umap"] = pred_adata.obsm["X_umap"]
         adata.obsm[self.model_name] = pred_adata.X
@@ -119,11 +119,8 @@ class Embedder:
 
         # Compute correlation coefficient
         if self.plot_corr_size > 0:
-            import pdb
-
-            pdb.set_trace()
             sc.pp.highly_variable_genes(
-                adata, n_top_genes=self.max_len, flavor="seurat_v3"
+                adata, n_top_genes=self.max_len * 2, flavor="seurat_v3"
             )
             highly_variable = adata.var.index[adata.var.highly_variable].tolist()
             random_indices = np.random.randint(
@@ -134,8 +131,9 @@ class Embedder:
             )
             col = Collator(
                 organisms=self.organisms,
-                valid_genes=list(set(self.model.genes) & set(highly_variable)),
-                how="all",
+                valid_genes=self.model.genes,
+                how="some",
+                genelist=highly_variable,
             )
             dataloader = DataLoader(
                 adataset,
@@ -144,35 +142,70 @@ class Embedder:
                 num_workers=self.num_workers,
                 shuffle=False,
             )
-            for i in dataloader:
-                expression = torch.log2(1 + ((batch["x"] * 10e4) / depth[:, None]))
-                res = self.model._predict(
-                    expression.to(self.model.device),
-                    batch["genes"].to(self.model.device),
-                    batch["depth"].to(self.model.device),
-                )
-                break
-            # pos = adata.obsm["scprint_pos"][random_indices]
+            # self.trainer.num_predict_batches = 1
+            self.trainer.predict(self.model, dataloader)
 
-            X = batch["x"]
+            res = self.model.expr_pred
+            # pos = adata.obsm["scprint_pos"][random_indices]
             out = utils.zinb_sample(
-                res["expr"][0],
-                res["expr"][0],
-                res["expr"][0],
-            )numpy()
+                res[0],
+                res[1],
+                res[2],
+            ).numpy()
+            for i in dataloader:
+                break
+            try:
+                mean_expr = pd.read_parquet("../../data/avg_expr.parquet")
+                genes_used = [self.model.genes[int(i)] for i in self.model.pos[0]]
+                mean_expr = mean_expr[mean_expr.index.isin(genes_used)][
+                    ["avg_expr", "avg_expr_wexpr"]
+                ].values
+                out = np.hstack([out.T, mean_expr])
+            except:
+                print(
+                    "cannot read the mean expr file under scprint/data/avg_expr.parquet"
+                )
+                out = out.T
+                mean_expr = None
+
             corr_coef, p_value = spearmanr(
-                adata.obsm[name][random_indices].
-                X[
-                    np.array(list(range(self.plot_corr_size)))[:, None], pos.numpy()
-                ].toarray(),
-            )[:, :]
+                out,
+                i["x"].T,
+            )
+            corr_coef[p_value > 0.05] = 0
             # corr_coef[]
             # only on non zero values,
             # compare a1-b1 corr with a1-b(n) corr. should be higher
 
             # Plot correlation coefficient
             plt.figure(figsize=(10, 5))
-            plt.imshow(corr_coef, cmap="coolwarm", interpolation="none")
+            plt.imshow(
+                corr_coef, cmap="coolwarm", interpolation="none", vmin=-1, vmax=1
+            )
+            plt.colorbar()
+            plt.title('Correlation Coefficient of expr and i["x"]')
+            plt.show()
+            expr = np.array(res[0])
+            expr[
+                np.random.binomial(
+                    1,
+                    p=np.array(torch.nn.functional.sigmoid(res[2].to(torch.float32))),
+                ).astype(bool)
+            ] = 0
+            corr_coef, p_value = spearmanr(
+                np.hstack([expr.T, mean_expr]) if mean_expr is not None else expr.T,
+                i["x"].T,
+            )
+            corr_coef[p_value > 0.05] = 0
+            # corr_coef[]
+            # only on non zero values,
+            # compare a1-b1 corr with a1-b(n) corr. should be higher
+
+            # Plot correlation coefficient
+            plt.figure(figsize=(10, 5))
+            plt.imshow(
+                corr_coef, cmap="coolwarm", interpolation="none", vmin=-1, vmax=1
+            )
             plt.colorbar()
             plt.title('Correlation Coefficient of expr and i["x"]')
             plt.show()
