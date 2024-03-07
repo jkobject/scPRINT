@@ -174,7 +174,7 @@ class scPrint(L.LightningModule):
             sembeddings = torch.nn.AdaptiveAvgPool1d(d_model)(
                 torch.tensor(embeddings.values)
             )
-            
+
             self.gene_encoder = encoders.GeneEncoder(
                 len(self.vocab), d_model, weights=sembeddings, freeze=True
             )
@@ -758,7 +758,7 @@ class scPrint(L.LightningModule):
                     pred=output["cls_output_" + labelname],
                     cl=clss[:, j],
                     maxsize=self.labels_counts[labelname],
-                    mat_cls_hierarchy=self.mat_cls_hierarchy,
+                    cls_hierarchy=self.mat_cls_hierarchy,
                 )
                 # TASK 2bis. adversarial label prediction
                 if do_adv_cls:
@@ -1008,6 +1008,8 @@ class scPrint(L.LightningModule):
         # output = self._generate(
         #    cell_embs, gene_pos, depth_mult=expression.sum(1), full_depth=depth
         # )
+        if len(self.pred_embedding) == 0:
+            self.pred_embedding = self.labels
         ind = [self.labels.index(i) + 2 for i in self.pred_embedding]
         if not keep_output:
             return {
@@ -1096,6 +1098,7 @@ class scPrint(L.LightningModule):
                 columns=colname,
             ),
         )
+
         for n in self.labels:
             if gtclass is not None:
                 tr = utils.translate(adata.obs[n].tolist(), n)
