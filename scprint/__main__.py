@@ -22,7 +22,8 @@ class MySaveConfig(SaveConfigCallback):
                     log_freq=self.config.get("wandblog_freq", 500),
                     log_graph=self.config.get("wandblog_graph", False),
                 )
-                trainer.logger.log(trainer.datamodule)
+                #trainer.logger.log_hyperparams({'datamodule':trainer.datamodule})
+                print(trainer.datamodule)
             else:
                 print(trainer.datamodule)
         return super().setup(trainer, pl_module, stage)

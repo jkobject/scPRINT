@@ -122,7 +122,7 @@ trainer:
   enable_checkpointing: null
   enable_progress_bar: null
   enable_model_summary: null
-  accumulate_grad_batches: 2
+  accumulate_grad_batches: 1
   gradient_clip_val: 10
   gradient_clip_algorithm: null
   deterministic: null
@@ -171,12 +171,16 @@ model:
   drop_path_rate: 0.02
   weight_init: ''
 data:
-  mdataset: null
   collection_name: preprocessed dataset
   organisms:
   - NCBITaxon:9606
-  weight_scaler: 3
-  train_oversampling: 2
+  weight_scaler: 10
+  train_oversampling: 2.0
+  validation_split: 0.1
+  test_split: 0.05
+  gene_embeddings: ./data/main/embeddings.parquet
+  use_default_col: true
+  gene_position_tolerance: 10000
   label_to_weight:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -191,9 +195,6 @@ data:
   - self_reported_ethnicity_ontology_term_id
   - sex_ontology_term_id
   - organism_ontology_term_id
-  validation_split: 0.2
-  test_split: 0.1
-  use_default_col: true
   all_labels:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -212,11 +213,9 @@ data:
   - self_reported_ethnicity_ontology_term_id
   how: random expr
   organism_name: organism_ontology_term_id
-  max_len: 1000
-  add_zero_genes: 100
+  max_len: 1200
+  add_zero_genes: 0
   do_gene_pos: ./data/main/biomart.parquet
-  gene_embeddings: ./data/main/embeddings.parquet
-  gene_position_tolerance: 10000
   tp_name: heat_diff
   batch_size: 64
   shuffle: null

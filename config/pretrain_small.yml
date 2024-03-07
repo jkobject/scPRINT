@@ -14,7 +14,7 @@ trainer:
   limit_train_batches: 5000
   limit_val_batches: 1000
   reload_dataloaders_every_n_epochs: 1
-  accumulate_grad_batches: 2
+  accumulate_grad_batches: 1
   max_time:
     hours: 4
   logger:
@@ -92,13 +92,13 @@ data:
   gene_embeddings: ./data/main/embeddings.parquet
   collection_name: preprocessed dataset
   how: random expr
-  max_len: 1000
+  max_len: 1200
   weight_scaler: 10
   do_gene_pos: ./data/main/biomart.parquet
   add_zero_genes: 0
   train_oversampling: 2
-  validation_split: 0.2
-  test_split: 0.1
+  validation_split: 0.1
+  test_split: 0.05
   batch_size: 64
   num_workers: 16
   # TODO: drop tissue & dev stage until part or is taken in account
