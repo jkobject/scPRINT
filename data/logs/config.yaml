@@ -54,7 +54,7 @@ trainer:
       do_mvc: false
       do_adv_cls: false
       do_next_tp: false
-      do_generate: false
+      do_generate: true
       class_scale: 500.0
       mask_ratio:
       - 0.3
@@ -90,7 +90,7 @@ trainer:
     init_args:
       monitor: val_loss
       min_delta: 0.0
-      patience: 3
+      patience: 10
       verbose: false
       mode: min
       strict: true
@@ -109,7 +109,7 @@ trainer:
   min_epochs: null
   max_steps: -1
   min_steps: null
-  max_time: '{''hours'': 12}'
+  max_time: '{''hours'': 4}'
   limit_train_batches: 5000
   limit_val_batches: 1000
   limit_test_batches: null
@@ -122,7 +122,7 @@ trainer:
   enable_checkpointing: null
   enable_progress_bar: null
   enable_model_summary: null
-  accumulate_grad_batches: 1
+  accumulate_grad_batches: 2
   gradient_clip_val: 10
   gradient_clip_algorithm: null
   deterministic: null
@@ -142,8 +142,9 @@ model:
   d_hid: 512
   edge_dim: 12
   nlayers: 4
-  layers_cls: []
-  dropout: 0.1
+  layers_cls:
+  - 128
+  dropout: 0.2
   transformer: flash
   expr_emb_style: continuous
   domain_spec_batchnorm: None
@@ -155,7 +156,7 @@ model:
   - self_reported_ethnicity_ontology_term_id
   - sex_ontology_term_id
   cell_emb_style: cls
-  lr: 0.001
+  lr: 0.002
   strict_loading: true
   residual_in_fp32: true
   num_heads_kv: null
@@ -174,8 +175,8 @@ data:
   collection_name: preprocessed dataset
   organisms:
   - NCBITaxon:9606
-  weight_scaler: 4
-  train_oversampling: 5
+  weight_scaler: 3
+  train_oversampling: 2
   label_to_weight:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -209,9 +210,9 @@ data:
   - disease_ontology_term_id
   - assay_ontology_term_id
   - self_reported_ethnicity_ontology_term_id
-  how: most expr
+  how: random expr
   organism_name: organism_ontology_term_id
-  max_len: 2000
+  max_len: 1000
   add_zero_genes: 100
   do_gene_pos: ./data/main/biomart.parquet
   gene_embeddings: ./data/main/embeddings.parquet
@@ -235,4 +236,4 @@ wandblog: all
 log_freq: 200
 log_graph: true
 project: scprint_scale
-ckpt_path: data/logs/scprint_scale/hn8fftsv/checkpoints/epoch=4-step=25000.ckpt
+ckpt_path: null

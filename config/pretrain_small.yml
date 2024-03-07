@@ -14,7 +14,7 @@ trainer:
   limit_train_batches: 5000
   limit_val_batches: 1000
   reload_dataloaders_every_n_epochs: 1
-  accumulate_grad_batches: 1
+  accumulate_grad_batches: 2
   max_time:
     hours: 4
   logger:
@@ -34,6 +34,7 @@ trainer:
         ecs_threshold: 0.6
         ecs_scale: 10.0
         do_mvc: False
+        do_generate: True
         do_adv_cls: False
         do_next_tp: False
         class_scale: 500.0
@@ -66,8 +67,8 @@ trainer:
 model:
   nhead: 4
   nlayers: 4
-  layers_cls: []
-  dropout: 0.1
+  layers_cls: [128]
+  dropout: 0.2
   transformer: flash
   mvc_decoder: inner product
   d_model: 128
@@ -90,12 +91,12 @@ data:
   gene_position_tolerance: 10_000
   gene_embeddings: ./data/main/embeddings.parquet
   collection_name: preprocessed dataset
-  how: most expr
+  how: random expr
   max_len: 1000
-  weight_scaler: 4
+  weight_scaler: 3
   do_gene_pos: ./data/main/biomart.parquet
   add_zero_genes: 100
-  train_oversampling: 5
+  train_oversampling: 2
   validation_split: 0.2
   test_split: 0.1
   batch_size: 64
