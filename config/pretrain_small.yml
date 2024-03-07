@@ -58,8 +58,8 @@ trainer:
       init_args:
         logging_interval: epoch
     #- class_path: lightning.pytorch.callbacks.LearningRateFinder
-      #init_args:
-      #  mode: exponential
+    #init_args:
+    #  mode: exponential
   #plugins:
   #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
   #    requeue_signal: signal.SIGHUP
@@ -90,12 +90,11 @@ data:
   gene_position_tolerance: 10_000
   gene_embeddings: ./data/main/embeddings.parquet
   collection_name: preprocessed dataset
-  how: most expr
+  how: random expr
   max_len: 1000
-  weight_scaler: 4
+  weight_scaler: 10
   do_gene_pos: ./data/main/biomart.parquet
-  add_zero_genes: 100
-  train_oversampling: 5
+  add_zero_genes: 0
   validation_split: 0.2
   test_split: 0.1
   batch_size: 64

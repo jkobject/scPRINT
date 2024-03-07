@@ -6,7 +6,7 @@ import torch
 from scdataloader.data import SimpleAnnDataset
 from scdataloader import Collator
 from scprint.model import utils
-
+import bionty as bt
 from torch.utils.data import DataLoader
 
 import pandas as pd
@@ -116,7 +116,37 @@ class Embedder:
         adata.obsm[self.model_name] = pred_adata.X
         pred_adata.obs.index = adata.obs.index
         adata.obs = pd.concat([adata.obs, pred_adata.obs], axis=1)
+        print("metrics for this dataset of size:", adata.shape[0])
+        for label in self.model.labels:
+            res = []
+            if label not in adata.obs.columns:
+                continue
+            class_topred = self.model.label_decoders[label].values()
+            if label in self.model.cls_hierarchy:
+                class_groupings = {
+                    k: [
+                        i.ontology_id
+                        for i in bt.CellType.filter(k).first().children.all()
+                    ]
+                    for k in set(adata.obs[label].unique()) - set(class_topred)
+                }
+            for pred, true in adata.obs[["pred_" + label, label]].values:
+                if pred == true:
+                    res.append(True)
+                    continue
 
+                if label in self.model.cls_hierarchy:
+                    if true in class_groupings:
+                        res.append(pred in class_groupings[true])
+                        continue
+                    elif true not in class_topred:
+                        raise ValueError(f"true label {true} not in available classes")
+                elif true not in class_topred:
+                    raise ValueError(f"true label {true} not in available classes")
+                res.append(False)
+            print("    ", label)
+            print("     accuracy:", sum(res) / len(res))
+            print(" ")
         # Compute correlation coefficient
         if self.plot_corr_size > 0:
             sc.pp.highly_variable_genes(
