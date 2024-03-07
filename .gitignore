@@ -147,6 +147,7 @@ data/tensorboard/*
 notebooks/assessments/*/
 data/logs/*
 .lr_find_*
-step_*_umap_.*
+step_*_.*
 data/main/embeddings.parquet
 slurm-*.out
+notebooks/assessments/step_0_.h5ad

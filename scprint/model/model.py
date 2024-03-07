@@ -136,14 +136,15 @@ class scPrint(L.LightningModule):
         self.pred_embedding = pred_embedding
         self.lr = lr
         self.strict_loading = strict_loading
-        # compute tensor for cls_hierarchy
-        self.cls_hierarchy = {}
+        # compute tensor for mat_cls_hierarchy
+        self.mat_cls_hierarchy = {}
+        self.cls_hierarchy = cls_hierarchy
 
         for k, v in cls_hierarchy.items():
             tens = torch.zeros((len(v), labels[k]))
             for k2, v2 in v.items():
                 tens[k2 - labels[k], v2] = 1
-            self.cls_hierarchy[k] = tens.to(bool)
+            self.mat_cls_hierarchy[k] = tens.to(bool)
         self.expr_emb_style = expr_emb_style
 
         if self.expr_emb_style not in ["category", "continuous", "none"]:
@@ -173,6 +174,7 @@ class scPrint(L.LightningModule):
             sembeddings = torch.nn.AdaptiveAvgPool1d(d_model)(
                 torch.tensor(embeddings.values)
             )
+            
             self.gene_encoder = encoders.GeneEncoder(
                 len(self.vocab), d_model, weights=sembeddings, freeze=True
             )
@@ -203,7 +205,7 @@ class scPrint(L.LightningModule):
             len(self.labels) + 2, d_model
         )
         # self.time_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
-        self.depth_coder = encoders.ContinuousValueEncoder(d_model, dropout)
+        self.depth_decoder = encoders.ContinuousValueEncoder(d_model, dropout)
 
         # Model
         # Batch Norm
@@ -361,7 +363,7 @@ class scPrint(L.LightningModule):
             pass
             # cell_embs[:, 2, :] = self.time_encoder(timepoint)
         if full_depth is not None:
-            cell_embs[:, 1, :] = self.depth_encoder(torch.log2(1 + full_depth))
+            cell_embs[:, 1, :] = self.depth_decoder(torch.log2(1 + full_depth))
 
         enc = torch.cat([cell_embs, enc], dim=1)
 
@@ -492,8 +494,8 @@ class scPrint(L.LightningModule):
         if type(self.transformer) is FlashTransformerEncoder:
             for encoder_layers in self.transformer.blocks:
                 encoder_layers.set_seq_parallel(True)
-        for k, v in self.cls_hierarchy.items():
-            self.cls_hierarchy[k] = v.to(self.device)
+        for k, v in self.mat_cls_hierarchy.items():
+            self.mat_cls_hierarchy[k] = v.to(self.device)
 
     def training_step(
         self,
@@ -756,7 +758,7 @@ class scPrint(L.LightningModule):
                     pred=output["cls_output_" + labelname],
                     cl=clss[:, j],
                     maxsize=self.labels_counts[labelname],
-                    cls_hierarchy=self.cls_hierarchy,
+                    mat_cls_hierarchy=self.mat_cls_hierarchy,
                 )
                 # TASK 2bis. adversarial label prediction
                 if do_adv_cls:
@@ -767,9 +769,9 @@ class scPrint(L.LightningModule):
                             advpred = self.cls_decoders[adv_label](
                                 output["cell_embs"][:, 2 + j, :]
                             )
-                            if len(self.cls_hierarchy) > 0:
+                            if len(self.mat_cls_hierarchy) > 0:
                                 # computin hierarchical labels and adding them to cl
-                                clhier = self.cls_hierarchy.get(labelname, {})
+                                clhier = self.mat_cls_hierarchy.get(labelname, {})
                                 if len(clhier) > 0:
                                     addpred = torch.zeros(
                                         (newcl.shape[0], max(clhier.keys()) - maxsize)
@@ -815,8 +817,8 @@ class scPrint(L.LightningModule):
         return losses, total_loss
 
     def on_validation_start(self):
-        for k, v in self.cls_hierarchy.items():
-            self.cls_hierarchy[k] = v.to(self.device)
+        for k, v in self.mat_cls_hierarchy.items():
+            self.mat_cls_hierarchy[k] = v.to(self.device)
 
     def on_validation_epoch_start(self):
         self.embs = None
@@ -880,12 +882,12 @@ class scPrint(L.LightningModule):
     # TODO: compute classification accuracy metrics
     # def on_validation_epoch_end(self):
     #     for labelname, cl in zip(self.labels, clss):
-    #         if len(self.cls_hierarchy) > 0:
-    #             if len(self.cls_hierarchy[labelname]) > 0:
-    #                 if cl in self.cls_hierarchy[labelname].keys():
+    #         if len(self.mat_cls_hierarchy) > 0:
+    #             if len(self.mat_cls_hierarchy[labelname]) > 0:
+    #                 if cl in self.mat_cls_hierarchy[labelname].keys():
     #                     # we have to compute the loss by comparing the known
     #                     # class to the children probabilities
-    #                     children = self.cls_hierarchy[labelname][cl]
+    #                     children = self.mat_cls_hierarchy[labelname][cl]
     #                     # make a tensor of the children probabilities
     #                     cl = torch.zeros_like(output["cls_output_" + labelname])
     #                     for child in children:
@@ -1003,9 +1005,9 @@ class scPrint(L.LightningModule):
             return
         output = self.forward(gene_pos, expression.sum(1), expression, full_depth=depth)
         cell_embs = output["cell_embs"]
-        output = self._generate(
-            cell_embs, gene_pos, depth_mult=expression.sum(1), full_depth=depth
-        )
+        # output = self._generate(
+        #    cell_embs, gene_pos, depth_mult=expression.sum(1), full_depth=depth
+        # )
         ind = [self.labels.index(i) + 2 for i in self.pred_embedding]
         if not keep_output:
             return {
@@ -1029,6 +1031,7 @@ class scPrint(L.LightningModule):
             ).transpose(0, 1)
             self.pos = gene_pos
             self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]]
+            return self.expr_pred
         else:
             self.embs = torch.cat([self.embs, torch.mean(cell_embs[:, ind, :], dim=1)])
             self.pred = torch.cat(
@@ -1085,6 +1088,7 @@ class scPrint(L.LightningModule):
                     ]
                 ).T
             obs = np.hstack([obs, nobs])
+
         adata = AnnData(
             np.array(self.embs.to(device="cpu", dtype=torch.float32)),
             obs=pd.DataFrame(
@@ -1092,6 +1096,14 @@ class scPrint(L.LightningModule):
                 columns=colname,
             ),
         )
+        for n in self.labels:
+            if gtclass is not None:
+                tr = utils.translate(adata.obs[n].tolist(), n)
+                if tr is not None:
+                    adata.obs["conv_" + n] = adata.obs[n].replace(tr)
+            tr = utils.translate(adata.obs["pred_" + n].tolist(), n)
+            if tr is not None:
+                adata.obs["conv_pred_" + n] = adata.obs["pred_" + n].replace(tr)
         sc.pp.neighbors(adata)
         sc.tl.umap(adata)
         sc.tl.leiden(adata)
@@ -1100,7 +1112,18 @@ class scPrint(L.LightningModule):
         if gtclass is not None:
             color = [
                 i
-                for pair in zip(self.labels, ["pred_" + i for i in self.labels])
+                for pair in zip(
+                    [
+                        "conv_" + i if "conv_" + i in adata.obs.columns else i
+                        for i in self.labels
+                    ],
+                    [
+                        "conv_pred_" + i
+                        if "conv_pred_" + i in adata.obs.columns
+                        else "pred_" + i
+                        for i in self.labels
+                    ],
+                )
                 for i in pair
             ]
             fig, axs = plt.subplots(
@@ -1115,7 +1138,12 @@ class scPrint(L.LightningModule):
                     show=False,
                 )
         else:
-            color = ["pred_" + i for i in self.labels]
+            color = [
+                "conv_pred_" + i
+                if "conv_pred_" + i in adata.obs.columns
+                else "pred_" + i
+                for i in self.labels
+            ]
             fig, axs = plt.subplots(len(color), 1, figsize=(16, len(color) * 8))
             for i, col in enumerate(color):
                 sc.pl.umap(

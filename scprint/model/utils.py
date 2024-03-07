@@ -2,6 +2,8 @@ import torch
 import numpy as np
 from typing import Optional, Union
 from torch.distributions import Poisson, Gamma
+import bionty as bt
+from collections import Counter
 
 
 def downsample_profile(mat, renoise):
@@ -36,9 +38,7 @@ def downsample_profile(mat, renoise):
     # we model the sampling zeros (dropping 30% of the reads)
     res = torch.poisson(
         torch.rand((batch, ngenes)).to(device=mat.device)
-        * (
-            (tnoise * totcounts.unsqueeze(1)) / (0.5 * ngenes)
-        )  # (/ torch.Tensor([3.2,4.1]).unsqueeze(1)
+        * ((tnoise * totcounts.unsqueeze(1)) / (0.5 * ngenes))
     ).int()
     # we model the technical zeros (dropping 50% of the genes)
     drop = (torch.rand((batch, ngenes)) > tnoise).int().to(device=mat.device)
@@ -93,3 +93,22 @@ def zinb_sample(mu, theta, zi_probs, sample_shape=torch.Size([])):
     is_zero = torch.rand_like(samp) <= zi_probs
     samp_ = torch.where(is_zero, torch.zeros_like(samp), samp)
     return samp_
+
+
+def translate(val, t="cell_type_ontology_term_id"):
+    if t == "cell_type_ontology_term_id":
+        obj = bt.CellType.public(organism="all")
+    elif t == "assay_ontology_term_id":
+        obj = bt.ExperimentalFactor.public()
+    elif t == "tissue_ontology_term_id":
+        obj = bt.Tissue.public()
+    else:
+        return None
+    if type(val) is str:
+        return {val: obj.search(val, field=obj.ontology_id).name.iloc[0]}
+    elif type(val) is list or type(val) is set:
+        return {i: obj.search(i, field=obj.ontology_id).name.iloc[0] for i in set(val)}
+    elif type(val) is dict or type(val) is Counter:
+        return {
+            obj.search(k, field=obj.ontology_id).name.iloc[0]: v for k, v in val.items()
+        }
