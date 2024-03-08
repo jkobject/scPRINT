@@ -1,9 +1,6 @@
-[submodule "scprint/RNABERT"]
-path = scprint/RNABERT
+[submodule "RNABERT"]
+path = RNABERT
 url = https://github.com/jkobject/RNABERT
-[submodule "scprint/CodonBERT"]
-path = scprint/CodonBERT
-url = https://github.com/Sanofi-Public/CodonBERT
 [submodule "scDataLoader"]
-	path = scDataLoader
-	url = https://github.com/jkobject/scDataLoader
+path = scDataLoader
+url = https://github.com/jkobject/scDataLoader

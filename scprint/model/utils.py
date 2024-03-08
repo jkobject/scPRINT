@@ -4,6 +4,140 @@ from typing import Optional, Union
 from torch.distributions import Poisson, Gamma
 import bionty as bt
 from collections import Counter
+import math
+import torch.nn as nn
+
+import scanpy as sc
+from anndata import AnnData
+
+import numpy as np
+from matplotlib import pyplot as plt
+
+
+def make_adata(
+    pred, embs, labels, step=0, label_decoders=None, gtclass=None, name="", mdir="/tmp"
+):
+    colname = ["pred_" + i for i in labels]
+    obs = np.array(pred.to(device="cpu", dtype=torch.int32))
+    # label decoders is not cls_decoders. one is a dict to map class codes (ints)
+    # to class names the other is the module the predict the class
+    if label_decoders is not None:
+        obs = np.array(
+            [
+                [label_decoders[labels[i]][n] for n in name]
+                for i, name in enumerate(obs.T)
+            ]
+        ).T
+
+    if gtclass is not None:
+        colname += labels
+        nobs = np.array(gtclass.to(device="cpu", dtype=torch.int32))
+        if label_decoders is not None:
+            nobs = np.array(
+                [
+                    [label_decoders[labels[i]][n] for n in name]
+                    for i, name in enumerate(nobs.T)
+                ]
+            ).T
+        obs = np.hstack([obs, nobs])
+
+    adata = AnnData(
+        np.array(embs.to(device="cpu", dtype=torch.float32)),
+        obs=pd.DataFrame(
+            obs,
+            columns=colname,
+        ),
+    )
+
+    for n in labels:
+        if gtclass is not None:
+            tr = translate(adata.obs[n].tolist(), n)
+            if tr is not None:
+                adata.obs["conv_" + n] = adata.obs[n].replace(tr)
+        tr = translate(adata.obs["pred_" + n].tolist(), n)
+        if tr is not None:
+            adata.obs["conv_pred_" + n] = adata.obs["pred_" + n].replace(tr)
+    sc.pp.neighbors(adata)
+    sc.tl.umap(adata)
+    sc.tl.leiden(adata)
+    adata.obs = adata.obs.astype("category")
+    print(adata)
+    if gtclass is not None:
+        color = [
+            i
+            for pair in zip(
+                [
+                    "conv_" + i if "conv_" + i in adata.obs.columns else i
+                    for i in labels
+                ],
+                [
+                    "conv_pred_" + i
+                    if "conv_pred_" + i in adata.obs.columns
+                    else "pred_" + i
+                    for i in labels
+                ],
+            )
+            for i in pair
+        ]
+        fig, axs = plt.subplots(int(len(color) / 2), 2, figsize=(24, len(color) * 4))
+        plt.subplots_adjust(wspace=1)
+        for i, col in enumerate(color):
+            sc.pl.umap(
+                adata,
+                color=col,
+                ax=axs[i // 2, i % 2],
+                show=False,
+            )
+    else:
+        color = [
+            "conv_pred_" + i if "conv_pred_" + i in adata.obs.columns else "pred_" + i
+            for i in labels
+        ]
+        fig, axs = plt.subplots(len(color), 1, figsize=(16, len(color) * 8))
+        for i, col in enumerate(color):
+            sc.pl.umap(
+                adata,
+                color=col,
+                ax=axs[i],
+                show=False,
+            )
+    adata.write(mdir + "/step_" + str(step) + "_" + name + ".h5ad")
+    return adata
+
+
+def _init_weights(
+    module,
+    n_layer,
+    initializer_range=0.02,
+    mup_width_scale=1.0,
+    rescale_prenorm_residual=True,
+):
+    mup_init_scale = math.sqrt(mup_width_scale)
+    if isinstance(module, nn.Linear):
+        nn.init.normal_(module.weight, std=initializer_range * mup_init_scale)
+        optim_cfg = getattr(module.weight, "_optim", {})
+        optim_cfg.update({"lr_multiplier": mup_width_scale})
+        setattr(module.weight, "_optim", optim_cfg)
+        if module.bias is not None:
+            nn.init.zeros_(module.bias)
+    elif isinstance(module, nn.Embedding):
+        pass
+
+    if rescale_prenorm_residual:
+        # Reinitialize selected weights subject to the OpenAI GPT-2 Paper Scheme:
+        #   > A modified initialization which accounts for the accumulation on the residual path with model depth. Scale
+        #   > the weights of residual layers at initialization by a factor of 1/√N where N is the # of residual layers.
+        #   >   -- GPT-2 :: https://openai.com/blog/better-language-models/
+        #
+        # Reference (Megatron-LM): https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/model/gpt_model.py
+        for name, p in module.named_parameters():
+            if name in ["out_proj.weight", "fc2.weight"]:
+                # Special Scaled Initialization --> There are 2 Layer Norms per Transformer Block
+                nn.init.normal_(
+                    p,
+                    mean=0.0,
+                    std=initializer_range * mup_init_scale / math.sqrt(2 * n_layer),
+                )
 
 
 def downsample_profile(mat, renoise):
@@ -31,6 +165,9 @@ def downsample_profile(mat, renoise):
     Returns:
         torch.Tensor: The matrix count after applying noise.
     """
+    # Randomly drop on average N counts to each element of expression using a heavy tail Gaussian distribution
+    # here we try to get the scale of the distribution so as to remove the right number of counts from each gene
+    # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02601-5#:~:text=Zero%20measurements%20in%20scRNA%2Dseq,generation%20of%20scRNA%2Dseq%20data.
     totcounts = mat.sum(1)
     batch = mat.shape[0]
     ngenes = mat.shape[1]
@@ -93,6 +230,7 @@ def zinb_sample(mu, theta, zi_probs, sample_shape=torch.Size([])):
     is_zero = torch.rand_like(samp) <= zi_probs
     samp_ = torch.where(is_zero, torch.zeros_like(samp), samp)
     return samp_
+
 
 def translate(val, t="cell_type_ontology_term_id"):
     if t == "cell_type_ontology_term_id":
