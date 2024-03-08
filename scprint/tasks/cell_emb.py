@@ -15,30 +15,49 @@ from lightning.pytorch import Trainer
 
 from scipy.stats import spearmanr
 
+from typing import List
+from anndata import AnnData
+
 
 class Embedder:
     def __init__(
         self,
-        model,
-        batch_size=64,
-        num_workers=8,
-        how="most expr",
-        max_len=1000,
-        add_zero_genes=100,
-        precision="16-mixed",
-        organisms=[
+        model: torch.nn.Module,
+        batch_size: int = 64,
+        num_workers: int = 8,
+        how: str = "most expr",
+        max_len: int = 1000,
+        add_zero_genes: int = 100,
+        precision: str = "16-mixed",
+        organisms: List[str] = [
             "NCBITaxon:9606",
         ],
-        pred_embedding=[
+        pred_embedding: List[str] = [
             "cell_type_ontology_term_id",
             "disease_ontology_term_id",
             "self_reported_ethnicity_ontology_term_id",
             "sex_ontology_term_id",
         ],
-        model_name="scprint",
-        output_expression="sample",  # one of "all" "sample" "none"
-        plot_corr_size=64,
+        model_name: str = "scprint",
+        output_expression: str = "sample",  # one of "all" "sample" "none"
+        plot_corr_size: int = 64,
     ):
+        """
+        Embedder a class to embed and annotate cells using a model
+
+        Args:
+            model (torch.nn.Module): The model to be used for embedding and annotating cells.
+            batch_size (int, optional): The size of the batches to be used in the DataLoader. Defaults to 64.
+            num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 8.
+            how (str, optional): The method to be used for selecting valid genes. Defaults to "most expr".
+            max_len (int, optional): The maximum length of the gene sequence. Defaults to 1000.
+            add_zero_genes (int, optional): The number of zero genes to add to the gene sequence. Defaults to 100.
+            precision (str, optional): The precision to be used in the Trainer. Defaults to "16-mixed".
+            organisms (List[str], optional): The list of organisms to be considered. Defaults to [ "NCBITaxon:9606", ].
+            pred_embedding (List[str], optional): The list of labels to be used for plotting embeddings. Defaults to [ "cell_type_ontology_term_id", "disease_ontology_term_id", "self_reported_ethnicity_ontology_term_id", "sex_ontology_term_id", ].
+            model_name (str, optional): The name of the model to be used. Defaults to "scprint".
+            output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
+        """
         self.model = model
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -54,7 +73,7 @@ class Embedder:
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
-    def __call__(self, adata):
+    def __call__(self, adata: AnnData):
         # Add at least the organism you are working with
         adataset = SimpleAnnDataset(adata, obs_to_output=["organism_ontology_term_id"])
         col = Collator(
@@ -147,6 +166,7 @@ class Embedder:
             print("    ", label)
             print("     accuracy:", sum(res) / len(res))
             print(" ")
+
         # Compute correlation coefficient
         if self.plot_corr_size > 0:
             sc.pp.highly_variable_genes(

@@ -103,6 +103,48 @@ def _fwd_kernel(
     BLOCK_M: tl.constexpr,
     BLOCK_N: tl.constexpr,
 ):
+    """
+    _fwd_kernel is a Triton implementation of the forward pass of FlashAttention.
+
+    Args:
+        Q (torch.Tensor): Query tensor of shape (batch_size, sequence_length, num_heads, head_dim)
+        K (torch.Tensor): Key tensor of shape (batch_size, sequence_length, num_heads, head_dim)
+        V (torch.Tensor): Value tensor of shape (batch_size, sequence_length, num_heads, head_dim)
+        Bias (torch.Tensor): Bias tensor for the attention scores. Can be of shape (batch_size, num_heads, 1, sequence_length) or (batch_size, num_heads, sequence_length, sequence_length)
+        Out (torch.Tensor): Output tensor where the results are to be stored
+        Lse (torch.Tensor): Tensor to store log-sum-exp of the attention scores
+        TMP (torch.Tensor): Temporary scratchpad tensor to workaround a compiler bug
+        stride_qb (int): Stride for the batch dimension in the query tensor
+        stride_qh (int): Stride for the head dimension in the query tensor
+        stride_qm (int): Stride for the sequence dimension in the query tensor
+        stride_kb (int): Stride for the batch dimension in the key tensor
+        stride_kh (int): Stride for the head dimension in the key tensor
+        stride_kn (int): Stride for the sequence dimension in the key tensor
+        stride_vb (int): Stride for the batch dimension in the value tensor
+        stride_vh (int): Stride for the head dimension in the value tensor
+        stride_vn (int): Stride for the sequence dimension in the value tensor
+        stride_bb (int): Stride for the batch dimension in the bias tensor
+        stride_bh (int): Stride for the head dimension in the bias tensor
+        stride_bm (int): Stride for the sequence dimension in the bias tensor
+        stride_ob (int): Stride for the batch dimension in the output tensor
+        stride_oh (int): Stride for the head dimension in the output tensor
+        stride_om (int): Stride for the sequence dimension in the output tensor
+        nheads (int): Number of attention heads
+        seqlen_q (int): Sequence length for the query tensor
+        seqlen_k (int): Sequence length for the key tensor
+        seqlen_q_rounded (int): Rounded up sequence length for the query tensor
+        headdim (int): Dimension of each attention head
+        CACHE_KEY_SEQLEN_Q (int): Cached sequence length for the query tensor
+        CACHE_KEY_SEQLEN_K (int): Cached sequence length for the key tensor
+        BIAS_TYPE (tl.constexpr): Type of bias used. Can be 'none', 'vector', or 'matrix'
+        IS_CAUSAL (tl.constexpr): Whether the attention is causal or not
+        BLOCK_HEADDIM (tl.constexpr): Block size for the head dimension
+        EVEN_M (tl.constexpr): Whether the sequence length for the query tensor is divisible by the block size
+        EVEN_N (tl.constexpr): Whether the sequence length for the key tensor is divisible by the block size
+        EVEN_HEADDIM (tl.constexpr): Whether the head dimension is divisible by the block size
+        BLOCK_M (tl.constexpr): Block size for the sequence dimension in the query tensor
+        BLOCK_N (tl.constexpr): Block size for the sequence dimension in the key tensor
+    """
     start_m = tl.program_id(0)
     off_hb = tl.program_id(1)
     off_b = off_hb // nheads
@@ -302,6 +344,26 @@ def _bwd_preprocess_do_o_dot(
     BLOCK_M: tl.constexpr,
     BLOCK_HEADDIM: tl.constexpr,
 ):
+    """
+    _bwd_preprocess_do_o_dot is a Triton implementation of the backward pass of FlashAttention.
+
+    Args:
+        Out (torch.Tensor): The output tensor from the forward pass of FlashAttention.
+        DO (torch.Tensor): The gradient of the output tensor from the backward pass.
+        Delta (torch.Tensor): The tensor to store the sum of element-wise product of Out and DO.
+        stride_ob (int): Stride for the batch dimension in the output tensor.
+        stride_oh (int): Stride for the head dimension in the output tensor.
+        stride_om (int): Stride for the sequence dimension in the output tensor.
+        stride_dob (int): Stride for the batch dimension in the DO tensor.
+        stride_doh (int): Stride for the head dimension in the DO tensor.
+        stride_dom (int): Stride for the sequence dimension in the DO tensor.
+        nheads (int): Number of attention heads.
+        seqlen_q (int): Sequence length for the query tensor.
+        seqlen_q_rounded (int): Rounded up sequence length for the query tensor.
+        headdim (int): Dimension of each attention head.
+        BLOCK_M (tl.constexpr): Block size for the sequence dimension in the query tensor.
+        BLOCK_HEADDIM (tl.constexpr): Block size for the head dimension.
+    """
     start_m = tl.program_id(0)
     off_hb = tl.program_id(1)
     off_b = off_hb // nheads

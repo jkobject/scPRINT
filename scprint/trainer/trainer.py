@@ -1,38 +1,37 @@
 from lightning.pytorch.callbacks import Callback
-
-try:
-    from ..model.flash_attn import FlashTransformerEncoder
-except ModuleNotFoundError as e:
-    print(e)
-    print(
-        "can't use flash attention and triton kernel,\
-        you likely don't have the right hardware or didn't \
-        make the right installation"
-    )
-    FlashTransformerEncoder = None
+from typing import List
 
 
 class TrainingMode(Callback):
     def __init__(
         self,
-        do_denoise=True,
-        noise=[0.3],
-        do_cce=True,
-        cce_sim=0.5,
-        do_ecs=True,
+        do_denoise: bool = True,
+        noise: List[float] = [0.3],
+        do_cce: bool = True,
+        cce_sim: float = 0.5,
+        do_ecs: bool = True,
         ecs_threshold: float = 0.3,
         ecs_scale: float = 1.0,
-        do_mvc=False,
-        do_adv_cls=False,
-        do_next_tp=False,
-        do_generate=False,
+        do_mvc: bool = False,
+        do_adv_cls: bool = False,
+        do_next_tp: bool = False,
+        do_generate: bool = False,
         class_scale: float = 1.0,
-        mask_ratio=[0.15, 0.3],
-        warmup_duration=500,
-        weight_decay=0.01,
-        fused_adam=False,
-        lr_patience=3,
+        mask_ratio: List[float] = [0.15, 0.3],
+        warmup_duration: int = 500,
+        weight_decay: float = 0.01,
+        fused_adam: bool = False,
+        lr_patience: int = 3,
     ):
+        """
+        TrainingMode a callback to set the training specific info to the model.
+
+        This is because lightning is unfortunately setup this way. the model should be separated from training
+        but at the same time it has training specific methods... so we have to do this.
+
+        Args:
+            see @model.py
+        """
         super().__init__()
         self.do_denoise = do_denoise
         self.noise = noise

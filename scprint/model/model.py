@@ -221,16 +221,6 @@ class scPrint(L.LightningModule):
             self.transformer = FastTransformerEncoder(
                 d_model, nhead, d_hid, nlayers, dropout, "linear"
             )
-        # flash
-        elif transformer == "flash":
-            if FlashTransformerEncoder is None:
-                raise ValueError("flash transformer requires flash package")
-            # NOT flash transformer using the special tritton kernel
-            # or parallelMHA (add the process group thing and faster)
-            self.transformer = FlashTransformerEncoder(
-                d_model, nhead, nlayers, dropout=dropout, **flash_attention_kwargs
-            )
-
         # flashsparse
         elif transformer == "flashsparse":
             if Hashformer is None:
@@ -249,7 +239,6 @@ class scPrint(L.LightningModule):
         # That is why we include checkpoints for both tuned and untuned models.
         # https://github.com/shamim-hussain/egt/blob/master/README.md
         # https://github.com/shamim-hussain/egt_pytorch
-
         elif transformer == "scprint":
             self.transformer = EGT(
                 num_layers=nlayers,
@@ -258,13 +247,19 @@ class scPrint(L.LightningModule):
                 num_heads=nhead,
                 num_virtual_nodes=len(self.labels),
             )
-        # regular
+        # regular or flash
         else:
-            self.transformer = TransformerEncoder(
-                TransformerEncoderLayer(
-                    d_model, nhead, d_hid, dropout, batch_first=True
-                ),
+            if transformer == "flash" and FlashTransformerEncoder is None:
+                raise ValueError("flash transformer requires flash package")
+                # NOT flash transformer using the special tritton kernel
+                # or parallelMHA (add the process group thing and faster)
+            self.transformer = FlashTransformerEncoder(
+                d_model,
+                nhead,
                 nlayers,
+                dropout=dropout,
+                use_flash_attn=(transformer == "flash"),
+                **flash_attention_kwargs,
             )
 
         # decoders
@@ -528,14 +523,13 @@ class scPrint(L.LightningModule):
 
     def training_step(
         self,
-        batch,
+        batch: Dict[Tensor],
         batch_idx,
     ):
         """
         training_step defines the train loop. It is independent of forward
 
         @see pl.LightningModule
-
 
         Returns:
             _type_: _description_
@@ -560,19 +554,41 @@ class scPrint(L.LightningModule):
 
     def _full_training(
         self,
-        batch,
-        do_denoise=False,
-        noise=[],
-        do_next_tp=False,
-        do_cce=False,
-        cce_sim=0.5,
-        do_ecs=False,
-        do_mvc=False,
-        do_adv_cls=False,
-        do_generate=False,
-        mask_ratio=[0.15],
+        batch: Dict[Tensor],
+        do_denoise: bool = False,
+        noise: list[float] = [],
+        do_next_tp: bool = False,
+        do_cce: bool = False,
+        cce_sim: float = 0.5,
+        do_ecs: bool = False,
+        do_mvc: bool = False,
+        do_adv_cls: bool = False,
+        do_generate: bool = False,
+        mask_ratio: list[float] = [0.15],
     ):
-        """_full_training @see training_step for the description of the parameters"""
+        """
+        _full_training implement the trainng steps: forward (multiple sometimes), loss
+
+        Args:
+            batch (dict[Tensors]): A dictionary containing tensors for the training batch:
+                - "x": the expression levels of genes in the minibatch
+                - "genes": the genes used for each cell in the minibatch
+                - "class": the class to predict for each cell
+                - "depth": the full depth of each cell in the minibatch
+            do_denoise (bool, optional): A flag to indicate whether to perform denoising. Defaults to False.
+            noise (list[float], optional): A list of noise levels to be used in denoising. Defaults to [].
+            do_next_tp (bool, optional): A flag to indicate whether to perform next time point prediction. Defaults to False.
+            do_cce (bool, optional): A flag to indicate whether to perform cross-categorical entropy. Defaults to False.
+            cce_sim (float, optional): The similarity threshold for cross-categorical entropy. Defaults to 0.5.
+            do_ecs (bool, optional): A flag to indicate whether to perform elastic cell similarity. Defaults to False.
+            do_mvc (bool, optional): A flag to indicate whether to perform multi-view coding. Defaults to False.
+            do_adv_cls (bool, optional): A flag to indicate whether to perform adversarial classification. Defaults to False.
+            do_generate (bool, optional): A flag to indicate whether to perform data generation. Defaults to False.
+            mask_ratio (list, optional): A list of mask ratios to be used in the training. Defaults to [0.15].
+
+        Returns:
+            loss, losses: the total loss as float and the individual losses as dict
+        """
         if type(mask_ratio) is not list:
             mask_ratio = [mask_ratio]
 
@@ -722,22 +738,25 @@ class scPrint(L.LightningModule):
         do_mvc=False,
     ):
         """
-        _compute_loss
+        _compute_loss compute the loss of the model given output from the forward pass
 
         Args:
-            output (_type_): _description_
-            expression (_type_): _description_
-            mask (_type_): _description_
-            clss (_type_): _description_
-            do_ecs (bool, optional): _description_. Defaults to False.
-            do_adv_cls (bool, optional): _description_. Defaults to False.
-            do_mvc (bool, optional): _description_. Defaults to False.
+            output (dict): A dictionary containing the output of the forward pass.
+            expression (Tensor): A tensor containing the expression levels of genes.
+            mask (Tensor): A tensor indicating the masked positions in the input data.
+            clss (Tensor): A tensor containing the class labels for each cell.
+            do_ecs (bool, optional): A flag to indicate whether to perform elastic cell similarity.
+                Defaults to False.
+            do_adv_cls (bool, optional): A flag to indicate whether to perform adversarial classification.
+                Defaults to False.
+            do_mvc (bool, optional): A flag to indicate whether to perform masked value prediction for cell embedding.
+                Defaults to False.
 
         Raises:
-            ValueError: _description_
+            ValueError: Raised when an invalid operation or input is encountered.
 
         Returns:
-            _type_: _description_
+            tuple: A tuple containing the total loss as a float and the individual losses as a dictionary.
         """
         total_loss = 0
         losses = {}
@@ -857,19 +876,10 @@ class scPrint(L.LightningModule):
     ):
         """
         validation_step defines the validation loop. It is independent of forward
+        @see pl.LightningModule
 
         Args:
-            batch (list[Tensor]): shape [Tensor(minibatch, seq_len)*2, Tensor(minibatch, n_labels)]
-                the n_labels should be in the same orders as the labels provided in the model
-                the first Tensor is gene ids, the second is expression of those gene_pos
-            batch_idx (Tensor): shape (minibatch)
-            superbatch (list[Tensor], optional): shape [(neighbors, seq_len)*minibatch | None]
-                gives out additional expression (on the same gene_pos) for the k
-                nearest neighbors of the cell at the same minibatch index in "batch"). Defaults to None.
-            superbatch_idx (Tensor, optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
+            batch (list[Tensor]): @see training_step
         """
         val_loss, losses = self._full_training(
             batch,
@@ -909,7 +919,12 @@ class scPrint(L.LightningModule):
     # TODO: compute classification accuracy metrics
 
     def test_step(self, batch, batch_idx):
-        """@see pl.LightningModule"""
+        """
+        @see pl.LightningModule
+
+        Args:
+            batch @see training_step
+        """
         total_loss, losses = self._full_training(
             batch,
             self.do_denoise,
@@ -940,8 +955,7 @@ class scPrint(L.LightningModule):
         embed given gene expression, encode the gene embedding and cell embedding.
 
         Args:
-            gene_pos (Tensor): _description_
-            expression (Tensor): _description_
+            batch @see training_step
 
         Returns:
             Tensor: _description_
@@ -949,7 +963,25 @@ class scPrint(L.LightningModule):
         return self._predict(batch["genes"], batch["x"], batch["depth"])
 
     def _predict(self, gene_pos, expression, depth, keep_output=True):
-        """@see pl.LightningModule"""
+        """
+        @see predict_step will save output of predict in multiple self variables
+
+        - embs: the cell embeddings (means from label specific embeddings given by self.pred_embedding)
+        - pred: the predicted cell labels
+        - pos: the genes used
+        - expr_pred: the expression prediction. [mean, disp, zero_logits]
+        - mean_attn: the mean attention across cells for the given layer (in self.get_attention_layer)
+
+        these will be finalized in self.on_predict_epoch_end()
+
+        Args:
+            @see training_step
+            other important arguments:
+            keep_output (bool, optional): whether to keep the output in memory. Defaults to True.
+            self.get_attention_layer (list, optional): the layers to get the attention from. Defaults to [].
+            self.pred_embedding (list, optional): the labels to predict. Defaults to [].
+
+        """
         if not self.trainer.is_global_zero:
             print("you are not on the main node. cancelling predict step")
             return
@@ -1033,16 +1065,16 @@ class scPrint(L.LightningModule):
 
     def get_cell_embs(self, layer_output):
         """
-        get_cell_embs _summary_
+        get_cell_embs
 
         Args:
-            layer_output (_type_): _description_
+            layer_output (Tensor): The output tensor from a layer in the model.
 
         Raises:
-            ValueError: _description_
+            ValueError: Raised when an unknown cell embedding style is encountered.
 
         Returns:
-            _type_: _description_
+            Tensor: The cell embeddings tensor.
         """
         if self.cell_emb_style == "cls" and self.labels is not None:
             # (minibatch, embsize)
@@ -1070,11 +1102,11 @@ class scPrint(L.LightningModule):
         should call forward multiple times
 
         Args:
-            cell_emb(:obj:`Tensor`): shape (minibatch, embsize)
-            src(:obj:`Tensor`): shape (minibatch, seq_len)
-            values(:obj:`Tensor`): shape (minibatch, seq_len), optional
-            gen_iters(:obj:`int`): number of generation iterations
-            labels(:obj:`Tensor`): shape (batch,), optional
+            cell_emb(:obj:`Tensor`): A tensor representing cell embeddings. It has a shape of (minibatch, embsize).
+            src(:obj:`Tensor`): A tensor representing the source data. It has a shape of (minibatch, seq_len).
+            values(:obj:`Tensor`): An optional tensor representing the values. It has a shape of (minibatch, seq_len).
+            gen_iters(:obj:`int`): An integer representing the number of generation iterations.
+            labels(:obj:`Tensor`): An optional tensor representing the labels. It has a shape of (batch,).
         """
         if tp is not None:
             tp = tp / gen_iters
@@ -1091,7 +1123,12 @@ class scPrint(L.LightningModule):
         return output  # (minibatch, seq_len)
 
     def log_adata(self, gtclass=None, name=""):
-        """see @utils.log_adata"""
+        """
+        log_adata will log an adata from predictions.
+        It will log to tensorboard and wandb if available
+
+        see @utils.log_adata
+        """
         try:
             mdir = self.logger.save_dir if self.logger.save_dir is not None else "/tmp"
         except:

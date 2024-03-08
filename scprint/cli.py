@@ -4,6 +4,11 @@ import torch
 
 
 class MyCLI(LightningCLI):
+    """
+    MyCLI is a subclass of LightningCLI to add some missing params
+    and create bindings between params of the model and the data.
+    """
+
     def add_arguments_to_parser(self, parser):
         parser.link_arguments(
             "data.gene_pos", "model.gene_pos_enc", apply_on="instantiate"

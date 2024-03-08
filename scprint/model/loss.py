@@ -209,6 +209,16 @@ def similarity(x, y, temp):
 
 
 def ecs(cell_emb, ecs_threshold=0.5):
+    """
+    ecs Computes the similarity of cell embeddings based on a threshold.
+
+    Args:
+        cell_emb (torch.Tensor): A tensor representing cell embeddings.
+        ecs_threshold (float, optional): A threshold for determining similarity. Defaults to 0.5.
+
+    Returns:
+        torch.Tensor: A tensor representing the mean of 1 minus the square of the difference between the cosine similarity and the threshold.
+    """
     # Here using customized cosine similarity instead of F.cosine_similarity
     # to avoid the pytorch issue of similarity larger than 1.0, pytorch # 78064
     # normalize the embedding
@@ -225,6 +235,22 @@ def ecs(cell_emb, ecs_threshold=0.5):
 
 
 def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
+    """
+    Computes the classification loss for a given batch of predictions and ground truth labels.
+
+    Args:
+        labelname (str): The name of the label.
+        pred (torch.Tensor): The predicted logits for the batch.
+        cl (torch.Tensor): The ground truth labels for the batch.
+        maxsize (int): The number of possible labels.
+        cls_hierarchy (dict, optional): The hierarchical structure of the labels. Defaults to {}.
+
+    Raises:
+        ValueError: If the labelname is not found in the cls_hierarchy dictionary.
+
+    Returns:
+        torch.Tensor: The computed binary cross entropy loss for the given batch.
+    """
     newcl = torch.zeros(
         (cl.shape[0], maxsize), device=cl.device
     )  # batchsize * n_labels

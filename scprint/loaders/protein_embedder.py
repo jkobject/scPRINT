@@ -12,13 +12,31 @@ from torch import load
 class PROTBERT:
     def __init__(
         self,
-        config="esm-extract",
-        pretrained_model="esm2_t33_650M_UR50D",
+        config: str = "esm-extract",
+        pretrained_model: str = "esm2_t33_650M_UR50D",
     ):
+        """
+        PROTBERT a ghost class to call protein LLMs to encode protein sequences.
+
+        Args:
+            config (str, optional): The configuration for the model. Defaults to "esm-extract".
+            pretrained_model (str, optional): The pretrained model to be used. Defaults to "esm2_t33_650M_UR50D".
+        """
         self.config = config
         self.pretrained_model = pretrained_model
 
     def __call__(self, input_file, output_folder="/tmp/esm_out/", cache=True):
+        """
+        Call the PROTBERT model on the input file.
+
+        Args:
+            input_file (str): The input file to be processed.
+            output_folder (str, optional): The folder where the output will be stored. Defaults to "/tmp/esm_out/".
+            cache (bool, optional): If True, use cached data if available. Defaults to True.
+
+        Returns:
+            pd.DataFrame: The results of the model as a DataFrame.
+        """
         if not os.path.exists(output_folder) or not cache:
             os.makedirs(output_folder, exist_ok=True)
             print("running protbert")
@@ -42,10 +60,13 @@ class PROTBERT:
 
     def read_results(self, output_folder):
         """
-        read_results read multiple .pt files in a folder and convert in a dataframe
+        Read multiple .pt files in a folder and convert them into a DataFrame.
 
         Args:
-            output_folder (_type_): _description_
+            output_folder (str): The folder where the .pt files are stored.
+
+        Returns:
+            pd.DataFrame: The results of the model as a DataFrame.
         """
         files = os.listdir(output_folder)
         files = [i for i in files if i.endswith(".pt")]

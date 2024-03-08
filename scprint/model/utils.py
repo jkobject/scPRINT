@@ -17,6 +17,22 @@ from matplotlib import pyplot as plt
 def make_adata(
     pred, embs, labels, step=0, label_decoders=None, gtclass=None, name="", mdir="/tmp"
 ):
+    """
+    This function creates an AnnData object from the given input parameters.
+
+    Args:
+        pred (torch.Tensor): Predicted labels. The shape of the tensor is (n_cells, n_classes)
+        embs (torch.Tensor): Embeddings of the cells. The shape of the tensor is (n_cells, n_features)
+        labels (list): List of labels for the predicted classes.
+        step (int, optional): Step number. Default is 0. (for storing the anndata without overwriting others)
+        label_decoders (dict, optional): Dictionary to map class codes to class names. Default is None.
+        gtclass (torch.Tensor, optional): Ground truth class. Default is None.
+        name (str, optional): Name of the AnnData object. Default is an empty string.
+        mdir (str, optional): Directory to save the AnnData object. Default is "/tmp".
+
+    Returns:
+        adata (anndata.AnnData): The created AnnData object.
+    """
     colname = ["pred_" + i for i in labels]
     obs = np.array(pred.to(device="cpu", dtype=torch.int32))
     # label decoders is not cls_decoders. one is a dict to map class codes (ints)
@@ -79,7 +95,7 @@ def make_adata(
             )
             for i in pair
         ]
-        fig, axs = plt.subplots(int(len(color) / 2), 2, figsize=(24, len(color) * 4))
+        _, axs = plt.subplots(int(len(color) / 2), 2, figsize=(24, len(color) * 4))
         plt.subplots_adjust(wspace=1)
         for i, col in enumerate(color):
             sc.pl.umap(
@@ -112,6 +128,24 @@ def _init_weights(
     mup_width_scale=1.0,
     rescale_prenorm_residual=True,
 ):
+    """
+    This function initializes the weights of the given module. The initialization is done based on the type of the module.
+
+    If the module is a Linear layer, the weights are initialized with a normal distribution with a standard deviation
+    that is a product of the initializer range and the mup_init_scale. The learning rate multiplier is also set for the
+    weights of the Linear layer. If the module has a bias, it is initialized with zeros.
+    If the module is an Embedding layer, no initialization is performed.
+    If the rescale_prenorm_residual flag is set to True, the weights of the residual layers are reinitialized according
+    to the scheme proposed in the OpenAI GPT-2 Paper. The weights are scaled by a factor of 1/sqrt(N), where N is the
+    number of residual layers.
+
+    Args:
+        module (nn.Module): The module whose weights are to be initialized.
+        n_layer (int): The number of layers in the module.
+        initializer_range (float, optional): The range of the initializer. Defaults to 0.02.
+        mup_width_scale (float, optional): The scale for the mup initialization. Defaults to 1.0.
+        rescale_prenorm_residual (bool, optional): Flag to indicate whether to rescale the prenorm residual. Defaults to True.
+    """
     mup_init_scale = math.sqrt(mup_width_scale)
     if isinstance(module, nn.Linear):
         nn.init.normal_(module.weight, std=initializer_range * mup_init_scale)
@@ -217,6 +251,18 @@ def masker(
 
 
 def zinb_sample(mu, theta, zi_probs, sample_shape=torch.Size([])):
+    """
+    zinb_sample This function generates a sample from a Zero-Inflated Negative Binomial (ZINB) distribution.
+
+    Args:
+        mu (torch.Tensor): The mean of the Negative Binomial (NB) distribution.
+        theta (torch.Tensor): The dispersion parameter of the NB distribution.
+        zi_probs (torch.Tensor): The zero-inflation probabilities.
+        sample_shape (torch.Size, optional): The output shape. Defaults to torch.Size([]).
+
+    Returns:
+        torch.Tensor: A sample from the ZINB distribution.
+    """
     concentration = theta
     rate = theta / mu
     # Important remark: Gamma is parametrized by the rate = 1/scale!
@@ -233,6 +279,16 @@ def zinb_sample(mu, theta, zi_probs, sample_shape=torch.Size([])):
 
 
 def translate(val, t="cell_type_ontology_term_id"):
+    """
+    translate This function translates the given value based on the specified type.
+
+    Args:
+        val (str/list/set/dict/Counter): The value to be translated.
+        t (str, optional): The type of translation to be performed. Defaults to "cell_type_ontology_term_id".
+
+    Returns:
+        dict: A dictionary with the translated values.
+    """
     if t == "cell_type_ontology_term_id":
         obj = bt.CellType.df().set_index("ontology_id")
     elif t == "assay_ontology_term_id":

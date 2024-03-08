@@ -1,7 +1,7 @@
 # Copyright (c) 2024, Tri Dao.
 
 from functools import partial
-from typing import Optional
+from typing import Optional, Callable, Type, Dict, Any
 
 import torch
 import torch.nn as nn
@@ -17,21 +17,21 @@ from .layer_norm import layer_norm_fn, RMSNorm
 class Block(nn.Module):
     def __init__(
         self,
-        dim,
-        mixer_cls=None,
-        mlp_cls=None,
-        norm_cls=partial(nn.LayerNorm, eps=1e-6),
-        dropout_cls=nn.Dropout,
-        prenorm=True,
-        resid_dropout1=0.0,
-        resid_dropout2=0.0,
-        drop_path1=0.0,
-        drop_path2=0.0,
-        fused_dropout_add_ln=False,
-        return_residual=False,
-        residual_in_fp32=False,
-        sequence_parallel=False,
-        mark_shared_params=False,
+        dim: int,
+        mixer_cls: Optional[Callable] = None,
+        mlp_cls: Optional[Callable] = None,
+        norm_cls: Callable = partial(nn.LayerNorm, eps=1e-6),
+        dropout_cls: Type[nn.Dropout] = nn.Dropout,
+        prenorm: bool = True,
+        resid_dropout1: float = 0.0,
+        resid_dropout2: float = 0.0,
+        drop_path1: float = 0.0,
+        drop_path2: float = 0.0,
+        fused_dropout_add_ln: bool = False,
+        return_residual: bool = False,
+        residual_in_fp32: bool = False,
+        sequence_parallel: bool = False,
+        mark_shared_params: bool = False,
     ):
         """
         For prenorm=True, this Block has a slightly different structure compared to a regular
@@ -46,9 +46,28 @@ class Block(nn.Module):
         For prenorm=False, this Block has the same structure as a regular postnorm Transformer
         block: MHA -> Dropout -> Add -> LN -> MLP -> Dropout -> Add -> LN.
 
-        return_residual: whether each of the sub-layers (mixer and mlp) will return the residual.
-        This is for performance reason: for post-norm architecture, returning the input allows us
-        to fuse the backward of nn.Linear with the residual connection.
+        Args:
+            dim (int): the number of features in the input.
+            mixer_cls (Optional[Callable], optional): the class to use for the mixer layer. Defaults to None.
+            mlp_cls (Optional[Callable], optional): the class to use for the mlp layer. Defaults to None.
+            norm_cls (Callable, optional): the class to use for the layer norm. Defaults to partial(nn.LayerNorm, eps=1e-6).
+            dropout_cls (Type[nn.Dropout], optional): the class to use for the dropout. Defaults to nn.Dropout.
+            prenorm (bool, optional): whether to use pre-norm or post-norm. Defaults to True.
+            resid_dropout1 (float, optional): the dropout probability for the first dropout layer. Defaults to 0.0.
+            resid_dropout2 (float, optional): the dropout probability for the second dropout layer. Defaults to 0.0.
+            drop_path1 (float, optional): the drop path probability for the first drop path layer. Defaults to 0.0.
+            drop_path2 (float, optional): the drop path probability for the second drop path layer. Defaults to 0.0.
+            fused_dropout_add_ln (bool, optional): whether to fuse the dropout, add and layer norm. Defaults to False.
+            return_residual (bool, optional): whether each of the sub-layers (mixer and mlp) will return the residual.
+                This is for performance reason: for post-norm architecture, returning the input allows us
+                to fuse the backward of nn.Linear with the residual connection.
+                Defaults to False.
+            residual_in_fp32 (bool, optional): whether to keep the residual in fp32. This is for performance reason:
+                for post-norm architecture, keeping the residual in fp32 allows us to fuse the backward of nn.Linear
+                with the residual connection. Defaults to False.
+            sequence_parallel (bool, optional): whether to use sequence parallelism. Defaults to False.
+            mark_shared_params (bool, optional): whether to mark the norm parameters as "shared_params".
+                This is useful when we want to sync the norm parameters across workers. Defaults to False.
         """
         super().__init__()
         self.prenorm = prenorm
@@ -114,21 +133,29 @@ class Block(nn.Module):
         self,
         hidden_states: Tensor,
         residual: Optional[Tensor] = None,
-        src_mask=None,
-        is_causal=None,
-        src_key_padding_mask=None,
-        mixer_subset=None,
-        mixer_kwargs=None,
-        return_qkv=False,
+        src_mask: Optional[Tensor] = None,
+        is_causal: Optional[bool] = None,
+        src_key_padding_mask: Optional[Tensor] = None,
+        mixer_subset: Optional[Tensor] = None,
+        mixer_kwargs: Optional[Dict[str, Any]] = None,
+        return_qkv: bool = False,
     ):
         r"""Pass the input through the encoder layer.
 
         Args:
-            hidden_states: the sequence to the encoder layer (required).
-            residual: if postnorm, residual=None, If prenorm, hidden_states = Attn/MLP(LN(residual))
-            mixer_subset: for cross-attention only. If not None, will take a subset of x
-                before applying the query projection. Useful for e.g., ViT where we only care
-                about the CLS token in the last layer.
+            hidden_states (Tensor): The sequence to be passed to the encoder layer. This is a required argument.
+            residual (Optional[Tensor]): This argument is used differently based on the normalization method.
+                If postnorm is used, residual should be None. If prenorm is used, hidden_states is updated as Attn/MLP(LN(residual)).
+            mixer_subset: This argument is used only for cross-attention.
+                If not None, a subset of the input sequence 'x' is taken before applying the query projection.
+                This is particularly useful for models like ViT where only the CLS token in the last layer is of interest.
+            mixer_kwargs: This argument is used only for cross-attention.
+                It is a dictionary of additional arguments to be passed to the mixer.
+            return_qkv: If True, the function will return the query, key, and value tensors.
+
+        Returns:
+            Tensor or Tuple[Tensor, Tensor]: The output tensor of the encoder layer.
+            If return_qkv is True, the function will return a tuple of the output tensor and the query, key, and value tensors.
         """
         if self.prenorm:
             if not self.fused_dropout_add_ln:
