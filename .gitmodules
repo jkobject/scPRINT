@@ -1,3 +1,6 @@
 [submodule "scDataLoader"]
 path = scDataLoader
 url = https://github.com/jkobject/scDataLoader
+[submodule "RNABERT"]
+	path = RNABERT
+	url = https://github.com/jkobject/RNABERT
