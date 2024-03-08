@@ -1,6 +1,3 @@
-[submodule "RNABERT"]
-path = RNABERT
-url = https://github.com/jkobject/RNABERT
 [submodule "scDataLoader"]
 path = scDataLoader
 url = https://github.com/jkobject/scDataLoader
