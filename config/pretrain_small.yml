@@ -34,6 +34,7 @@ trainer:
         ecs_threshold: 0.6
         ecs_scale: 10.0
         do_mvc: False
+        do_generate: True
         do_adv_cls: False
         do_next_tp: False
         class_scale: 500.0
@@ -66,8 +67,8 @@ trainer:
 model:
   nhead: 4
   nlayers: 4
-  layers_cls: []
-  dropout: 0.1
+  layers_cls: [128]
+  dropout: 0.2
   transformer: flash
   mvc_decoder: inner product
   d_model: 128
@@ -91,12 +92,13 @@ data:
   gene_embeddings: ./data/main/embeddings.parquet
   collection_name: preprocessed dataset
   how: random expr
-  max_len: 1000
+  max_len: 1200
   weight_scaler: 10
   do_gene_pos: ./data/main/biomart.parquet
   add_zero_genes: 0
-  validation_split: 0.2
-  test_split: 0.1
+  train_oversampling: 2
+  validation_split: 0.1
+  test_split: 0.05
   batch_size: 64
   num_workers: 16
   # TODO: drop tissue & dev stage until part or is taken in account

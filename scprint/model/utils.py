@@ -94,7 +94,6 @@ def zinb_sample(mu, theta, zi_probs, sample_shape=torch.Size([])):
     samp_ = torch.where(is_zero, torch.zeros_like(samp), samp)
     return samp_
 
-
 def translate(val, t="cell_type_ontology_term_id"):
     if t == "cell_type_ontology_term_id":
         obj = bt.CellType.df().set_index("ontology_id")

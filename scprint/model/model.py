@@ -64,7 +64,7 @@ class scPrint(L.LightningModule):
         expr_emb_style: str = "continuous",  # "binned_pos", "cont_pos"
         domain_spec_batchnorm: str = "None",
         n_input_bins: int = 0,
-        mvc_decoder: str = "inner product",
+        mvc_decoder: str = "None",
         pred_embedding: list[str] = [],
         cell_emb_style: str = "cls",
         lr=0.001,
@@ -290,7 +290,7 @@ class scPrint(L.LightningModule):
             )
 
         # expression decoder from batch embbedding
-        if mvc_decoder is not None:
+        if mvc_decoder != "None":
             self.mvc_decoder = decoders.MVCDecoder(
                 d_model,
                 arch_style=mvc_decoder,
