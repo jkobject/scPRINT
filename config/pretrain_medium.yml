@@ -37,6 +37,7 @@ trainer:
         do_adv_cls: False
         do_next_tp: False
         class_scale: 500.0
+        do_generate: True
         warmup_duration: 500
         weight_decay: 0.1
         fused_adam: True
@@ -53,7 +54,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.EarlyStopping
       init_args:
         monitor: val_loss
-        patience: 3
+        patience: 2
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: epoch
@@ -65,12 +66,12 @@ trainer:
   #    requeue_signal: signal.SIGHUP
 model:
   nhead: 4
-  nlayers: 4
-  layers_cls: []
+  nlayers: 6
+  layers_cls: [256]
   dropout: 0.1
   transformer: flash
-  mvc_decoder: inner product
-  d_model: 128
+  mvc_decoder: None
+  d_model: 256
   residual_in_fp32: True
   num_heads_kv: null
   fused_dropout_add_ln: False
@@ -90,14 +91,14 @@ data:
   gene_position_tolerance: 10_000
   gene_embeddings: ./data/main/embeddings.parquet
   collection_name: preprocessed dataset
-  how: most expr
+  how: random expr
   max_len: 2000
-  weight_scaler: 4
+  weight_scaler: 10
   do_gene_pos: ./data/main/biomart.parquet
-  add_zero_genes: 100
-  train_oversampling: 5
-  validation_split: 0.2
-  test_split: 0.1
+  add_zero_genes: 0
+  train_oversampling: 2
+  validation_split: 0.1
+  test_split: 0.05
   batch_size: 64
   num_workers: 16
   # TODO: drop tissue & dev stage until part or is taken in account
