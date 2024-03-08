@@ -107,10 +107,18 @@ class FlashTransformerEncoder(nn.Module):
         assert mode == ""
         named_apply(_init_weights, self)
 
-    def forward(self, hidden_states: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self, hidden_states: Tensor, mask: Optional[Tensor] = None, return_qkv=[]
+    ) -> Tensor:
         residual = None
-        for block in self.blocks:
-            hidden_states, residual = block(hidden_states, residual)
+        qkvs = []
+        for i, block in enumerate(self.blocks):
+            hidden_states = block(hidden_states, residual, return_qkv=(i in return_qkv))
+            if i in return_qkv:
+                qkvs.append(hidden_states[-1])
+                hidden_states, residual = hidden_states[:-1]
+            else:
+                hidden_states, residual = hidden_states
         if not self.fused_dropout_add_ln:
             residual = self.drop_path(self.dropout(hidden_states)) + residual
             hidden_states = self.norm(residual.to(dtype=self.norm.weight.dtype))
@@ -136,7 +144,7 @@ class FlashTransformerEncoder(nn.Module):
                 rowscale=rowscale,
                 prenorm=False,
             )
-        return hidden_states
+        return hidden_states if len(return_qkv) == 0 else (hidden_states, qkvs)
 
 
 def _init_weights(module: nn.Module, name: str = ""):

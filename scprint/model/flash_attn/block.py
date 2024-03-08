@@ -119,6 +119,7 @@ class Block(nn.Module):
         src_key_padding_mask=None,
         mixer_subset=None,
         mixer_kwargs=None,
+        return_qkv=False,
     ):
         r"""Pass the input through the encoder layer.
 
@@ -163,7 +164,12 @@ class Block(nn.Module):
                 mixer_kwargs = {}
             if mixer_subset is not None:
                 mixer_kwargs["mixer_subset"] = mixer_subset
-            hidden_states = self.mixer(hidden_states, **mixer_kwargs)
+            hidden_states = self.mixer(
+                hidden_states, return_qkv=return_qkv, **mixer_kwargs
+            )
+            if return_qkv:
+                qkv = hidden_states[1]
+                hidden_states = hidden_states[0]
             if mixer_subset is not None:
                 residual = residual[:, mixer_subset]
             if not isinstance(self.mlp, nn.Identity):
@@ -199,12 +205,25 @@ class Block(nn.Module):
                         is_rms_norm=isinstance(self.norm2, RMSNorm),
                     )
                 hidden_states = self.mlp(hidden_states)
-            return hidden_states, residual
+            return (
+                (hidden_states, residual)
+                if not return_qkv
+                else (
+                    hidden_states,
+                    residual,
+                    qkv,
+                )
+            )
         else:
             assert residual is None
             mixer_out = self.mixer(
-                hidden_states, **(mixer_kwargs if mixer_kwargs is not None else {})
+                hidden_states,
+                return_qkv=return_qkv,
+                **(mixer_kwargs if mixer_kwargs is not None else {})
             )
+            if return_qkv:
+                qkv = mixer_out[-1]
+                mixer_out = mixer_out[:-1]
             if self.return_residual:  # mixer out is actually a pair here
                 mixer_out, hidden_states = mixer_out
             if not self.fused_dropout_add_ln:
@@ -267,4 +286,4 @@ class Block(nn.Module):
                         prenorm=False,
                         is_rms_norm=isinstance(self.norm2, RMSNorm),
                     )
-            return hidden_states
+            return hidden_states if not return_qkv else (hidden_states, qkv)

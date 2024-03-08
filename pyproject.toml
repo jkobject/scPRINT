@@ -56,6 +56,7 @@ lnschema-bionty = "*"
 bionty = "*"
 wandb = "*"
 wandb-core = "*"
+pykeops = "*"
 # pip install anndata matplotlib seaborn gseapy ipykernel owlready2 biomart scib scipy pandas numpy leidenalg decoupler Bio attridict gget pynndescent einops rich tensorboardX jsonargparse bionty wandb scikit-learn hydra-core typeshed-client docstring-parser lnschema-bionty
 # pip install pytorch-fast-transformers transformers lightning torchtext==0.15.1
 # pip install git+https://github.com/facebookresearch/esm.git

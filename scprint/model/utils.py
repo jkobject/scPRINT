@@ -97,18 +97,20 @@ def zinb_sample(mu, theta, zi_probs, sample_shape=torch.Size([])):
 
 def translate(val, t="cell_type_ontology_term_id"):
     if t == "cell_type_ontology_term_id":
-        obj = bt.CellType.public(organism="all")
+        obj = bt.CellType.df().set_index("ontology_id")
     elif t == "assay_ontology_term_id":
-        obj = bt.ExperimentalFactor.public()
+        obj = bt.ExperimentalFactor.df().set_index("ontology_id")
     elif t == "tissue_ontology_term_id":
-        obj = bt.Tissue.public()
+        obj = bt.Tissue.df().set_index("ontology_id")
+    elif t == "disease_ontology_term_id":
+        obj = bt.Disease.df().set_index("ontology_id")
+    elif t == "self_reported_ethnicity_ontology_term_id":
+        obj = bt.Ethnicity.df().set_index("ontology_id")
     else:
         return None
     if type(val) is str:
-        return {val: obj.search(val, field=obj.ontology_id).name.iloc[0]}
+        return {val: obj.loc[val]["name"]}
     elif type(val) is list or type(val) is set:
-        return {i: obj.search(i, field=obj.ontology_id).name.iloc[0] for i in set(val)}
+        return {i: obj.loc[i]["name"] for i in set(val)}
     elif type(val) is dict or type(val) is Counter:
-        return {
-            obj.search(k, field=obj.ontology_id).name.iloc[0]: v for k, v in val.items()
-        }
+        return {obj.loc[k]["name"]: v for k, v in val.items()}

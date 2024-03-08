@@ -536,6 +536,7 @@ class MHA(nn.Module):
         max_seqlen=None,
         mixer_subset=None,
         inference_params=None,
+        return_qkv=False,
         **kwargs,
     ):
         """
@@ -684,4 +685,7 @@ class MHA(nn.Module):
                     q, kv, inference_params
                 )
         out = self.out_proj(rearrange(context, "... h d -> ... (h d)"))
-        return out if not self.return_residual else (out, x)
+        if return_qkv:
+            return out if not self.return_residual else (out, x), qkv
+        else:
+            return out if not self.return_residual else (out, x)

@@ -118,6 +118,7 @@ class scPrint(L.LightningModule):
         self.fused_adam = False
         self.lr_patience = 3
         self.lrfinder_steps = 0
+        self.get_attention_layer = []
         self.embs = None
         # should be stored somehow
         self.d_model = d_model
@@ -319,8 +320,6 @@ class scPrint(L.LightningModule):
         # (minibatch,), then will be compared to this timepoint
         timepoint: Optional[Tensor] = None,
         cell_embs: Optional[Tensor] = None,  # (minibatch, n_labels, embsize)
-        get_attention: bool = False,
-        attention_layer: Optional[int] = None,
     ):
         """
         _encode given gene expression, encode the gene embedding and cell embedding.
@@ -375,9 +374,8 @@ class scPrint(L.LightningModule):
         #     )  # the batch norm always works on dim 1
         # elif getattr(self, "bn", None) is not None:
         #     total_embs = self.bn(total_embs.permute(0, 2, 1)).permute(0, 2, 1)
-        output = self.transformer(enc)
         # TODO: get the attention here
-        return output  # (minibatch, seq_len, embsize)
+        return enc  # (minibatch, seq_len, embsize)
 
     def _decoder(
         self, transformer_output, depth_mult, get_gene_emb=False, do_sample=False
@@ -432,6 +430,7 @@ class scPrint(L.LightningModule):
         timepoint: Optional[Tensor] = None,  # (new_minibatch_of_nxt_cells,)
         get_gene_emb: bool = False,
         do_sample: bool = False,
+        get_attention_layer: list = [],
     ):
         """
         Args:
@@ -441,10 +440,18 @@ class scPrint(L.LightningModule):
         Returns:
             dict of output Tensors.
         """
-        transformer_output = self._encoder(
-            gene_pos, expression, mask, full_depth, timepoint
-        )
-        return self._decoder(transformer_output, depth_mult, get_gene_emb, do_sample)
+        encoding = self._encoder(gene_pos, expression, mask, full_depth, timepoint)
+        transformer_output = self.transformer(encoding, return_qkv=get_attention_layer)
+        if len(get_attention_layer) > 0:
+            transformer_output, qkvs = transformer_output
+            return (
+                self._decoder(transformer_output, depth_mult, get_gene_emb, do_sample),
+                qkvs,
+            )
+        else:
+            return self._decoder(
+                transformer_output, depth_mult, get_gene_emb, do_sample
+            )
 
     def configure_optimizers(self):
         # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam
@@ -1003,7 +1010,17 @@ class scPrint(L.LightningModule):
         if not self.trainer.is_global_zero:
             print("you are not on the main node. cancelling predict step")
             return
-        output = self.forward(gene_pos, expression.sum(1), expression, full_depth=depth)
+        output = self.forward(
+            gene_pos,
+            expression.sum(1),
+            expression,
+            full_depth=depth,
+            get_attention_layer=self.get_attention_layer,
+        )
+        if len(self.get_attention_layer) > 0:
+            qkv = [i[:,:,:2,:].mean(0) for i in output[1]]
+            output = output[0]
+            
         cell_embs = output["cell_embs"]
         # output = self._generate(
         #    cell_embs, gene_pos, depth_mult=expression.sum(1), full_depth=depth
