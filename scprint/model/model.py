@@ -285,7 +285,6 @@ class scPrint(L.LightningModule):
             self.mvc_decoder = decoders.MVCDecoder(
                 d_model,
                 arch_style=mvc_decoder,
-                dropout=dropout,
             )
         else:
             self.mvc_decoder = None
