@@ -338,7 +338,7 @@ class scPrint(L.LightningModule):
         self.cur_gene_token_embs = enc.clone()
         if expression is not None:
             enc += self.expr_encoder(
-                torch.log2(1 + expression), mask
+                expression/expression.sum(1), mask
             )  # (minibatch, seq_len, embsize)
 
         if self.gene_pos_enc:
@@ -424,7 +424,7 @@ class scPrint(L.LightningModule):
     def forward(
         self,
         gene_pos: Tensor,
-        depth_mult: Tensor,
+        depth_mult: Optional[Tensor] = None,
         expression: Optional[Tensor] = None,
         mask: Optional[Tensor] = None,
         # (minibatch,) unormalized total counts
@@ -444,6 +444,7 @@ class scPrint(L.LightningModule):
         transformer_output = self._encoder(
             gene_pos, expression, mask, full_depth, timepoint
         )
+        depth_mult = expression.sum(1) if depth_mult is None else depth_mult
         return self._decoder(transformer_output, depth_mult, get_gene_emb, do_sample)
 
     def configure_optimizers(self):
@@ -599,7 +600,7 @@ class scPrint(L.LightningModule):
                 mask_ratio=i,
             ).to(gene_pos.device)
             output = self.forward(
-                gene_pos, expression.sum(1), expression, mask, total_count, timepoint
+                gene_pos, expression, mask, total_count, timepoint
             )
             l, tot = self._compute_loss(
                 output, expression, mask, clss, do_ecs, do_adv_cls, do_mvc
@@ -620,12 +621,11 @@ class scPrint(L.LightningModule):
                 # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02601-5#:~:text=Zero%20measurements%20in%20scRNA%2Dseq,generation%20of%20scRNA%2Dseq%20data.
                 # TODO: test and look a bit more into it
                 expr = utils.downsample_profile(expression, renoise=i)
-                true_rescale = expr.sum(1) / expression.sum(1)
                 output = self.forward(
                     gene_pos,
-                    expression.sum(1),
                     expr,
-                    full_depth=total_count * true_rescale,  # TODO: add rescaled count
+                    depth_mult=expression.sum(1),
+                    full_depth=total_count,
                     timepoint=timepoint,
                 )
                 l, tot = self._compute_loss(
@@ -922,7 +922,7 @@ class scPrint(L.LightningModule):
         """
         layer_output = self._encoder(
             gene_pos,
-            expression,
+            expression/expression.sum(1),
         )
         embs = self._get_cell_embs(layer_output)
         return embs
@@ -1003,7 +1003,7 @@ class scPrint(L.LightningModule):
         if not self.trainer.is_global_zero:
             print("you are not on the main node. cancelling predict step")
             return
-        output = self.forward(gene_pos, expression.sum(1), expression, full_depth=depth)
+        output = self.forward(gene_pos, expression, full_depth=depth)
         cell_embs = output["cell_embs"]
         # output = self._generate(
         #    cell_embs, gene_pos, depth_mult=expression.sum(1), full_depth=depth
@@ -1179,7 +1179,7 @@ class scPrint(L.LightningModule):
         Returns:
             dict of output Tensors.
         """
-        output = self.forward(gene_pos, expression.sum(1), expression, full_depth=depth)
+        output = self.forward(gene_pos, expression, full_depth=depth)
         return output
 
 
