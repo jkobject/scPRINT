@@ -31,26 +31,46 @@ then install scPrint
 pip install scprint
 ```
 
+> I had to install a specific version of pytorch, torchaudio, torchtext.. for my cuda version.
+My cuda compiler nvcc compiles cuda 11.7. my cuda-smi (api) is currently 12.1.
+
+> Please install all of it for your cuda version and it should still work. for more information on this, please see [installation.md](installation.md).
+
+### in dev mode
+
+```python
+conda create ...
+git clone https://github.com/jkobject/scPRINT
+cd scPRINT
+git checkout dev
+git submodule init
+git submodule update
+# install pytorch as mentionned above if you have a GPU
+pip install -e .[dev]
+# install triton as mentioned in .toml if you want to
+mkdocs serve # to view the dev documentation
+```
+
 ## Usage
 
 ```py
-from scprint import BaseClass
-from scprint import base_function
+from lightning.pytorch import Trainer
+from scprint import scPrint
+from scdataloader import DataModule
 
-BaseClass().base_method()
-base_function()
+...
+model = scPrint(...)
+trainer = Trainer(...)
+trainer.fit(model, datamodule=datamodule)
 ```
 
 ```bash
-$ python -m scprint
+$ python -m scPrint/__main__.py
 #or
-$ scprint
+$ scprint fit/train/predict/test
 ```
 
-I had to install a specific version of pytorch, triton, torchaudio, torchtext.. for my cuda version.
-My cuda compiler nvcc compiles cuda 11.7. my cuda-smi (api) is currently 12.1.
-
-Please install all of it for your cuda version and it should still work
+for more information on usage please see the documentation in https://jkobject.com/scPrint
 
 ## Development
 

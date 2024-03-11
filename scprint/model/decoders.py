@@ -34,6 +34,16 @@ class ExprDecoder(nn.Module):
         nfirst_labels_to_skip: int = 0,
         dropout: float = 0.1,
     ):
+        """
+        ExprDecoder Decoder for the gene expression prediction.
+
+        Will output the mean, variance and zero logits, parameters of a zero inflated negative binomial distribution.
+
+        Args:
+            d_model (int): The dimension of the model. This is the size of the input feature vector.
+            nfirst_labels_to_skip (int, optional): The number of initial labels to skip in the sequence. Defaults to 0.
+            dropout (float, optional): The dropout rate applied during training to prevent overfitting. Defaults to 0.1.
+        """
         super(ExprDecoder, self).__init__()
         self.nfirst_labels_to_skip = nfirst_labels_to_skip
         self.fc = nn.Sequential(
@@ -62,27 +72,26 @@ class ExprDecoder(nn.Module):
 
 
 class MVCDecoder(nn.Module):
-    """
-    Decoder for the masked value prediction for cell embeddings.
-    """
-
     def __init__(
         self,
         d_model: int,
         arch_style: str = "inner product",
-        dropout: float = 0.1,
         query_activation: nn.Module = nn.Sigmoid,
         hidden_activation: nn.Module = nn.PReLU,
     ) -> None:
         """
+        MVCDecoder Decoder for the masked value prediction for cell embeddings.
+
+        Will use the gene embeddings with the cell embeddings to predict the mean, variance and zero logits
+
         Args:
             d_model (:obj:`int`): dimension of the gene embedding.
             arch_style (:obj:`str`): architecture style of the decoder, choice from
                 1. "inner product" or 2. "cell product" 3. "concat query" or 4. "sum query".
             query_activation (:obj:`nn.Module`): activation function for the query
-                vectors.
+                vectors. Defaults to nn.Sigmoid.
             hidden_activation (:obj:`nn.Module`): activation function for the hidden
-                layers.
+                layers. Defaults to nn.PReLU.
         """
         super(MVCDecoder, self).__init__()
         if arch_style == "inner product":
@@ -153,10 +162,6 @@ class MVCDecoder(nn.Module):
 
 
 class ClsDecoder(nn.Module):
-    """
-    Decoder for classification task.
-    """
-
     def __init__(
         self,
         d_model: int,
@@ -165,6 +170,19 @@ class ClsDecoder(nn.Module):
         activation: Callable = nn.ReLU,
         dropout: float = 0.1,
     ):
+        """
+        ClsDecoder Decoder for classification task.
+
+        Args:
+            d_model: int, dimension of the input.
+            n_cls: int, number of classes.
+            layers: list[int], list of hidden layers.
+            activation: nn.Module, activation function.
+            dropout: float, dropout rate.
+
+        Returns:
+            Tensor, shape [batch_size, n_cls]
+        """
         super(ClsDecoder, self).__init__()
         # module list
         layers = [d_model] + layers

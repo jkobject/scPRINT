@@ -3,6 +3,8 @@
 import math
 from functools import partial
 
+from typing import Optional, Any
+
 import torch
 import torch.nn as nn
 from einops import rearrange, repeat
@@ -23,24 +25,24 @@ RotaryEmbedding = None
 
 
 class FlashSelfAttention(nn.Module):
-    """Implement the scaled dot product attention with softmax.
-    Arguments
-    ---------
-        softmax_scale: The temperature to use for the softmax attention.
-                      (default: 1/sqrt(d_keys) where d_keys is computed at
-                      runtime)
-        attention_dropout: The dropout rate to apply to the attention
-                           (default: 0.0)
-    """
-
     def __init__(
         self,
-        causal=False,
-        softmax_scale=None,
-        attention_dropout=0.0,
-        alibi_slopes=None,
-        deterministic=False,
+        causal: bool = False,
+        softmax_scale: Optional[float] = None,
+        attention_dropout: float = 0.0,
+        alibi_slopes: Optional[Any] = None,
+        deterministic: bool = False,
     ):
+        """Implement the scaled dot product attention with softmax.
+
+        Args:
+            softmax_scale (float, optional): The temperature to use for the softmax attention.
+                (default: 1/sqrt(d_keys) where d_keys is computed at
+                runtime)
+            attention_dropout (float, optional): The dropout rate to apply to the attention
+                (default: 0.0)
+            causal (bool, optional): Whether to use causal attention. Defaults to False.
+        """
         super().__init__()
         assert flash_attn_qkvpacked_func is not None, "FlashAttention is not installed"
         assert flash_attn_qkvpacked_func is not None, "FlashAttention is not installed"
@@ -49,27 +51,26 @@ class FlashSelfAttention(nn.Module):
 
     def forward(
         self,
-        qkv,
-        causal=None,
-        cu_seqlens=None,
-        max_seqlen=None,
-        cu_seqlens_k=None,
-        max_seqlen_k=None,
+        qkv: torch.Tensor,
+        causal: Optional[bool] = None,
+        cu_seqlens: Optional[torch.Tensor] = None,
+        max_seqlen: Optional[int] = None,
+        cu_seqlens_k: Optional[torch.Tensor] = None,
+        max_seqlen_k: Optional[int] = None,
         **kwargs,
     ):
         """Implements the multihead softmax attention.
-        Arguments
-        ---------
-            qkv: The tensor containing the query, key, and value.
+
+        Args
+            qkv (Tensor): The tensor containing the query, key, and value.
                 If cu_seqlens is None and max_seqlen is None, then qkv has shape (B, S, 3, H, D).
                 If cu_seqlens is not None and max_seqlen is not None, then qkv has shape
                 (total, 3, H, D), where total is the sum of the sequence lengths in the batch.
-            causal: if passed, will override self.causal
-            cu_seqlens: (batch_size + 1,), dtype torch.int32. The cumulative sequence lengths
+            causal (bool): if passed, will override self.causal
+            cu_seqlens (batch_size + 1,), dtype torch.int32. The cumulative sequence lengths
                 of the sequences in the batch, used to index into qkv.
-            max_seqlen: int. Maximum sequence length in the batch.
+            max_seqlen (int). Maximum sequence length in the batch.
         Returns:
-        --------
             out: (total, H, D) if cu_seqlens is not None and max_seqlen is not None,
                 else (B, S, H, D).
         """
@@ -86,16 +87,6 @@ class FlashSelfAttention(nn.Module):
 
 
 class FlashCrossAttention(nn.Module):
-    """Implement the scaled dot product attention with softmax.
-    Arguments
-    ---------
-        softmax_scale: The temperature to use for the softmax attention.
-                      (default: 1/sqrt(d_keys) where d_keys is computed at
-                      runtime)
-        attention_dropout: The dropout rate to apply to the attention
-                           (default: 0.0)
-    """
-
     def __init__(
         self,
         causal=False,
@@ -104,6 +95,16 @@ class FlashCrossAttention(nn.Module):
         alibi_slopes=None,
         deterministic=False,
     ):
+        """
+        Implement the scaled dot product attention with softmax.
+
+        Args
+            softmax_scale: The temperature to use for the softmax attention.
+                (default: 1/sqrt(d_keys) where d_keys is computed at
+                runtime)
+            attention_dropout: The dropout rate to apply to the attention
+                (default: 0.0)
+        """
         super().__init__()
         assert flash_attn_kvpacked_func is not None, "FlashAttention is not installed"
         assert flash_attn_kvpacked_func is not None, "FlashAttention is not installed"
@@ -123,9 +124,10 @@ class FlashCrossAttention(nn.Module):
         cu_seqlens_k=None,
         max_seqlen_k=None,
     ):
-        """Implements the multihead softmax attention.
-        Arguments
-        ---------
+        """
+        Implements the multihead softmax attention.
+
+        Args
             q: The tensor containing the query. (B, Sq, H, D)
             kv: The tensor containing the key and value. (B, Sk, 2, H_k, D)
             causal: if passed, will override self.causal
@@ -154,14 +156,15 @@ class FlashCrossAttention(nn.Module):
 
 
 class SelfAttention(nn.Module):
-    """Implement the scaled dot product attention with softmax.
-    Arguments
-    ---------
+    """
+    Implement the scaled dot product attention with softmax.
+
+    Args:
         softmax_scale: The temperature to use for the softmax attention.
-                      (default: 1/sqrt(d_keys) where d_keys is computed at
-                      runtime)
+            (default: 1/sqrt(d_keys) where d_keys is computed at
+            runtime)
         attention_dropout: The dropout rate to apply to the attention
-                           (default: 0.0)
+            (default: 0.0)
     """
 
     def __init__(self, causal=False, softmax_scale=None, attention_dropout=0.0):
@@ -171,9 +174,10 @@ class SelfAttention(nn.Module):
         self.drop = nn.Dropout(attention_dropout)
 
     def forward(self, qkv, causal=None, key_padding_mask=None):
-        """Implements the multihead softmax attention.
-        Arguments
-        ---------
+        """
+        Implements the multihead softmax attention.
+
+        Args:
             qkv: The tensor containing the query, key, and value. (B, S, 3, H, D)
             causal: if passed, will override self.causal
             key_padding_mask: boolean mask to apply to the attention weights. True means to keep,
@@ -307,38 +311,58 @@ def _update_kv_cache(kv, inference_params, layer_idx):
 
 
 class MHA(nn.Module):
-    """Multi-head self-attention and cross-attention"""
-
     def __init__(
         self,
-        embed_dim,
-        num_heads,
-        num_heads_kv=None,
-        cross_attn=False,
-        qkv_proj_bias=True,
-        out_proj_bias=True,
-        dropout=0.0,
-        softmax_scale=None,
-        causal=False,
-        layer_idx=None,
-        dwconv=False,
-        rotary_emb_dim=0,
-        rotary_emb_base=10000.0,
-        rotary_emb_scale_base=None,
-        rotary_emb_interleaved=False,
-        use_alibi=False,
-        fused_bias_fc=False,
-        use_flash_attn=False,
-        return_residual=False,
-        checkpointing=False,
-        device=None,
-        dtype=None,
+        embed_dim: int,
+        num_heads: int,
+        num_heads_kv: Optional[int] = None,
+        cross_attn: bool = False,
+        qkv_proj_bias: bool = True,
+        out_proj_bias: bool = True,
+        dropout: float = 0.0,
+        softmax_scale: Optional[float] = None,
+        causal: bool = False,
+        layer_idx: Optional[int] = None,
+        dwconv: bool = False,
+        rotary_emb_dim: int = 0,
+        rotary_emb_base: float = 10000.0,
+        rotary_emb_scale_base: Optional[float] = None,
+        rotary_emb_interleaved: bool = False,
+        use_alibi: bool = False,
+        fused_bias_fc: bool = False,
+        use_flash_attn: bool = False,
+        return_residual: bool = False,
+        checkpointing: bool = False,
+        device: Optional[torch.device] = None,
+        dtype: Optional[torch.dtype] = None,
     ) -> None:
         """
-        num_heads_kv: can be used to toggle MQA / GQA. If None, use num_heads.
-        return_residual: whether to return the input x along with the output. This is for
-            performance reason: for post-norm architecture, returning the input allows us
-            to fuse the backward of nn.Linear with the residual connection.
+        MHA Multi-head self-attention and cross-attention
+
+        Args:
+            embed_dim
+            num_heads_kv (int): can be used to toggle MQA / GQA. If None, use num_heads.
+            return_residual (bool, optional): whether to return the input x along with the output. This is for
+                performance reason: for post-norm architecture, returning the input allows us
+                to fuse the backward of nn.Linear with the residual connection.
+                Defaults to False.
+            checkpointing (bool, optional): whether to use checkpointing to save memory.
+                Defaults to False.
+            num_heads_kv (int, optional): can be used to toggle MQA / GQA. If None, use num_heads.
+            cross_attn (bool, optional): whether to use cross-attention. Defaults to False.
+            qkv_proj_bias (bool, optional): whether to use bias in the query, key, value projection. Defaults to True.
+            out_proj_bias (bool, optional): whether to use bias in the output projection. Defaults to True.
+            dropout (float, optional): dropout rate. Defaults to 0.0.
+            softmax_scale (float, optional): The temperature to use for the softmax attention.
+            causal (bool, optional): whether to use causal attention. Defaults to False.
+            layer_idx (int, optional): layer index for inference cache. Defaults to None.
+            dwconv (bool, optional): whether to use depthwise convolution. Defaults to False.
+            fused_bias_fc (bool, optional): whether to use fused_bias_fc. Defaults to False.
+            use_flash_attn (bool, optional): whether to use FlashAttention. Defaults to False.
+            return_residual (bool, optional): whether to return the input x along with the output. This is for
+            checkpointing (bool, optional): whether to use checkpointing to save memory. Defaults to False.
+            device (torch.device, optional): device. Defaults to None.
+            dtype (torch.dtype, optional): dtype. Defaults to None.
         """
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -529,17 +553,18 @@ class MHA(nn.Module):
 
     def forward(
         self,
-        x,
-        x_kv=None,
-        key_padding_mask=None,
-        cu_seqlens=None,
-        max_seqlen=None,
-        mixer_subset=None,
-        inference_params=None,
+        x: torch.Tensor,
+        x_kv: Optional[torch.Tensor] = None,
+        key_padding_mask: Optional[torch.Tensor] = None,
+        cu_seqlens: Optional[torch.Tensor] = None,
+        max_seqlen: Optional[int] = None,
+        mixer_subset: Optional[torch.Tensor] = None,
+        inference_params: Optional[dict] = None,
+        return_qkv: bool = False,
         **kwargs,
     ):
         """
-        Arguments:
+        Args:
             x: (batch, seqlen, hidden_dim) (where hidden_dim = num heads * head dim) if
                 cu_seqlens is None and max_seqlen is None, else (total, hidden_dim) where total
                 is the is the sum of the sequence lengths in the batch.
@@ -555,6 +580,13 @@ class MHA(nn.Module):
                 about the CLS token in the last layer.
             inference_params: for generation. Adapted from Megatron-LM (and Apex)
             https://github.com/NVIDIA/apex/blob/3ff1a10f72ec07067c4e44759442329804ac5162/apex/transformer/testing/standalone_transformer_lm.py#L470
+            return_qkv: whether to return the qkv tensor. Defaults to False.
+
+        Returns:
+            out: (batch, seqlen, hidden_dim) if cu_seqlens is None and max_seqlen is None,
+                else (total, hidden_dim) where total is the sum of the sequence lengths in the batch.
+            qkv: (batch, seqlen, 3, hidden_dim) if cu_seqlens is None and max_seqlen is None,
+                else (total, 3, hidden_dim) where total is the sum of the sequence lengths in the batch.
         """
         if cu_seqlens is not None:
             assert max_seqlen is not None
@@ -684,4 +716,7 @@ class MHA(nn.Module):
                     q, kv, inference_params
                 )
         out = self.out_proj(rearrange(context, "... h d -> ... (h d)"))
-        return out if not self.return_residual else (out, x)
+        if return_qkv:
+            return out if not self.return_residual else (out, x), qkv
+        else:
+            return out if not self.return_residual else (out, x)

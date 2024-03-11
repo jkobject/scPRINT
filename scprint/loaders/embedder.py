@@ -1,5 +1,6 @@
 from scprint import utils
-from scprint.dataloader import PROTBERT, RNABERT
+from ..loaders import PROTBERT
+from RNABERT import RNABERT
 from torch.nn import AdaptiveAvgPool1d
 import pandas as pd
 import torch
@@ -7,12 +8,25 @@ import os
 
 
 def embed(
-    genedf,
-    organism="homo_sapiens",
-    cache=True,
-    fasta_path="/tmp/data/fasta/",
-    embedding_size=512,
+    genedf: pd.DataFrame,
+    organism: str = "homo_sapiens",
+    cache: bool = True,
+    fasta_path: str = "/tmp/data/fasta/",
+    embedding_size: int = 512,
 ):
+    """
+    embed embed a set of genes using fasta file and LLMs
+
+    Args:
+        genedf (pd.DataFrame): A DataFrame containing gene information.
+        organism (str, optional): The organism to which the genes belong. Defaults to "homo_sapiens".
+        cache (bool, optional): If True, the function will use cached data if available. Defaults to True.
+        fasta_path (str, optional): The path to the directory where the fasta files are stored. Defaults to "/tmp/data/fasta/".
+        embedding_size (int, optional): The size of the embeddings to be generated. Defaults to 512.
+
+    Returns:
+        pd.DataFrame: Returns a DataFrame containing the protein embeddings, and the RNA embeddings.
+    """
     # given a gene file and organism
     # load the organism fasta if not already done
     utils.load_fasta_species(species=organism, output_path=fasta_path, cache=cache)

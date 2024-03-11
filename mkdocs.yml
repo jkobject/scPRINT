@@ -1,10 +1,37 @@
 site_name: scprint
-theme: readthedocs
+theme:
+  name: readthedocs
+  # analytics:
+  # gtag: G-ABC123
 site_url: https://www.jkobject.com/scPRINT/
 nav:
   - Home: index.md
-  - About: about.md
-plugins: 
+  - structure: structure.md
+  - training: notebooks/pretrain.ipynb
+  - grn inference: notebooks/grn.ipynb
+  - cell embedding and classification: notebooks/embeddings.ipynb
+  - gene embeddings: notebooks/generate_gene_embeddings.ipynb
+  - documentation:
+      - utils: utils.md
+      - model: model.md
+      - embedders: loaders.md
+      - tasks: tasks.md
+plugins:
   - search
   - mkdocstrings:
-    enable_inventory: false
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_root_heading: true
+            show_source: true
+            summary: true
+            merge_init_into_class: true
+            show_signature: false
+            do_heading: true
+      default_handler: python
+  - git-revision-date-localized
+  - git-authors
+  - mkdocs-jupyter:
+      include_source: True
+      include_requirejs: true

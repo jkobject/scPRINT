@@ -1,6 +1,5 @@
 import torch
 from torch import nn, Tensor
-import torch.nn.functional as F
 from torch.nn.init import trunc_normal_
 from torchvision.ops import StochasticDepth
 
@@ -13,7 +12,6 @@ import os
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 ########
-from .flashEGT import flash_attn_qkvpacked_func
 from . import MHA, Block, Mlp
 from .layer_norm import layer_norm_fn
 
@@ -36,19 +34,45 @@ class FlashTransformerEncoder(nn.Module):
         nhead: int,
         nlayers: int,
         dropout: float = 0.1,
-        residual_in_fp32=True,
-        num_heads_kv=None,
-        checkpointing=False,
-        fused_dropout_add_ln=False,
-        return_residual=False,
-        prenorm=True,
-        mlp_ratio=4.0,
-        fused_mlp=False,
-        fused_bias_fc=False,
-        sequence_parallel=False,
-        drop_path_rate=0.0,
-        weight_init="",
+        residual_in_fp32: bool = True,
+        num_heads_kv: Optional[int] = None,
+        checkpointing: bool = False,
+        fused_dropout_add_ln: bool = False,
+        return_residual: bool = False,
+        prenorm: bool = True,
+        mlp_ratio: float = 4.0,
+        fused_mlp: bool = False,
+        fused_bias_fc: bool = False,
+        sequence_parallel: bool = False,
+        drop_path_rate: float = 0.0,
+        use_flash_attn: bool = True,
+        weight_init: str = "",
     ):
+        """
+        FlashTransformerEncoder a transformer encoder with flash attention.
+
+        Args:
+            d_model (int): The dimension of the input vectors.
+            nhead (int): The number of attention heads.
+            nlayers (int): The number of layers in the transformer.
+            dropout (float, optional): The dropout rate to apply to the output of the positional encoding. Defaults to 0.1.
+            residual_in_fp32 (bool, optional): Whether to force the residual to be in fp32 format. Defaults to True.
+            num_heads_kv (_type_, optional): The number of heads for key/value. Defaults to None.
+            checkpointing (bool, optional): Whether to use gradient checkpointing. Defaults to False.
+            fused_dropout_add_ln (bool, optional): Whether to fuse dropout, addition and layer normalization operations. Defaults to False.
+            return_residual (bool, optional): Whether to return the residual. Defaults to False.
+            prenorm (bool, optional): Whether to use pre-normalization. Defaults to True.
+            mlp_ratio (float, optional): The ratio for MLP. Defaults to 4.0.
+            fused_mlp (bool, optional): Whether to use fused MLP. Defaults to False.
+            fused_bias_fc (bool, optional): Whether to fuse bias and fully connected layers. Defaults to False.
+            sequence_parallel (bool, optional): Whether to use sequence parallelism. Defaults to False.
+            drop_path_rate (float, optional): The drop path rate. Defaults to 0.0.
+            weight_init (str, optional): The weight initialization method. Defaults to "".
+
+        Raises:
+            ImportError: Raised when Triton is not installed but fused_dropout_add_ln is set to True.
+            NotImplementedError: Raised when an unsupported operation is attempted.
+        """
         super(FlashTransformerEncoder, self).__init__()
 
         self.blocks = nn.ModuleList()
@@ -63,7 +87,7 @@ class FlashTransformerEncoder(nn.Module):
                 num_heads=nhead,
                 dropout=dropout,
                 causal=False,
-                use_flash_attn=True,
+                use_flash_attn=use_flash_attn,
                 num_heads_kv=num_heads_kv,
                 checkpointing=checkpointing,
                 fused_bias_fc=fused_bias_fc,
@@ -107,10 +131,18 @@ class FlashTransformerEncoder(nn.Module):
         assert mode == ""
         named_apply(_init_weights, self)
 
-    def forward(self, hidden_states: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self, hidden_states: Tensor, mask: Optional[Tensor] = None, return_qkv=[]
+    ) -> Tensor:
         residual = None
-        for block in self.blocks:
-            hidden_states, residual = block(hidden_states, residual)
+        qkvs = []
+        for i, block in enumerate(self.blocks):
+            hidden_states = block(hidden_states, residual, return_qkv=(i in return_qkv))
+            if i in return_qkv:
+                qkvs.append(hidden_states[-1])
+                hidden_states, residual = hidden_states[:-1]
+            else:
+                hidden_states, residual = hidden_states
         if not self.fused_dropout_add_ln:
             residual = self.drop_path(self.dropout(hidden_states)) + residual
             hidden_states = self.norm(residual.to(dtype=self.norm.weight.dtype))
@@ -136,7 +168,7 @@ class FlashTransformerEncoder(nn.Module):
                 rowscale=rowscale,
                 prenorm=False,
             )
-        return hidden_states
+        return hidden_states if len(return_qkv) == 0 else (hidden_states, qkvs)
 
 
 def _init_weights(module: nn.Module, name: str = ""):
@@ -166,70 +198,3 @@ def named_apply(
     if depth_first and include_root:
         fn(module=module, name=name)
     return module
-
-
-class FlashSelfAttention(nn.Module):
-    """Implement the scaled dot product attention with softmax.
-    Arguments
-    ---------
-        softmax_scale: The temperature to use for the softmax attention.
-            (default: 1/sqrt(d_keys) where d_keys is computed at
-            runtime)
-        attention_dropout: The dropout rate to apply to the attention
-            (default: 0.0)
-    """
-
-    def __init__(
-        self,
-        causal=False,
-        softmax_scale=None,
-        use_tritton=True,
-    ):
-        super().__init__()
-        # if use_tritton:
-        ##TEMP##
-
-        # else:
-        #    from flash_attn import flash_attn_qkvpacked_func
-
-        # self.flash_attn_qkvpacked_func = flash_attn_qkvpacked_func
-
-        self.causal = causal
-        self.softmax_scale = softmax_scale
-
-    def forward(
-        self,
-        qkv,
-        bias=None,
-        gates=None,
-        causal=False,
-        cu_seqlens=None,
-        max_seqlen=None,
-        mask=None,
-    ):
-        """Implements the multihead softmax attention.
-        Arguments
-        ---------
-            qkv: The tensor containing the query, key, and value.
-                If cu_seqlens is None and max_seqlen is None, then qkv has shape (B, S, 3, H, D).
-                If cu_seqlens is not None and max_seqlen is not None, then qkv has shape
-                (total, 3, H, D), where total is the sum of the sequence lengths in the batch.
-            causal: if passed, will override self.causal
-            cu_seqlens: (batch_size + 1,), dtype torch.int32. The cumulative sequence lengths
-                of the sequences in the batch, used to index into qkv.
-            max_seqlen: int. Maximum sequence length in the batch.
-        Returns:
-        --------
-            out: (total, H, D) if cu_seqlens is not None and max_seqlen is not None,
-                else (B, S, H, D).
-        """
-        assert qkv.dtype in [torch.float16, torch.bfloat16]
-        assert qkv.is_cuda
-        causal = self.causal if causal is None else causal
-        return flash_attn_qkvpacked_func(
-            qkv,
-            bias,
-            gates,
-            causal,
-            self.softmax_scale,
-        )

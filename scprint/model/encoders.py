@@ -6,13 +6,6 @@ import numpy as np
 
 
 class GeneEncoder(nn.Module):
-    """
-    Encodes gene sequences into a continuous vector space using an embedding layer.
-    The output is then normalized using a LayerNorm.
-
-    Note: not used in the current version of scprint.
-    """
-
     def __init__(
         self,
         num_embeddings: int,
@@ -22,6 +15,21 @@ class GeneEncoder(nn.Module):
         dropout: float = 0.1,
         freeze: bool = False,
     ):
+        """
+        Encodes gene sequences into a continuous vector space using an embedding layer.
+
+        The output is then normalized using a LayerNorm.
+
+        Args:
+            num_embeddings (int): The number of possible values.
+            embedding_dim (int): The dimension of the output vectors.
+            padding_idx (int, optional): The index of the padding token. Defaults to None.
+            weights (Tensor, optional): The initial weights for the embedding layer. Defaults to None.
+            dropout (float, optional): The dropout rate to apply to the output of the positional encoding. Defaults to 0.1.
+            freeze (bool, optional): Whether to freeze the weights of the embedding layer. Defaults to False.
+
+        Note: not used in the current version of scprint.
+        """
         super(GeneEncoder, self).__init__()
         self.embedding = nn.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx, _freeze=freeze
@@ -45,20 +53,6 @@ class GeneEncoder(nn.Module):
 
 
 class PositionalEncoding(nn.Module):
-    """
-    The PositionalEncoding module applies a positional encoding to a sequence of vectors.
-    This is necessary for the Transformer model, which does not have any inherent notion of
-    position in a sequence. The positional encoding is added to the input embeddings and
-    allows the model to attend to positions in the sequence.
-
-    Args:
-        d_model (int): The dimension of the input vectors.
-        dropout (float, optional): The dropout rate to apply to the output of the positional encoding.
-        max_len (int, optional): The maximum length of a sequence that this module can handle.
-
-    Note: not used in the current version of scprint.
-    """
-
     def __init__(
         self,
         d_model: int,
@@ -67,6 +61,19 @@ class PositionalEncoding(nn.Module):
         dropout: float = 0.1,
         maxval=10000.0,
     ):
+        """
+        The PositionalEncoding module applies a positional encoding to a sequence of vectors.
+        This is necessary for the Transformer model, which does not have any inherent notion of
+        position in a sequence. The positional encoding is added to the input embeddings and
+        allows the model to attend to positions in the sequence.
+
+        Args:
+            d_model (int): The dimension of the input vectors.
+            dropout (float, optional): The dropout rate to apply to the output of the positional encoding.
+            max_len (int, optional): The maximum length of a sequence that this module can handle.
+
+        Note: not used in the current version of scprint.
+        """
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
         position = torch.arange(max_len).unsqueeze(1)
@@ -164,10 +171,6 @@ class DPositionalEncoding(nn.Module):
 
 
 class ContinuousValueEncoder(nn.Module):
-    """
-    Encode real number values to a vector using neural nets projection.
-    """
-
     def __init__(
         self,
         d_model: int,
@@ -176,6 +179,19 @@ class ContinuousValueEncoder(nn.Module):
         layers: int = 1,
         size: int = 1,
     ):
+        """
+        Encode real number values to a vector using neural nets projection.
+
+        Args:
+            d_model (int): The dimension of the input vectors.
+            dropout (float, optional): The dropout rate to apply to the output of the positional encoding.
+            max_value (int, optional): The maximum value of the input. Defaults to 100_000.
+            layers (int, optional): The number of layers in the encoder. Defaults to 1.
+            size (int, optional): The size of the input. Defaults to 1.
+
+        Returns:
+            torch.Tensor: A tensor representing the encoded continuous values.
+        """
         super(ContinuousValueEncoder, self).__init__()
         self.max_value = max_value
         self.encoder = nn.ModuleList()
@@ -205,18 +221,25 @@ class ContinuousValueEncoder(nn.Module):
 
 
 class CategoryValueEncoder(nn.Module):
-    """
-    Encodes categorical values into a vector using an embedding layer and layer normalization.
-
-    Note: not used in the current version of scprint.
-    """
-
     def __init__(
         self,
         num_embeddings: int,
         embedding_dim: int,
         padding_idx: Optional[int] = None,
     ):
+        """
+        Encodes categorical values into a vector using an embedding layer and layer normalization.
+
+        Args:
+            num_embeddings (int): The number of possible values.
+            embedding_dim (int): The dimension of the output vectors.
+            padding_idx (int, optional): The index of the padding token. Defaults to None.
+
+        Returns:
+            torch.Tensor: A tensor representing the encoded categorical values.
+
+        Note: not used in the current version of scprint.
+        """
         super(CategoryValueEncoder, self).__init__()
         self.embedding = nn.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
