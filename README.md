@@ -44,11 +44,11 @@ git clone https://github.com/jkobject/scPRINT
 cd scPRINT
 git checkout dev
 git submodule init
-# install pytorch as mentionned above
-pip install -e .
-# install triton as mentioned in .toml
+# install pytorch as mentionned above if you have a GPU
+pip install -e .[dev]
+# install triton as mentioned in .toml if you want to
+mkdocs serve # to view the dev documentation
 ```
-
 
 ## Usage
 
