@@ -25,9 +25,9 @@ class Embedder:
         model: torch.nn.Module,
         batch_size: int = 64,
         num_workers: int = 8,
-        how: str = "most expr",
-        max_len: int = 1000,
-        add_zero_genes: int = 100,
+        how: str = "random expr",
+        max_len: int = 2000,
+        add_zero_genes: int = 0,
         precision: str = "16-mixed",
         organisms: List[str] = [
             "NCBITaxon:9606",

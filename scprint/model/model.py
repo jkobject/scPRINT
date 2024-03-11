@@ -134,6 +134,8 @@ class scPrint(L.LightningModule):
         # compute tensor for mat_cls_hierarchy
         self.mat_cls_hierarchy = {}
         self.cls_hierarchy = cls_hierarchy
+        if "strict_loading" in flash_attention_kwargs:
+            flash_attention_kwargs.pop("strict_loading")
 
         for k, v in cls_hierarchy.items():
             tens = torch.zeros((len(v), labels[k]))
@@ -295,7 +297,6 @@ class scPrint(L.LightningModule):
             )
         )
         self.save_hyperparameters()
-        print(self)
 
     def _encoder(
         self,
@@ -523,7 +524,7 @@ class scPrint(L.LightningModule):
 
     def training_step(
         self,
-        batch: Dict[Tensor],
+        batch: Dict[str, Tensor],
         batch_idx,
     ):
         """
@@ -554,7 +555,7 @@ class scPrint(L.LightningModule):
 
     def _full_training(
         self,
-        batch: Dict[Tensor],
+        batch: Dict[str, Tensor],
         do_denoise: bool = False,
         noise: list[float] = [],
         do_next_tp: bool = False,
@@ -945,7 +946,7 @@ class scPrint(L.LightningModule):
     def on_predict_epoch_start(self):
         """@see pl.LightningModule"""
         self.embs = None
-        self.num_pred_batch = 0
+        self.n_c_batch = 0
         if type(self.transformer) is FlashTransformerEncoder:
             for encoder_layers in self.transformer.blocks:
                 encoder_layers.set_seq_parallel(False)
@@ -1046,8 +1047,9 @@ class scPrint(L.LightningModule):
                 torch.cat([self.expr_pred[1], output["disp"]]),
                 torch.cat([self.expr_pred[2], output["zero_logits"]]),
             ]
-            self.mean_attn = [j + qkv[i] for i, j in enumerate(self.mean_attn)]
-        self.num_pred_batch += 1
+            if len(self.get_attention_layer) > 0:
+                self.mean_attn = [j + qkv[i] for i, j in enumerate(self.mean_attn)]
+        self.n_c_batch += 1
 
     def on_predict_epoch_end(self):
         """@see pl.LightningModule will"""
@@ -1060,7 +1062,8 @@ class scPrint(L.LightningModule):
         self.pred = self.pred.to(device="cpu", dtype=torch.float32)
         self.embs = self.embs.to(device="cpu", dtype=torch.float32)
         self.pos = self.pos.to(device="cpu", dtype=torch.int32)
-        self.mean_attn = [i / self.num_pred_batch for i in self.mean_attn]
+        if len(self.get_attention_layer) > 0:
+            self.mean_attn = [i / self.n_c_batch for i in self.mean_attn]
         return self.log_adata()
 
     def get_cell_embs(self, layer_output):

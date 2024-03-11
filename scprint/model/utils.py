@@ -1,21 +1,30 @@
 import torch
 import numpy as np
-from typing import Optional, Union
+from typing import Optional, Union, List, Dict
 from torch.distributions import Poisson, Gamma
 import bionty as bt
 from collections import Counter
 import math
 import torch.nn as nn
+from torch import Tensor
 
 import scanpy as sc
 from anndata import AnnData
 
 import numpy as np
 from matplotlib import pyplot as plt
+import pandas as pd
 
 
 def make_adata(
-    pred, embs, labels, step=0, label_decoders=None, gtclass=None, name="", mdir="/tmp"
+    pred: Tensor,
+    embs: Tensor,
+    labels: List[str],
+    step: int = 0,
+    label_decoders: Optional[Dict] = None,
+    gtclass: Optional[Tensor] = None,
+    name: str = "",
+    mdir: str = "/tmp",
 ):
     """
     This function creates an AnnData object from the given input parameters.
@@ -122,11 +131,11 @@ def make_adata(
 
 
 def _init_weights(
-    module,
-    n_layer,
-    initializer_range=0.02,
-    mup_width_scale=1.0,
-    rescale_prenorm_residual=True,
+    module: nn.Module,
+    n_layer: int,
+    initializer_range: float = 0.02,
+    mup_width_scale: float = 1.0,
+    rescale_prenorm_residual: bool = True,
 ):
     """
     This function initializes the weights of the given module. The initialization is done based on the type of the module.
@@ -174,7 +183,7 @@ def _init_weights(
                 )
 
 
-def downsample_profile(mat, renoise):
+def downsample_profile(mat: Tensor, renoise: float):
     """
     This function downsamples the expression profile of a given single cell RNA matrix.
 
@@ -250,7 +259,12 @@ def masker(
     return torch.Tensor(np.array(mask)).to(torch.bool)
 
 
-def zinb_sample(mu, theta, zi_probs, sample_shape=torch.Size([])):
+def zinb_sample(
+    mu: torch.Tensor,
+    theta: torch.Tensor,
+    zi_probs: torch.Tensor,
+    sample_shape: torch.Size = torch.Size([]),
+):
     """
     zinb_sample This function generates a sample from a Zero-Inflated Negative Binomial (ZINB) distribution.
 
@@ -278,7 +292,9 @@ def zinb_sample(mu, theta, zi_probs, sample_shape=torch.Size([])):
     return samp_
 
 
-def translate(val, t="cell_type_ontology_term_id"):
+def translate(
+    val: Union[str, list, set, dict, Counter], t: str = "cell_type_ontology_term_id"
+):
     """
     translate This function translates the given value based on the specified type.
 

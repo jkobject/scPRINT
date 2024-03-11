@@ -14,7 +14,7 @@ nav:
   - documentation:
       - utils: utils.md
       - model: model.md
-      - loaders: embedders.md
+      - embedders: loaders.md
       - tasks: tasks.md
 plugins:
   - search

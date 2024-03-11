@@ -1,297 +1,163 @@
-import collections
-import operator
-import os
-from typing import Mapping
-
-import matplotlib.pyplot as plt
-import networkx as nx
-import numpy as np
-import pandas as pd
 import scanpy as sc
-import seaborn as sns
-import tqdm
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import MinMaxScaler
+import torch
+
+from scdataloader.data import SimpleAnnDataset
+from scdataloader import Collator
+from grnndata import utils
+from torch.utils.data import DataLoader
+
+from lightning.pytorch import Trainer
+
+from typing import List
+from anndata import AnnData
+
+from scprint.utils.sinkhorn import SinkhornDistance
+
+from grnndata import GRNAnnData
 
 
-# The class is modified from https://github.com/nceglia/genevector
-class GeneEmbedding(object):
-    def __init__(self, embeddings: Mapping):
-        self.embeddings = embeddings
-        # self.context = dataset.data
-        self.vector = []
-        self.genes = []
-        for gene in tqdm.tqdm(self.embeddings.keys()):
-            self.vector.append(self.embeddings[gene])
-            self.genes.append(gene)
+class GRNfer:
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        adata: AnnData,
+        batch_size: int = 64,
+        num_workers: int = 8,
+        how: str = "random expr",
+        num_genes: int = 3000,
+        precision: str = "16-mixed",
+        organisms: List[str] = [
+            "NCBITaxon:9606",
+        ],
+        model_name: str = "scprint",
+        filtration="sinkhorn",
+    ):
+        """
+        Embedder a class to embed and annotate cells using a model
 
-    def read_embedding(self, filename):
-        embedding = dict()
-        lines = open(filename, "r").read().splitlines()[1:]
-        for line in lines:
-            vector = line.split()
-            gene = vector.pop(0)
-            embedding[gene] = np.array([float(x) for x in vector])
-        return embedding
+        Args:
+            model (torch.nn.Module): The model to be used for embedding and annotating cells.
+            batch_size (int, optional): The size of the batches to be used in the DataLoader. Defaults to 64.
+            num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 8.
+            how (str, optional): The method to be used for selecting valid genes. Defaults to "most expr".
+            max_len (int, optional): The maximum length of the gene sequence. Defaults to 1000.
+            add_zero_genes (int, optional): The number of zero genes to add to the gene sequence. Defaults to 100.
+            precision (str, optional): The precision to be used in the Trainer. Defaults to "16-mixed".
+            organisms (List[str], optional): The list of organisms to be considered. Defaults to [ "NCBITaxon:9606", ].
+            pred_embedding (List[str], optional): The list of labels to be used for plotting embeddings. Defaults to [ "cell_type_ontology_term_id", "disease_ontology_term_id", "self_reported_ethnicity_ontology_term_id", "sex_ontology_term_id", ].
+            model_name (str, optional): The name of the model to be used. Defaults to "scprint".
+            output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
+        """
+        self.model = model
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.how = how
+        self.num_genes = num_genes
+        self.organisms = organisms
+        self.model_name = model_name
+        self.adata = adata
+        self.precision = precision
+        self.filtration = filtration
+        self.trainer = Trainer(precision=precision)
+        # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
-    def get_adata(self, resolution=20):
-        mat = np.array(self.vector)
-        np.savetxt(".tmp.txt", mat)
-        gdata = sc.read_text(".tmp.txt")
-        os.remove(".tmp.txt")
-        gdata.obs.index = self.genes
-        sc.pp.neighbors(gdata, use_rep="X")
-        sc.tl.leiden(gdata, resolution=resolution)
-        sc.tl.umap(gdata)
-        return gdata
-
-    def plot_similarities(self, gene, n_genes=10, save=None):
-        df = self.compute_similarities(gene).head(n_genes)
-        _, ax = plt.subplots(1, 1, figsize=(3, 6))
-        sns.barplot(data=df, y="Gene", x="Similarity", palette="magma_r", ax=ax)
-        ax.set_title("{} Similarity".format(gene))
-        if save != None:
-            plt.savefig(save)
-
-    def plot_metagene(self, gdata, mg=None, title="Gene Embedding"):
-        highlight = []
-        labels = []
-        clusters = collections.defaultdict(list)
-        for x, y in zip(gdata.obs["leiden"], gdata.obs.index):
-            clusters[x].append(y)
-            if x == mg:
-                highlight.append(str(x))
-                labels.append(y)
-            else:
-                highlight.append("_Other")
-        _labels = []
-        for gene in labels:
-            _labels.append(gene)
-        gdata.obs["Metagene {}".format(mg)] = highlight
-        _, ax = plt.subplots(1, 1, figsize=(8, 6))
-        sc.pl.umap(gdata, alpha=0.5, show=False, size=100, ax=ax)
-        sub = gdata[gdata.obs["Metagene {}".format(mg)] != "_Other"]
-        sc.pl.umap(
-            sub,
-            color="Metagene {}".format(mg),
-            title=title,
-            size=200,
-            show=False,
-            add_outline=False,
-            ax=ax,
-        )
-        for gene, pos in zip(gdata.obs.index, gdata.obsm["X_umap"].tolist()):
-            if gene in _labels:
-                ax.text(
-                    pos[0] + 0.04,
-                    pos[1],
-                    str(gene),
-                    fontsize=6,
-                    alpha=0.9,
-                    fontweight="bold",
-                )
-        plt.tight_layout()
-
-    def plot_metagenes_scores(self, adata, metagenes, column, plot=None):
-        plt.figure(figsize=(5, 13))
-        matrix = []
-        meta_genes = []
-        cfnum = 1
-        cfams = dict()
-        for cluster, vector in metagenes.items():
-            row = []
-            cts = []
-            for ct in set(adata.obs[column]):
-                sub = adata[adata.obs[column] == ct]
-                val = np.mean(sub.obs[str(cluster) + "_SCORE"].tolist())
-                row.append(val)
-                cts.append(ct)
-            matrix.append(row)
-            label = str(cluster) + "_SCORE: " + ", ".join(vector[:10])
-            if len(set(vector)) > 10:
-                label += "*"
-            meta_genes.append(label)
-            cfams[cluster] = label
-            cfnum += 1
-        matrix = np.array(matrix)
-        df = pd.DataFrame(matrix, index=meta_genes, columns=cts)
-        plt.figure()
-        sns.clustermap(
-            df,
-            figsize=(5, 9),
-            dendrogram_ratio=0.1,
-            cmap="mako",
-            yticklabels=True,
-            standard_scale=0,
-        )
-        plt.tight_layout()
-        if plot:
-            plt.savefig(plot)
-
-    def score_metagenes(self, adata, metagenes):
-        for p, genes in metagenes.items():
-            try:
-                sc.tl.score_genes(adata, score_name=str(p) + "_SCORE", gene_list=genes)
-                scores = np.array(adata.obs[str(p) + "_SCORE"].tolist()).reshape(-1, 1)
-                scaler = MinMaxScaler()
-                scores = scaler.fit_transform(scores)
-                scores = list(scores.reshape(1, -1))[0]
-                adata.obs[str(p) + "_SCORE"] = scores
-            except Exception as e:
-                adata.obs[str(p) + "_SCORE"] = 0.0
-
-    def get_metagenes(self, gdata):
-        metagenes = collections.defaultdict(list)
-        for x, y in zip(gdata.obs["leiden"], gdata.obs.index):
-            metagenes[x].append(y)
-        return metagenes
-
-    def compute_similarities(self, gene, subset=None, feature_type=None):
-        if gene not in self.embeddings:
-            return None
-        # if feature_type:
-        #     subset = []
-        #     for gene in list(self.embeddings.keys()):
-        #         if feature_type == self.context.feature_types[gene]:
-        #             subset.append(gene)
-        embedding = self.embeddings[gene]
-        distances = dict()
-        if subset:
-            targets = set(list(self.embeddings.keys())).intersection(set(subset))
+    def __call__(self, layers, cell_type=None, agg="mean"):
+        # Add at least the organism you are working with
+        if cell_type is not None:
+            subadata = self.adata[self.adata.obs.cell_type == "B cell"].copy()
         else:
-            targets = list(self.embeddings.keys())
-        for target in targets:
-            if target not in self.embeddings:
-                continue
-            v = self.embeddings[target]
-            distance = float(
-                cosine_similarity(
-                    np.array(embedding).reshape(1, -1), np.array(v).reshape(1, -1)
-                )[0]
-            )
-            distances[target] = distance
-        sorted_distances = list(
-            reversed(sorted(distances.items(), key=operator.itemgetter(1)))
+            subadata = self.adata.copy()
+        sc.pp.highly_variable_genes(
+            subadata, n_top_genes=self.num_genes, flavor="seurat_v3"
         )
-        genes = [x[0] for x in sorted_distances]
-        distance = [x[1] for x in sorted_distances]
-        df = pd.DataFrame.from_dict({"Gene": genes, "Similarity": distance})
-        return df
-
-    # def clusters(self, clusters):
-    #     average_vector = dict()
-    #     gene_to_cluster = collections.defaultdict(list)
-    #     matrix = collections.defaultdict(list)
-    #     total_average_vector = []
-    #     for gene, cluster in zip(self.context.expressed_genes, clusters):
-    #         if gene in self.embeddings:
-    #             matrix[cluster].append(self.embeddings[gene])
-    #             gene_to_cluster[cluster].append(gene)
-    #             total_average_vector.append(self.embeddings[gene])
-    #     self.total_average_vector = list(np.average(total_average_vector, axis=0))
-    #     for cluster, vectors in matrix.items():
-    #         xvec = list(np.average(vectors, axis=0))
-    #         average_vector[cluster] = np.subtract(xvec, self.total_average_vector)
-    #     return average_vector, gene_to_cluster
-
-    def generate_weighted_vector(self, genes, markers, weights):
-        vector = []
-        for gene, vec in zip(self.genes, self.vector):
-            if gene in genes and gene in weights:
-                vector.append(weights[gene] * np.array(vec))
-            if gene not in genes and gene in markers and gene in weights:
-                vector.append(list(weights[gene] * np.negative(np.array(vec))))
-        return list(np.sum(vector, axis=0))
-
-    def generate_vector(self, genes):
-        vector = []
-        for gene, vec in zip(self.genes, self.vector):
-            if gene in genes:
-                vector.append(vec)
-        assert len(vector) != 0, genes
-        return list(np.average(vector, axis=0))
-
-    def generate_weighted_vector(self, genes, weights):
-        vector = []
-        weight = []
-        for gene, vec in zip(self.genes, self.vector):
-            if gene in genes and gene in weights:
-                vector.append(vec)
-                weight.append(weights[gene])
-        assert len(vector) != 0, genes
-        return list(np.average(vector, axis=0, weights=weight))
-
-    def cluster_definitions_as_df(self, top_n=20):
-        similarities = self.cluster_definitions
-        clusters = []
-        symbols = []
-        for key, genes in similarities.items():
-            clusters.append(key)
-            symbols.append(", ".join(genes[:top_n]))
-        df = pd.DataFrame.from_dict({"Cluster Name": clusters, "Top Genes": symbols})
-        return df
-
-    @staticmethod
-    def read_vector(vec):
-        lines = open(vec, "r").read().splitlines()
-        dims = lines.pop(0)
-        vecs = dict()
-        for line in lines:
-            try:
-                line = line.split()
-                gene = line.pop(0)
-                vecs[gene] = list(map(float, line))
-            except Exception as e:
-                continue
-        return vecs, dims
-
-    def get_similar_genes(self, vector):
-        distances = dict()
-        targets = list(self.embeddings.keys())
-        for target in targets:
-            if target not in self.embeddings:
-                continue
-            v = self.embeddings[target]
-            distance = float(
-                cosine_similarity(
-                    np.array(vector).reshape(1, -1), np.array(v).reshape(1, -1)
-                )[0]
-            )
-            distances[target] = distance
-        sorted_distances = list(
-            reversed(sorted(distances.items(), key=operator.itemgetter(1)))
+        highly_variable = subadata.var.index[subadata.var.highly_variable].tolist()
+        print(
+            "number of expressed genes in this cell type: "
+            + str((subadata.X.sum(0) > 1).sum())
         )
-        genes = [x[0] for x in sorted_distances]
-        distance = [x[1] for x in sorted_distances]
-        df = pd.DataFrame.from_dict({"Gene": genes, "Similarity": distance})
-        return df
 
-    def generate_network(self, threshold=0.5):
-        G = nx.Graph()
-        a = pd.DataFrame.from_dict(self.embeddings).to_numpy()
-        similarities = cosine_similarity(a.T)
-        genes = list(self.embeddings.keys())
-        similarities[similarities < threshold] = 0
-        edges = []
-        nz = list(zip(*similarities.nonzero()))
-        for n in tqdm.tqdm(nz):
-            edges.append((genes[n[0]], genes[n[1]]))
-        G.add_nodes_from(genes)
-        G.add_edges_from(edges)
-        return G
+        adataset = SimpleAnnDataset(
+            subadata, obs_to_output=["organism_ontology_term_id"]
+        )
+        col = Collator(
+            organisms=self.organisms,
+            valid_genes=self.model.genes,
+            how="some",
+            genelist=highly_variable,
+        )
+        dataloader = DataLoader(
+            adataset,
+            collate_fn=col,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+        )
+        self.model.get_attention_layer = layers
+        self.trainer.predict(self.model, dataloader)
 
-    @staticmethod
-    def average_vector_results(vec1, vec2, fname):
-        output = open(fname, "w")
-        vec1, dims = GeneEmbedding.read_vector(vec1)
-        vec2, _ = GeneEmbedding.read_vector(vec2)
-        genes = list(vec1.keys())
-        output.write(dims + "\n")
-        for gene in genes:
-            v1 = vec1[gene]
-            v2 = vec2[gene]
-            meanv = []
-            for x, y in zip(v1, v2):
-                meanv.append(str((x + y) / 2))
-            output.write("{} {}\n".format(gene, " ".join(meanv)))
-        output.close()
+        attn = self.model.mean_attn[0][8:][:, 0, :, :].permute(
+            1, 0, 2
+        ) @ self.model.mean_attn[0][8:][:, 1, :, :].permute(1, 2, 0)
+        scale = self.model.mean_attn[0].shape[-1] ** -0.5
+        attn = attn * scale
+        if self.filtration == "sinkhorn":
+            sink = SinkhornDistance(0.1, max_iter=200)
+            a = sink(attn)[0]
+            a = a * a.shape[-1]
+        elif self.filtration == "softmax":
+            a = torch.nn.functional.softmax(attn, dim=-1)
+        else:
+            raise ValueError("filtration must be one of 'sinkhorn', 'softmax'")
+
+        if agg == "mean":
+            a = a.mean(0).detach().cpu().numpy()
+        elif agg == "max":
+            a = a.max(0).detach().cpu().numpy()
+        elif agg == "None":
+            a = a.detach().cpu().numpy()
+            grns = []
+            for suba in a:
+                print(
+                    "avg link count: "
+                    + str((suba > (1 / attn.shape[-1])).sum() / attn.shape[-1])
+                )
+                suba[suba < (1 / a.shape[-1])] = 0
+                grn = GRNAnnData(
+                    subadata[:, col.accepted_genes[self.organisms[0]]][
+                        :, col.to_subset[self.organisms[0]]
+                    ].copy(),
+                    grn=suba,
+                )
+                top_central_genes = utils.get_centrality(grn)
+                grn.var.loc[[i[0] for i in top_central_genes], "symbol"]
+
+                grn.var_names = grn.var["symbol"]
+                grn.var["TFs"] = [
+                    True if i in utils.TF else False for i in grn.var_names
+                ]
+
+                grn.var = grn.var.drop(
+                    columns=["stable_id", "created_at", "updated_at"]
+                )
+                grns.append(grn)
+            return grns
+        else:
+            raise ValueError("agg must be one of 'mean', 'max' or 'None'")
+        print(
+            "avg link count: " + str((a > (1 / attn.shape[-1])).sum() / attn.shape[-1])
+        )
+        a[a < (1 / a.shape[-1])] = 0
+        grn = GRNAnnData(
+            subadata[:, col.accepted_genes[self.organisms[0]]][
+                :, col.to_subset[self.organisms[0]]
+            ].copy(),
+            grn=a,
+        )
+        top_central_genes = utils.get_centrality(grn)
+        grn.var.loc[[i[0] for i in top_central_genes], "symbol"]
+
+        grn.var_names = grn.var["symbol"]
+        grn.var["TFs"] = [True if i in utils.TF else False for i in grn.var_names]
+
+        grn.var = grn.var.drop(columns=["stable_id", "created_at", "updated_at"])
+        return grn

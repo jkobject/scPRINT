@@ -1,6 +1,6 @@
 # structure
 
-![](docs/model.structure.drawio.png)
+![](model.structure.drawio.png)
 
 ## gene embedders
 
