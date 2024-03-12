@@ -49,6 +49,7 @@ class scPrint(L.LightningModule):
         d_hid: int = 512,
         edge_dim: int = 12,
         nlayers: int = 6,
+        expr_encoder_layers: int = 2,
         layers_cls: list[int] = [],
         labels: Dict[str, int] = {},
         cls_hierarchy: Dict[str, Dict[int, list[int]]] = {},
@@ -113,8 +114,9 @@ class scPrint(L.LightningModule):
         self.warmup_duration = 500
         self.weight_decay = 0.0
         self.fused_adam = False
-        self.lr_patience = 3
+        self.lr_patience = 1
         self.lrfinder_steps = 0
+        self.n_c_batch = 0
         self.get_attention_layer = []
         self.embs = None
         # should be stored somehow
@@ -182,7 +184,9 @@ class scPrint(L.LightningModule):
 
         # Value Encoder, NOTE: the scaling style is also handled in _encode method
         if expr_emb_style in ["continuous", "full_pos"]:
-            self.expr_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
+            self.expr_encoder = encoders.ContinuousValueEncoder(
+                d_model, dropout, layers=expr_encoder_layers
+            )
         elif expr_emb_style == "binned_pos":
             assert n_input_bins > 0
             self.expr_encoder = encoders.CategoryValueEncoder(n_input_bins, d_model)
@@ -204,20 +208,14 @@ class scPrint(L.LightningModule):
             len(self.labels) + 2, d_model
         )
         # self.time_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
-        self.depth_decoder = encoders.ContinuousValueEncoder(d_model, dropout)
-
-        # Batch Encoder
-        if num_batch_labels > 0:
-            # self.batch_encoder = BatchLabelEncoder(num_batch_labels, d_model)
-            # batch norm (dsbn) <- not doing, weird
-            self.grad_reverse_discriminator_loss_loss = (
-                loss.AdversarialDiscriminatorLoss(
-                    d_model,
-                    n_cls=num_batch_labels,
-                )
-            )
-        else:
-            self.grad_reverse_discriminator_loss_loss = None
+        self.depth_decoder = encoders.ContinuousValueEncoder(
+            d_model, dropout, layers=expr_encoder_layers
+        )
+        # final encoder norm and dropout
+        self.norm_and_dropout = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Dropout(dropout),
+        )
 
         # Transformer
         # Linear
@@ -283,6 +281,17 @@ class scPrint(L.LightningModule):
                 d_model, n_cls, layers=layers_cls, dropout=dropout
             )
 
+        # Batch effect correction via adversarial training on batch labels
+        if num_batch_labels > 0:
+            # self.batch_encoder = BatchLabelEncoder(num_batch_labels, d_model)
+            # batch norm (dsbn) <- not doing, weird
+            self.grad_reverse_discriminator_loss = loss.AdversarialDiscriminatorLoss(
+                d_model,
+                n_cls=num_batch_labels,
+            )
+        else:
+            self.grad_reverse_discriminator_loss = None
+
         # expression decoder from batch embbedding
         if mvc_decoder != "None":
             self.mvc_decoder = decoders.MVCDecoder(
@@ -327,7 +336,6 @@ class scPrint(L.LightningModule):
 
         if self.gene_pos_enc:
             enc += self.pos_encoder(gene_pos)
-
         cell_embs = (
             self.label_encoder(
                 torch.Tensor([list(range(len(self.labels) + 2))] * gene_pos.shape[0])
@@ -344,16 +352,7 @@ class scPrint(L.LightningModule):
             cell_embs[:, 1, :] = self.depth_decoder(torch.log2(1 + full_depth))
 
         enc = torch.cat([cell_embs, enc], dim=1)
-
-        # TODO: seems to be a problem here:
-        # if getattr(self, "dsbn", None) is not None and batch_label is not None:
-        #     label = int(labels[0].item())
-        #     total_embs = self.dsbn(total_embs.permute(0, 2, 1), label).permute(
-        #         0, 2, 1
-        #     )  # the batch norm always works on dim 1
-        # elif getattr(self, "bn", None) is not None:
-        #     total_embs = self.bn(total_embs.permute(0, 2, 1)).permute(0, 2, 1)
-        return enc  # (minibatch, seq_len, embsize)
+        return self.norm_and_dropout(enc)  # (minibatch, seq_len, embsize)
 
     def _decoder(
         self, transformer_output, depth_mult, get_gene_emb=False, do_sample=False
@@ -446,6 +445,10 @@ class scPrint(L.LightningModule):
                 - "cls_output": the output of the classifier
         """
         encoding = self._encoder(gene_pos, expression, mask, full_depth, timepoint)
+        if self.trainer.global_step == 10:
+            import pdb
+
+            pdb.set_trace()
         transformer_output = self.transformer(encoding, return_qkv=get_attention_layer)
         if len(get_attention_layer) > 0:
             transformer_output, qkvs = transformer_output
@@ -493,7 +496,7 @@ class scPrint(L.LightningModule):
             # rate after every epoch/step.
             "frequency": 1,
             # Metric to to monitor for schedulers like `ReduceLROnPlateau`
-            "monitor": "val_loss",
+            "monitor": "val_loss" if self.trainer.val_dataloaders else "train_loss",
         }
         self.lrfinder_steps = 0
         for val in self.trainer.callbacks:
@@ -896,7 +899,7 @@ class scPrint(L.LightningModule):
             self._predict(gene_pos, expression, depth)
             self.info = batch["class"]
 
-        self.log("val_loss", val_loss, sync_dist=True)
+        self.log("val_loss", val_loss)
         self.log_dict(losses, sync_dist=True)
         return val_loss
 
@@ -929,8 +932,8 @@ class scPrint(L.LightningModule):
             self.do_generate,
             self.mask_ratio,
         )
-        self.log("test_loss: ", total_loss, sync_dist=True)
-        self.log_dict(losses, sync_dist=True)
+        self.log("test_loss: ", total_loss)
+        self.log_dict(losses)
         return total_loss
 
     def on_predict_epoch_start(self):

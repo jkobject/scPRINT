@@ -12,7 +12,6 @@ class GeneEncoder(nn.Module):
         embedding_dim: int,
         padding_idx: Optional[int] = None,
         weights: Optional[Tensor] = None,
-        dropout: float = 0.1,
         freeze: bool = False,
     ):
         """
@@ -42,14 +41,9 @@ class GeneEncoder(nn.Module):
             #    [torch.Tensor(weights), torch.zeros(1, embedding_dim)], dim=0
             # )
             self.embedding.weight.data.copy_(torch.Tensor(weights))
-        self.enc_norm = nn.LayerNorm(embedding_dim)
-        self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = self.embedding(x)  # (batch, seq_len, embsize)
-        x = self.enc_norm(x)
-        x = self.dropout(x)
-        return x
+        return self.embedding(x)  # (batch, seq_len, embsize)
 
 
 class PositionalEncoding(nn.Module):
@@ -58,7 +52,6 @@ class PositionalEncoding(nn.Module):
         d_model: int,
         max_len: int,
         token_to_pos: dict[str, int],  # [token, pos]
-        dropout: float = 0.1,
         maxval=10000.0,
     ):
         """
@@ -75,7 +68,6 @@ class PositionalEncoding(nn.Module):
         Note: not used in the current version of scprint.
         """
         super(PositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(p=dropout)
         position = torch.arange(max_len).unsqueeze(1)
 
         # Create a dictionary to convert token to position
@@ -88,7 +80,7 @@ class PositionalEncoding(nn.Module):
         pe[:, 0, 1::2] = torch.cos(position * div_term)
         # we reorder them and map them to gene_id (position)
         arr = []
-        for k, v in token_to_pos.items():
+        for _, v in token_to_pos.items():
             arr.append(pe[v - 1].numpy())
         pe = torch.Tensor(np.array(arr))
         self.register_buffer("pe", pe)
@@ -98,10 +90,8 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
-        return self.dropout(
-            torch.index_select(self.pe, 0, gene_pos.view(-1)).view(
-                gene_pos.shape + (-1,)
-            )
+        return torch.index_select(self.pe, 0, gene_pos.view(-1)).view(
+            gene_pos.shape + (-1,)
         )
 
 
@@ -127,11 +117,8 @@ class DPositionalEncoding(nn.Module):
         max_len_y: int,
         maxvalue_x=10000.0,
         maxvalue_y=10000.0,
-        dropout: float = 0.1,
     ):
         super(DPositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(p=dropout)
-
         position2 = torch.arange(max_len_y).unsqueeze(1)
         position1 = torch.arange(max_len_x).unsqueeze(1)
 
@@ -165,7 +152,7 @@ class DPositionalEncoding(nn.Module):
         """
         x = x + self.pe1[pos_x]
         x = x + self.pe2[pos_y]
-        return self.dropout(x)
+        return x
 
 
 class ContinuousValueEncoder(nn.Module):
@@ -193,11 +180,12 @@ class ContinuousValueEncoder(nn.Module):
         super(ContinuousValueEncoder, self).__init__()
         self.max_value = max_value
         self.encoder = nn.ModuleList()
-        for i in range(layers):
-            self.encoder.append(nn.Linear(size if i == 0 else d_model, d_model))
+        self.encoder.append(nn.Linear(size, d_model))
+        for _ in range(layers - 1):
             self.encoder.append(nn.LayerNorm(d_model))
             self.encoder.append(nn.ReLU())
             self.encoder.append(nn.Dropout(p=dropout))
+            self.encoder.append(nn.Linear(d_model, d_model))
 
     def forward(self, x: Tensor, mask: Tensor = None) -> Tensor:
         """
@@ -241,10 +229,6 @@ class CategoryValueEncoder(nn.Module):
         self.embedding = nn.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
         )
-        self.enc_norm = nn.LayerNorm(embedding_dim)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = x.long()
-        x = self.embedding(x)  # (batch, seq_len, embsize)
-        x = self.enc_norm(x)
-        return x
+        return self.embedding(x.long())  # (batch, seq_len, embsize)

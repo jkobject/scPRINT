@@ -1,8 +1,7 @@
 import torch.nn.functional as F
 import torch
 from torch import nn, Tensor
-
-# FROM SCGPT
+from torch.autograd import Function
 
 
 def masked_mse_loss(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
