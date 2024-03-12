@@ -30,11 +30,16 @@ then install scPrint
 ```bash
 pip install scprint
 ```
+> if you have a GPU that you want to use, you will benefit from flashattention. and you will have to do some more specific installs:
 
-> I had to install a specific version of pytorch, torchaudio, torchtext.. for my cuda version.
-My cuda compiler nvcc compiles cuda 11.7. my cuda-smi (api) is currently 12.1.
+1. find the version of torch 2.0.0 / torchvision 0.15.0 / torchaudio 2.0.0 that match your nvidia drivers in the torch website.
+2. apply the install command
+3. do `pip install pytorch-fast-transformers torchtext==0.15.1`
+4. do `pip install triton==2.0.0.dev20221202 --no-deps`
 
-> Please install all of it for your cuda version and it should still work. for more information on this, please see [installation.md](installation.md).
+You should be good to go. You need those specific versions for everything to work.. 
+not my fault, scream at nvidia, pytorch, Tri Dao and OpenAI :wink:
+
 
 ### in dev mode
 

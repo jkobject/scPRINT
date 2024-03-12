@@ -2,7 +2,6 @@ from typing import Dict, Union, Callable
 from torch import Tensor, nn
 from torch.nn import functional as F
 import torch
-from . import encoders
 
 
 class GraphSDEExprDecoder(nn.Module):
