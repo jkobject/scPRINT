@@ -331,7 +331,7 @@ class scPrint(L.LightningModule):
         self.cur_gene_token_embs = enc.clone()
         if expression is not None:
             enc += self.expr_encoder(
-                torch.log2(1 + expression), mask
+                expression / expression.sum(1), mask
             )  # (minibatch, seq_len, embsize)
 
         if self.gene_pos_enc:
@@ -402,13 +402,13 @@ class scPrint(L.LightningModule):
     def forward(
         self,
         gene_pos: Tensor,
-        depth_mult: Tensor,
         expression: Optional[Tensor] = None,
         mask: Optional[Tensor] = None,
         # (minibatch,) unormalized total counts
         full_depth: Optional[Tensor] = None,
         timepoint: Optional[Tensor] = None,  # (new_minibatch_of_nxt_cells,)
         get_gene_emb: bool = False,
+        depth_mult: Optional[Tensor] = None,
         do_sample: bool = False,
         get_attention_layer: list = [],
     ):
@@ -450,6 +450,9 @@ class scPrint(L.LightningModule):
 
             pdb.set_trace()
         transformer_output = self.transformer(encoding, return_qkv=get_attention_layer)
+
+        depth_mult = expression.sum(1) if depth_mult is None else depth_mult
+
         if len(get_attention_layer) > 0:
             transformer_output, qkvs = transformer_output
             return (
@@ -602,9 +605,7 @@ class scPrint(L.LightningModule):
                 batch_size=gene_pos.shape[0],
                 mask_ratio=i,
             ).to(gene_pos.device)
-            output = self.forward(
-                gene_pos, expression.sum(1), expression, mask, total_count, timepoint
-            )
+            output = self.forward(gene_pos, expression, mask, total_count, timepoint)
             l, tot = self._compute_loss(
                 output, expression, mask, clss, batch_idx, do_ecs, do_adv_cls, do_mvc
             )
@@ -620,11 +621,10 @@ class scPrint(L.LightningModule):
         if do_denoise:
             for i in noise:
                 expr = utils.downsample_profile(expression, renoise=i)
-                true_rescale = expr.sum(1) / expression.sum(1)
                 output = self.forward(
                     gene_pos,
-                    expression.sum(1),
                     expr,
+                    depth_mult=expression.sum(1),
                     full_depth=total_count,
                     timepoint=timepoint,
                 )
@@ -981,7 +981,6 @@ class scPrint(L.LightningModule):
             return
         output = self.forward(
             gene_pos,
-            expression.sum(1),
             expression,
             full_depth=depth,
             get_attention_layer=self.get_attention_layer,
@@ -1159,5 +1158,5 @@ class scPrint(L.LightningModule):
         Returns:
             dict of output Tensors.
         """
-        output = self.forward(gene_pos, expression.sum(1), expression, full_depth=depth)
+        output = self.forward(gene_pos, expression, full_depth=depth)
         return output
