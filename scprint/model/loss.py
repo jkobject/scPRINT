@@ -1,12 +1,11 @@
 import torch.nn.functional as F
 import torch
+from torch import nn, Tensor
 
 # FROM SCGPT
 
 
-def masked_mse_loss(
-    input: torch.Tensor, target: torch.Tensor, mask: torch.Tensor
-) -> torch.Tensor:
+def masked_mse_loss(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     """
     Compute the masked MSE loss between input and target.
     """
@@ -15,9 +14,7 @@ def masked_mse_loss(
     return loss / mask.sum()
 
 
-def masked_mae_loss(
-    input: torch.Tensor, target: torch.Tensor, mask: torch.Tensor
-) -> torch.Tensor:
+def masked_mae_loss(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     """
     Compute the masked MAE loss between input and target.
     MAE = mean absolute error
@@ -27,9 +24,7 @@ def masked_mae_loss(
     return loss / mask.sum()
 
 
-def masked_nb_loss(
-    input: torch.Tensor, target: torch.Tensor, mask: torch.Tensor
-) -> torch.Tensor:
+def masked_nb_loss(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     """
     Compute the masked negative binomial loss between input and target.
     """
@@ -42,7 +37,7 @@ def masked_nb_loss(
 # FROM SCVI
 
 
-def nb(x: torch.Tensor, mu: torch.Tensor, theta: torch.Tensor, eps=1e-8):
+def nb(x: Tensor, mu: Tensor, theta: Tensor, eps=1e-8):
     """
     This negative binomial function was taken from:
     Title: scvi-tools
@@ -56,11 +51,11 @@ def nb(x: torch.Tensor, mu: torch.Tensor, theta: torch.Tensor, eps=1e-8):
     Computes negative binomial loss.
     Parameters
     ----------
-    x: torch.Tensor
+    x: Tensor
          Torch Tensor of ground truth data.
-    mu: torch.Tensor
+    mu: Tensor
          Torch Tensor of means of the negative binomial (has to be positive support).
-    theta: torch.Tensor
+    theta: Tensor
          Torch Tensor of inverse dispersion parameter (has to be positive support).
     eps: Float
          numerical stability constant.
@@ -84,16 +79,16 @@ def nb(x: torch.Tensor, mu: torch.Tensor, theta: torch.Tensor, eps=1e-8):
     return res.sum(-1).mean()
 
 
-def nb_dist(x: torch.Tensor, mu: torch.Tensor, theta: torch.Tensor, eps=1e-8):
+def nb_dist(x: Tensor, mu: Tensor, theta: Tensor, eps=1e-8):
     loss = -NegativeBinomial(mu=mu, theta=theta).log_prob(x)
     return loss
 
 
 def zinb(
-    target: torch.Tensor,
-    mu: torch.Tensor,
-    theta: torch.Tensor,
-    pi: torch.Tensor,
+    target: Tensor,
+    mu: Tensor,
+    theta: Tensor,
+    pi: Tensor,
     eps=1e-6,
     mask=None,
 ):
@@ -101,8 +96,8 @@ def zinb(
     This zero-inflated negative binomial function was taken from:
     Title: scvi-tools
     Authors: Romain Lopez <romain_lopez@gmail.com>,
-             Adam Gayoso <adamgayoso@berkeley.edu>,
-             Galen Xing <gx2113@columbia.edu>
+            Adam Gayoso <adamgayoso@berkeley.edu>,
+            Galen Xing <gx2113@columbia.edu>
     Date: 16th November 2020
     Code version: 0.8.1
     Availability: https://github.com/YosefLab/scvi-tools/blob/8f5a9cc362325abbb7be1e07f9523cfcf7e55ec0/scvi/core/distributions/_negative_binomial.py
@@ -110,16 +105,16 @@ def zinb(
     Computes zero inflated negative binomial loss.
     Parameters
     ----------
-    x: torch.Tensor
-         Torch Tensor of ground truth data.
-    mu: torch.Tensor
-         Torch Tensor of means of the negative binomial (has to be positive support).
-    theta: torch.Tensor
-         Torch Tensor of inverses dispersion parameter (has to be positive support).
-    pi: torch.Tensor
-         Torch Tensor of logits of the dropout parameter (real support)
+    x: Tensor
+            Torch Tensor of ground truth data.
+    mu: Tensor
+            Torch Tensor of means of the negative binomial (has to be positive support).
+    theta: Tensor
+            Torch Tensor of inverses dispersion parameter (has to be positive support).
+    pi: Tensor
+            Torch Tensor of logits of the dropout parameter (real support)
     eps: Float
-         numerical stability constant.
+        numerical stability constant.
 
     Returns
     -------
@@ -148,7 +143,7 @@ def zinb(
     return -res.sum(-1).mean()
 
 
-def classifier_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+def classifier_loss(pred: Tensor, target: Tensor) -> Tensor:
     """
     Compute the cross entropy loss between prediction and target.
     """
@@ -156,9 +151,7 @@ def classifier_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     return loss
 
 
-def criterion_neg_log_bernoulli(
-    input: torch.Tensor, target: torch.Tensor, mask: torch.Tensor
-) -> torch.Tensor:
+def criterion_neg_log_bernoulli(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     """
     Compute the negative log-likelihood of Bernoulli distribution
     """
@@ -169,8 +162,8 @@ def criterion_neg_log_bernoulli(
 
 
 def masked_relative_error(
-    input: torch.Tensor, target: torch.Tensor, mask: torch.LongTensor
-) -> torch.Tensor:
+    input: Tensor, target: Tensor, mask: torch.LongTensor
+) -> Tensor:
     """
     Compute the masked relative error between input and target.
     """
@@ -179,9 +172,7 @@ def masked_relative_error(
     return loss.mean()
 
 
-def graph_similarity_loss(
-    input1: torch.Tensor, input2: torch.Tensor, mask: torch.Tensor
-) -> torch.Tensor:
+def graph_similarity_loss(input1: Tensor, input2: Tensor, mask: Tensor) -> Tensor:
     """
     Compute the similarity of 2 generated graphs.
     """
@@ -190,7 +181,7 @@ def graph_similarity_loss(
     return loss / mask.sum()
 
 
-def graph_sparsity_loss(input: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+def graph_sparsity_loss(input: Tensor, mask: Tensor) -> Tensor:
     """
     Compute the sparsity of generated graphs.
     """
@@ -213,21 +204,20 @@ def ecs(cell_emb, ecs_threshold=0.5):
     ecs Computes the similarity of cell embeddings based on a threshold.
 
     Args:
-        cell_emb (torch.Tensor): A tensor representing cell embeddings.
+        cell_emb (Tensor): A tensor representing cell embeddings.
         ecs_threshold (float, optional): A threshold for determining similarity. Defaults to 0.5.
 
     Returns:
-        torch.Tensor: A tensor representing the mean of 1 minus the square of the difference between the cosine similarity and the threshold.
+        Tensor: A tensor representing the mean of 1 minus the square of the difference between the cosine similarity and the threshold.
     """
     # Here using customized cosine similarity instead of F.cosine_similarity
     # to avoid the pytorch issue of similarity larger than 1.0, pytorch # 78064
     # normalize the embedding
     cell_emb_normed = F.normalize(cell_emb, p=2, dim=1)
-    ecs_sim = torch.mm(cell_emb_normed, cell_emb_normed.t())
+    cos_sim = torch.mm(cell_emb_normed, cell_emb_normed.t())
 
     # mask out diagnal elements
-    mask = torch.eye(ecs_sim.size(0)).bool().to(ecs_sim.device)
-    cos_sim = torch.mm(cell_emb_normed, cell_emb_normed.t())
+    mask = torch.eye(cos_sim.size(0)).bool().to(cos_sim.device)
     cos_sim = cos_sim.masked_fill(mask, 0.0)
     # only optimize positive similarities
     cos_sim = F.relu(cos_sim)
@@ -240,8 +230,8 @@ def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
 
     Args:
         labelname (str): The name of the label.
-        pred (torch.Tensor): The predicted logits for the batch.
-        cl (torch.Tensor): The ground truth labels for the batch.
+        pred (Tensor): The predicted logits for the batch.
+        cl (Tensor): The ground truth labels for the batch.
         maxsize (int): The number of possible labels.
         cls_hierarchy (dict, optional): The hierarchical structure of the labels. Defaults to {}.
 
@@ -249,7 +239,7 @@ def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
         ValueError: If the labelname is not found in the cls_hierarchy dictionary.
 
     Returns:
-        torch.Tensor: The computed binary cross entropy loss for the given batch.
+        Tensor: The computed binary cross entropy loss for the given batch.
     """
     newcl = torch.zeros(
         (cl.shape[0], maxsize), device=cl.device
@@ -292,3 +282,54 @@ def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
         pred, target=newcl, weight=weight
     )
     return myloss
+
+
+class AdversarialDiscriminatorLoss(nn.Module):
+    """
+    Discriminator for the adversarial training for batch correction.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        n_cls: int,
+        nlayers: int = 3,
+        activation: callable = nn.LeakyReLU,
+        reverse_grad: bool = True,
+    ):
+        super().__init__()
+        # module list
+        self.decoder = nn.ModuleList()
+        for _ in range(nlayers - 1):
+            self.decoder.append(nn.Linear(d_model, d_model))
+            self.decoder.append(nn.LayerNorm(d_model))
+            self.decoder.append(activation())
+        self.out_layer = nn.Linear(d_model, n_cls)
+        self.reverse_grad = reverse_grad
+
+    def forward(self, x: Tensor, batch_labels: Tensor) -> Tensor:
+        """
+        Args:
+            x: Tensor, shape [batch_size, embsize]
+        """
+        if self.reverse_grad:
+            x = grad_reverse(x, lambd=1.0)
+        for layer in self.decoder:
+            x = layer(x)
+        x = self.out_layer(x)
+        return F.cross_entropy(x, batch_labels)
+
+
+class GradReverse(Function):
+    @staticmethod
+    def forward(ctx, x: Tensor, lambd: float) -> Tensor:
+        ctx.lambd = lambd
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad_output: Tensor) -> Tensor:
+        return grad_output.neg() * ctx.lambd, None
+
+
+def grad_reverse(x: Tensor, lambd: float = 1.0) -> Tensor:
+    return GradReverse.apply(x, lambd)

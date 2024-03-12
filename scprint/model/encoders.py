@@ -150,7 +150,6 @@ class DPositionalEncoding(nn.Module):
         pe2[:, 0, half_n::2] = torch.sin(position2 * div_term2)
         pe2[:, 0, 1 + half_n :: 2] = torch.cos(position2 * div_term2)
         # https://github.com/tatp22/multidim-positional-encoding/blob/master/positional_encodings/torch_encodings.py
-        # TODO: seems to do it differently. I hope it still works ok!!
         self.register_buffer("pe1", pe1)
         self.register_buffer("pe2", pe2)
 
@@ -164,7 +163,6 @@ class DPositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
-        # TODO: try with a continuous value encoder of size 2 (start, end where they are normalized to 0-1)
         x = x + self.pe1[pos_x]
         x = x + self.pe2[pos_y]
         return self.dropout(x)
@@ -206,7 +204,6 @@ class ContinuousValueEncoder(nn.Module):
         Args:
             x: Tensor, shape [batch_size, seq_len]
         """
-        # TODO: test using actual embedding layer if input is categorical
         # expand last dimension
         x = x.unsqueeze(-1)
 

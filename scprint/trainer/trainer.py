@@ -9,6 +9,7 @@ class TrainingMode(Callback):
         noise: List[float] = [0.3],
         do_cce: bool = True,
         cce_sim: float = 0.5,
+        cce_scale: float = 1.0,
         do_ecs: bool = True,
         ecs_threshold: float = 0.3,
         ecs_scale: float = 1.0,
@@ -37,6 +38,7 @@ class TrainingMode(Callback):
         self.noise = noise
         self.do_cce = do_cce
         self.cce_sim = cce_sim
+        self.cce_scale = cce_scale
         self.do_ecs = do_ecs
         self.ecs_threshold = ecs_threshold
         self.ecs_scale = ecs_scale
@@ -57,6 +59,7 @@ class TrainingMode(Callback):
         model.noise = self.noise
         model.do_cce = self.do_cce
         model.cce_sim = self.cce_sim
+        model.cce_scale = self.cce_scale
         model.do_ecs = self.do_ecs
         model.ecs_threshold = self.ecs_threshold
         model.ecs_scale = self.ecs_scale
