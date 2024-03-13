@@ -89,17 +89,10 @@ def zinb(
     theta: Tensor,
     pi: Tensor,
     eps=1e-6,
-    mask=None,
 ):
     """
     This zero-inflated negative binomial function was taken from:
-    Title: scvi-tools
-    Authors: Romain Lopez <romain_lopez@gmail.com>,
-            Adam Gayoso <adamgayoso@berkeley.edu>,
-            Galen Xing <gx2113@columbia.edu>
-    Date: 16th November 2020
-    Code version: 0.8.1
-    Availability: https://github.com/YosefLab/scvi-tools/blob/8f5a9cc362325abbb7be1e07f9523cfcf7e55ec0/scvi/core/distributions/_negative_binomial.py
+    modified from scvi-tools
 
     Computes zero inflated negative binomial loss.
     Parameters
@@ -139,7 +132,7 @@ def zinb(
 
     res = mul_case_zero + mul_case_non_zero
     # we want to minize the loss but maximize the log likelyhood
-    return -res.sum(-1).mean()
+    return -res.mean()
 
 
 def classifier_loss(pred: Tensor, target: Tensor) -> Tensor:
@@ -193,7 +186,7 @@ def similarity(x, y, temp):
     """
     Dot product or cosine similarity
     """
-    res = F.cosine_similarity(x, y) / temp
+    res = F.cosine_similarity(x.unsqueeze(1), y.unsqueeze(0)) / temp
     labels = torch.arange(res.size(0)).long().to(device=res.device)
     return F.cross_entropy(res, labels)
 
@@ -257,22 +250,31 @@ def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
         if labelname in cls_hierarchy.keys():
             clhier = cls_hierarchy[labelname]
 
-            invw = weight[inv]
-            invw[clhier[cl[inv] - maxsize]] = 0
-            weight[inv] = invw
+            inv_weight = weight[inv]
+            # we set the weight of the elements that are not leaf to 0
+            # i.e. the elements where we will compute the max
+            inv_weight[clhier[cl[inv] - maxsize]] = 0
+            weight[inv] = inv_weight
 
             addnewcl = torch.ones(
                 weight.shape[0], device=pred.device
-            )  # no need to set the other to 0
+            )  # no need to set the other to 0 as the weight of the loss is set to 0
             addweight = torch.zeros(weight.shape[0], device=pred.device)
             addweight[inv] = 1
             # computing hierarchical labels and adding them to cl
-            cpred = pred.clone()
-            cpred[~inv] = torch.finfo(pred.dtype).min
-            cpred = torch.logsumexp(cpred, dim=-1)
+            addpred = pred.clone()
+            # we only keep the elements where we need to compute the max,
+            # for the rest we set them to -inf, so that they won't have any impact on the max()
+            inv_addpred = addpred[inv]
+            inv_addpred[inv_weight.to(bool)] = torch.finfo(pred.dtype).min
+            addpred[inv] = inv_addpred
 
+            # differentiable max
+            addpred = torch.logsumexp(addpred, dim=-1)
+
+            # we add the new labels to the cl
             newcl = torch.cat([newcl, addnewcl.unsqueeze(1)], dim=1)
-            pred = torch.cat([pred, cpred.unsqueeze(1)], dim=1)
+            pred = torch.cat([pred, addpred.unsqueeze(1)], dim=1)
             weight = torch.cat([weight, addweight.unsqueeze(1)], dim=1)
         else:
             raise ValueError("need to use cls_hierarchy for this usecase")

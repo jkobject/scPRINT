@@ -75,6 +75,7 @@ class MVCDecoder(nn.Module):
         self,
         d_model: int,
         arch_style: str = "inner product",
+        tot_labels: int = 1,
         query_activation: nn.Module = nn.Sigmoid,
         hidden_activation: nn.Module = nn.PReLU,
     ) -> None:
@@ -98,11 +99,11 @@ class MVCDecoder(nn.Module):
             self.query_activation = query_activation()
             self.pred_var_zero = nn.Linear(d_model, d_model * 3, bias=False)
         elif arch_style == "concat query":
-            self.gene2query = nn.Linear(d_model, 64)
+            self.gene2query = nn.Linear(d_model, d_model)
             self.query_activation = query_activation()
-            self.fc1 = nn.Linear(d_model + 64, 64)
+            self.fc1 = nn.Linear(d_model * (1 + tot_labels), d_model / 2)
             self.hidden_activation = hidden_activation()
-            self.fc2 = nn.Linear(64, 3)
+            self.fc2 = nn.Linear(d_model / 2, 3)
         elif arch_style == "sum query":
             self.gene2query = nn.Linear(d_model, d_model)
             self.query_activation = query_activation()
