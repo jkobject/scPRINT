@@ -18,6 +18,7 @@ class TrainingMode(Callback):
         do_next_tp: bool = False,
         do_generate: bool = False,
         class_scale: float = 1.0,
+        optim: str = "adamW",
         mask_ratio: List[float] = [0.15, 0.3],
         warmup_duration: int = 500,
         weight_decay: float = 0.01,
@@ -52,6 +53,7 @@ class TrainingMode(Callback):
         self.weight_decay = weight_decay
         self.fused_adam = fused_adam
         self.lr_patience = lr_patience
+        self.optim = optim
 
     def on_fit_start(self, trainer, model):
         # do something with all training_step outputs, for example:
@@ -73,3 +75,4 @@ class TrainingMode(Callback):
         model.fused_adam = self.fused_adam
         model.lr_patience = self.lr_patience
         model.do_generate = self.do_generate
+        model.optim = self.optim

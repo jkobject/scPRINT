@@ -359,8 +359,6 @@ class MHA(nn.Module):
             dwconv (bool, optional): whether to use depthwise convolution. Defaults to False.
             fused_bias_fc (bool, optional): whether to use fused_bias_fc. Defaults to False.
             use_flash_attn (bool, optional): whether to use FlashAttention. Defaults to False.
-            return_residual (bool, optional): whether to return the input x along with the output. This is for
-            checkpointing (bool, optional): whether to use checkpointing to save memory. Defaults to False.
             device (torch.device, optional): device. Defaults to None.
             dtype (torch.dtype, optional): dtype. Defaults to None.
         """
@@ -604,7 +602,7 @@ class MHA(nn.Module):
             assert not self.dwconv
 
         kwargs = (
-            {"cu_seqlens": cu_seqlens, "max_seqlen": max_seqlen, **kwargs}
+            {}  # "cu_seqlens": cu_seqlens, "max_seqlen": max_seqlen, **kwargs}
             if self.use_flash_attn
             else {"key_padding_mask": key_padding_mask, **kwargs}
         )

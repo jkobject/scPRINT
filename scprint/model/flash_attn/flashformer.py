@@ -112,6 +112,7 @@ class FlashTransformerEncoder(nn.Module):
             )
             self.blocks.append(encoder_layers)
 
+        self.prenorm = prenorm
         self.dropout = nn.Dropout(p=dropout)
         self.drop_path = StochasticDepth(p=dpr[-1], mode="row")
         self.norm = torch.nn.LayerNorm(d_model, eps=1e-6)
@@ -140,34 +141,39 @@ class FlashTransformerEncoder(nn.Module):
             hidden_states = block(hidden_states, residual, return_qkv=(i in return_qkv))
             if i in return_qkv:
                 qkvs.append(hidden_states[-1])
-                hidden_states, residual = hidden_states[:-1]
-            else:
-                hidden_states, residual = hidden_states
-        if not self.fused_dropout_add_ln:
-            residual = self.drop_path(self.dropout(hidden_states)) + residual
-            hidden_states = self.norm(residual.to(dtype=self.norm.weight.dtype))
-        else:
-            if self.drop_path.p == 0 or not self.training:
-                rowscale = None
-            else:
-                rowscale = self.drop_path(
-                    torch.ones(
-                        hidden_states.shape[:-1],
-                        device=hidden_states.device,
-                        dtype=hidden_states.dtype,
-                    )
+                hidden_states, residual = (
+                    hidden_states[:-1] if self.prenorm else hidden_states
                 )
-            # Set prenorm=False here since we don't need to the residual
-            hidden_states = layer_norm_fn(
-                hidden_states,
-                self.norm.weight,
-                self.norm.bias,
-                residual=residual,
-                eps=self.norm.eps,
-                dropout_p=self.dropout.p if self.training else 0.0,
-                rowscale=rowscale,
-                prenorm=False,
-            )
+            else:
+                hidden_states, residual = (
+                    hidden_states if self.prenorm else hidden_states
+                )
+        if self.prenorm:
+            if not self.fused_dropout_add_ln:
+                residual = self.drop_path(self.dropout(hidden_states)) + residual
+                hidden_states = self.norm(residual.to(dtype=self.norm.weight.dtype))
+            else:
+                if self.drop_path.p == 0 or not self.training:
+                    rowscale = None
+                else:
+                    rowscale = self.drop_path(
+                        torch.ones(
+                            hidden_states.shape[:-1],
+                            device=hidden_states.device,
+                            dtype=hidden_states.dtype,
+                        )
+                    )
+                # Set prenorm=False here since we don't need to the residual
+                hidden_states = layer_norm_fn(
+                    hidden_states,
+                    self.norm.weight,
+                    self.norm.bias,
+                    residual=residual,
+                    eps=self.norm.eps,
+                    dropout_p=self.dropout.p if self.training else 0.0,
+                    rowscale=rowscale,
+                    prenorm=False,
+                )
         return hidden_states if len(return_qkv) == 0 else (hidden_states, qkvs)
 
 
