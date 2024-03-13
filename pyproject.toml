@@ -57,6 +57,7 @@ wandb = "*"
 wandb-core = "*"
 pykeops = "*"
 louvain = "*"
+galore = { git = "https://github.com/jiaweizzhao/GaLore", branch = "main" }
 
 [tool.poetry.group.flashattention.dependencies]
 # C_INCLUDE_PATH=$CONDA_HOME/envs/scprint/include

@@ -194,7 +194,6 @@ class ContinuousValueEncoder(nn.Module):
         """
         # expand last dimension
         x = x.unsqueeze(-1)
-
         # use the mask embedding when x=-1
         # mask = (x == -1).float()
         x = torch.clamp(x, min=0, max=self.max_value)

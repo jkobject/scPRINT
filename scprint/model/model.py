@@ -211,7 +211,7 @@ class scPrint(L.LightningModule):
             len(self.labels) + 2, d_model
         )
         # self.time_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
-        self.depth_decoder = encoders.ContinuousValueEncoder(
+        self.depth_encoder = encoders.ContinuousValueEncoder(
             d_model, dropout, layers=expr_encoder_layers
         )
         # final encoder norm and dropout
@@ -353,7 +353,8 @@ class scPrint(L.LightningModule):
             pass
             # cell_embs[:, 2, :] = self.time_encoder(timepoint)
         if full_depth is not None:
-            cell_embs[:, 1, :] = self.depth_decoder(torch.log2(1 + full_depth))
+            depth = torch.log2(1 + full_depth).clone()
+            cell_embs[:, 1, :] += self.depth_encoder(depth).clone()
 
         enc = torch.cat([cell_embs, enc], dim=1)
         return enc  # self.norm_and_dropout(enc) # we already apply prenorm & dropout  # (minibatch, seq_len, embsize)
