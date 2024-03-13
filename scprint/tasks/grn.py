@@ -67,14 +67,19 @@ class GRNfer:
             subadata = self.adata[self.adata.obs.cell_type == "B cell"].copy()
         else:
             subadata = self.adata.copy()
-        sc.pp.highly_variable_genes(
-            subadata, n_top_genes=self.num_genes, flavor="seurat_v3"
-        )
-        highly_variable = subadata.var.index[subadata.var.highly_variable].tolist()
-        print(
-            "number of expressed genes in this cell type: "
-            + str((subadata.X.sum(0) > 1).sum())
-        )
+        if self.how == "most var":
+            sc.pp.highly_variable_genes(
+                subadata, n_top_genes=self.num_genes, flavor="seurat_v3"
+            )
+            highly_variable = subadata.var.index[subadata.var.highly_variable].tolist()
+            print(
+                "number of expressed genes in this cell type: "
+                + str((subadata.X.sum(0) > 1).sum())
+            )
+        elif self.how == "random expr":
+            pass
+        else:
+            raise ValueError("how must be one of 'most var', 'random expr'")
 
         adataset = SimpleAnnDataset(
             subadata, obs_to_output=["organism_ontology_term_id"]
@@ -82,8 +87,8 @@ class GRNfer:
         col = Collator(
             organisms=self.organisms,
             valid_genes=self.model.genes,
-            how="some",
-            genelist=highly_variable,
+            how="some" if self.how == "most var" else "random expr",
+            genelist=highly_variable if self.how == "most var" else [],
         )
         dataloader = DataLoader(
             adataset,
@@ -94,7 +99,8 @@ class GRNfer:
         )
         self.model.get_attention_layer = layers
         self.trainer.predict(self.model, dataloader)
-
+        return self.model.mean_attn
+"""
         attn = self.model.mean_attn[0][8:][:, 0, :, :].permute(
             1, 0, 2
         ) @ self.model.mean_attn[0][8:][:, 1, :, :].permute(1, 2, 0)
@@ -161,3 +167,4 @@ class GRNfer:
 
         grn.var = grn.var.drop(columns=["stable_id", "created_at", "updated_at"])
         return grn
+"""
