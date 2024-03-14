@@ -33,8 +33,8 @@ trainer:
         do_ecs: True
         #ecs_threshold: 0.6
         #ecs_scale: 10.0
-        do_mvc: False
-        do_adv_cls: False
+        do_mvc: True
+        do_adv_cls: True
         do_next_tp: False
         #class_scale: 500.0
         do_generate: True
@@ -42,8 +42,7 @@ trainer:
         #weight_decay: 0.001
         fused_adam: True
         lr_patience: 1
-        mask_ratio:
-          - 0.3
+        mask_ratio: []
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
         swa_lrs: 0.01
@@ -70,12 +69,11 @@ model:
   layers_cls: [256]
   dropout: 0.1
   transformer: flash
-  mvc_decoder: None
+  mvc_decoder: inner product 
   d_model: 256
   residual_in_fp32: True
   num_heads_kv: null
-  fused_dropout_add_ln: True
-  return_residual: False
+  fused_dropout_add_ln: False
   prenorm: True
   fused_mlp: False
   fused_bias_fc: False

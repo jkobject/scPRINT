@@ -32,14 +32,14 @@ trainer:
         cce_sim: 0.4
         do_ecs: True
         ecs_threshold: 0.6
-        ecs_scale: 10.0
+        # ecs_scale: 10.0
         do_mvc: False
         do_generate: True
         do_adv_cls: False
         do_next_tp: False
-        class_scale: 500.0
+        # class_scale: 500.0
         warmup_duration: 500
-        weight_decay: 0.1
+        weight_decay: 0.01
         fused_adam: True
         lr_patience: 1
         mask_ratio:
@@ -68,14 +68,13 @@ model:
   nhead: 4
   nlayers: 4
   layers_cls: [128]
-  dropout: 0.2
+  dropout: 0.1
   transformer: flash
   mvc_decoder: inner product
   d_model: 128
   residual_in_fp32: True
   num_heads_kv: null
   fused_dropout_add_ln: False
-  return_residual: False
   prenorm: True
   fused_mlp: False
   fused_bias_fc: False
@@ -97,7 +96,7 @@ data:
   do_gene_pos: ./data/main/biomart.parquet
   add_zero_genes: 0
   train_oversampling: 2
-  validation_split: 0.1
+  validation_split: 0.05
   test_split: 0.05
   batch_size: 64
   num_workers: 16

@@ -1,5 +1,4 @@
 # from scprint.base.base_model import BaseModel
-
 from typing import Optional, Dict
 from torch import Tensor, optim, nn
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
@@ -111,10 +110,10 @@ class scPrint(L.LightningModule):
         self.do_adv_cls = False
         self.do_next_tp = False
         self.do_generate = False
-        self.class_scale = 0.08
+        self.class_scale = 0.1
         self.mask_ratio = [0.3]
         self.warmup_duration = 500
-        self.weight_decay = 0.001
+        self.weight_decay = 0.01
         self.optim = "adamW"
         self.fused_adam = False
         self.lr_patience = 1
@@ -1222,7 +1221,7 @@ class scPrint(L.LightningModule):
             mdir = self.logger.save_dir if self.logger.save_dir is not None else "/tmp"
         except:
             mdir = "/tmp"
-        adata = utils.make_adata(
+        adata, fig = utils.make_adata(
             self.pred,
             self.embs,
             self.labels,
