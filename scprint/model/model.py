@@ -8,7 +8,7 @@ from lightning.pytorch.callbacks.lr_finder import LearningRateFinder
 import torch.distributed as dist
 import torch
 from galore_torch import GaLoreAdamW
-
+from math import factorial
 import lightning as L
 
 import pandas as pd
@@ -105,13 +105,13 @@ class scPrint(L.LightningModule):
         self.cce_scale = 0.01
         self.do_ecs = True
         self.ecs_threshold = 0.3
-        self.ecs_scale = 0.2
+        self.ecs_scale = 0.05
         self.do_mvc = False
         self.mvc_scale = 0.4
         self.do_adv_cls = False
         self.do_next_tp = False
         self.do_generate = False
-        self.class_scale = 0.2
+        self.class_scale = 0.08
         self.mask_ratio = [0.3]
         self.warmup_duration = 500
         self.weight_decay = 0.001
@@ -353,8 +353,8 @@ class scPrint(L.LightningModule):
             pass
             # cell_embs[:, 2, :] = self.time_encoder(timepoint)
         if full_depth is not None:
-            depth = torch.log2(1 + full_depth).clone()
-            cell_embs[:, 1, :] += self.depth_encoder(depth).clone()
+            cell_embs = cell_embs.clone()
+            cell_embs[:, 1, :] += self.depth_encoder(torch.log2(1 + full_depth))
 
         enc = torch.cat([cell_embs, enc], dim=1)
         return enc  # self.norm_and_dropout(enc) # we already apply prenorm & dropout  # (minibatch, seq_len, embsize)
@@ -671,6 +671,7 @@ class scPrint(L.LightningModule):
                     depth_mult=expression.sum(1),
                     full_depth=total_count,
                     do_mvc=do_mvc,
+                    do_class=True,
                 )
                 l, tot = self._compute_loss(
                     output,
@@ -714,7 +715,7 @@ class scPrint(L.LightningModule):
                 gene_pos,
                 full_depth=total_count,
                 depth_mult=expression.sum(1),
-                do_class=False,
+                do_class=True,
                 do_mvc=False,
             )
             cell_embs.append(output["cell_emb"].clone())
@@ -772,7 +773,7 @@ class scPrint(L.LightningModule):
                     loss_cce += loss.similarity(
                         cell_emb1, cell_emb2, cce_sim
                     )  # (nlabels, minibatch, minibatch)
-            total_loss += loss_cce * self.cce_scale
+            total_loss += loss_cce * self.cce_scale / factorial(len(cell_embs))
             # TASK 3b. contrastive graph embedding
             losses.update({"cce": loss_cce * self.cce_scale})
 
