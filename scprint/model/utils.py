@@ -84,21 +84,31 @@ def make_adata(
         if tr is not None:
             adata.obs["conv_pred_" + label] = adata.obs["pred_" + label].replace(tr)
         res = []
-        if label_decoders is not None:
+        if label_decoders is not None and gtclass is not None:
             class_topred = label_decoders[label].values()
+            if label in cls_hierarchy:
+                cur_cls_hierarchy = {
+                    label_decoders[label][k]: [label_decoders[label][i] for i in v]
+                    for k, v in cls_hierarchy[label].items()
+                }
+            else:
+                cur_cls_hierarchy = {}
             for pred, true in adata.obs[["pred_" + label, label]].values:
                 if pred == true:
                     res.append(True)
                     continue
-                if label in cls_hierarchy:
-                    if true in cls_hierarchy[label]:
-                        res.append(pred in cls_hierarchy[label][true])
-                        continue
+                if len(cls_hierarchy) > 0:
+                    if true in cur_cls_hierarchy:
+                        res.append(pred in cur_cls_hierarchy[true])
                     elif true not in class_topred:
                         raise ValueError(f"true label {true} not in available classes")
+                    elif true != "unknown":
+                        res.append(False)
                 elif true not in class_topred:
                     raise ValueError(f"true label {true} not in available classes")
-                res.append(False)
+                elif true != "unknown":
+                    res.append(False)
+                # else we pass
             accuracy["pred_" + label] = sum(res) / len(res)
     sc.pp.neighbors(adata)
     sc.tl.umap(adata)
@@ -159,6 +169,7 @@ def make_adata(
             axs[i].set_xlabel("UMAP1")
             axs[i].set_ylabel("UMAP2")
     adata.write(mdir + "/step_" + str(step) + "_" + name + ".h5ad")
+    plt.show()
     return adata, fig
 
 
