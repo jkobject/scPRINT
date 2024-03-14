@@ -141,28 +141,41 @@ class Embedder:
             if label not in adata.obs.columns:
                 continue
             class_topred = self.model.label_decoders[label].values()
+
             if label in self.model.cls_hierarchy:
-                class_groupings = {
-                    k: [
-                        i.ontology_id
-                        for i in bt.CellType.filter(k).first().children.all()
+                # class_groupings = {
+                #    k: [
+                #        i.ontology_id
+                #        for i in bt.CellType.filter(k).first().children.all()
+                #    ]
+                #    for k in set(adata.obs[label].unique()) - set(class_topred)
+                # }
+                cur_cls_hierarchy = {
+                    self.model.label_decoders[label][k]: [
+                        self.model.label_decoders[label][i] for i in v
                     ]
-                    for k in set(adata.obs[label].unique()) - set(class_topred)
+                    for k, v in self.model.cls_hierarchy[label].items()
                 }
+            else:
+                cur_cls_hierarchy = {}
+
             for pred, true in adata.obs[["pred_" + label, label]].values:
                 if pred == true:
                     res.append(True)
                     continue
-
-                if label in self.model.cls_hierarchy:
-                    if true in class_groupings:
-                        res.append(pred in class_groupings[true])
+                if len(cur_cls_hierarchy) > 0:
+                    if true in cur_cls_hierarchy:
+                        res.append(pred in cur_cls_hierarchy[true])
                         continue
                     elif true not in class_topred:
                         raise ValueError(f"true label {true} not in available classes")
+                    elif true != "unknown":
+                        res.append(False)
                 elif true not in class_topred:
                     raise ValueError(f"true label {true} not in available classes")
-                res.append(False)
+                elif true != "unknown":
+                    res.append(False)
+                # else we pass
             print("    ", label)
             print("     accuracy:", sum(res) / len(res))
             print(" ")
