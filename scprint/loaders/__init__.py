@@ -1,3 +1,3 @@
-from scprint.RNABERT.main import RNABERT
+# from ...RNABERT.main import RNABERT
 from .protein_embedder import PROTBERT
-from .embedder import embed
+from .embedder import protein_embeddings_generator

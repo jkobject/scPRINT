@@ -1,15 +1,16 @@
 from scprint import utils
 from ..loaders import PROTBERT
-from RNABERT import RNABERT
+
+# from RNABERT import RNABERT
 from torch.nn import AdaptiveAvgPool1d
 import pandas as pd
 import torch
 import os
 
 
-def embed(
+def protein_embeddings_generator(
     genedf: pd.DataFrame,
-    organism: str = "homo_sapiens",
+    organism: str = "homo_sapiens",  # mus_musculus,
     cache: bool = True,
     fasta_path: str = "/tmp/data/fasta/",
     embedding_size: int = 512,
@@ -37,7 +38,7 @@ def embed(
     protgenedf = genedf[genedf["biotype"] == "protein_coding"]
     utils.utils.run_command(["gunzip", fasta_path + fasta_file])
     utils.subset_fasta(
-        protgenedf["ensembl_gene_id"].tolist(),
+        protgenedf.index.tolist(),
         subfasta_path=fasta_path + "subset.fa",
         fasta_path=fasta_path + fasta_file[:-3],
         drop_unknown_seq=True,
@@ -45,36 +46,36 @@ def embed(
     # subset the gene file
     # embed
     prot_embedder = PROTBERT()
-    # TODO: to redebug
     prot_embeddings = prot_embedder(
         fasta_path + "subset.fa", output_folder=fasta_path + "esm_out/", cache=cache
     )
     # load the data and erase / zip the rest
     utils.utils.run_command(["gzip", fasta_path + fasta_file[:-3]])
     # return the embedding and gene file
+    # TODO: to redebug
     # do the same for RNA
-    rnagenedf = genedf[genedf["biotype"] != "protein_coding"]
-    fasta_file = next(
-        file for file in os.listdir(fasta_path) if file.endswith(".ncrna.fa.gz")
-    )
-    utils.utils.run_command(["gunzip", fasta_path + fasta_file])
-    utils.subset_fasta(
-        rnagenedf["ensembl_gene_id"].tolist(),
-        subfasta_path=fasta_path + "subset.ncrna.fa",
-        fasta_path=fasta_path + fasta_file[:-3],
-        drop_unknown_seq=True,
-    )
-    rna_embedder = RNABERT()
-    rna_embeddings = rna_embedder(fasta_path + "subset.ncrna.fa")
-    # Check if the sizes of the cembeddings are not the same
-    utils.utils.run_command(["gzip", fasta_path + fasta_file[:-3]])
-
+    # rnagenedf = genedf[genedf["biotype"] != "protein_coding"]
+    # fasta_file = next(
+    #    file for file in os.listdir(fasta_path) if file.endswith(".ncrna.fa.gz")
+    # )
+    # utils.utils.run_command(["gunzip", fasta_path + fasta_file])
+    # utils.subset_fasta(
+    #    rnagenedf["ensembl_gene_id"].tolist(),
+    #    subfasta_path=fasta_path + "subset.ncrna.fa",
+    #    fasta_path=fasta_path + fasta_file[:-3],
+    #    drop_unknown_seq=True,
+    # )
+    # rna_embedder = RNABERT()
+    # rna_embeddings = rna_embedder(fasta_path + "subset.ncrna.fa")
+    ## Check if the sizes of the cembeddings are not the same
+    # utils.utils.run_command(["gzip", fasta_path + fasta_file[:-3]])
+    #
     m = AdaptiveAvgPool1d(embedding_size)
     prot_embeddings = pd.DataFrame(
         data=m(torch.tensor(prot_embeddings.values)), index=prot_embeddings.index
     )
-    rna_embeddings = pd.DataFrame(
-        data=m(torch.tensor(rna_embeddings.values)), index=rna_embeddings.index
-    )
+    # rna_embeddings = pd.DataFrame(
+    #    data=m(torch.tensor(rna_embeddings.values)), index=rna_embeddings.index
+    # )
     # Concatenate the embeddings
-    return pd.concat([prot_embeddings, rna_embeddings])
+    return prot_embeddings  # pd.concat([prot_embeddings, rna_embeddings])
