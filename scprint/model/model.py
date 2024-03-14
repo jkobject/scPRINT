@@ -1221,7 +1221,7 @@ class scPrint(L.LightningModule):
             mdir = self.logger.save_dir if self.logger.save_dir is not None else "/tmp"
         except:
             mdir = "/tmp"
-        adata = utils.make_adata(
+        adata, fig = utils.make_adata(
             self.pred,
             self.embs,
             self.labels,

@@ -122,7 +122,7 @@ def make_adata(
             )
             for i in pair
         ]
-        _, axs = plt.subplots(int(len(color) / 2), 2, figsize=(24, len(color) * 4))
+        fig, axs = plt.subplots(int(len(color) / 2), 2, figsize=(24, len(color) * 4))
         plt.subplots_adjust(wspace=1)
         for i, col in enumerate(color):
             sc.pl.umap(
@@ -142,7 +142,7 @@ def make_adata(
             "conv_pred_" + i if "conv_pred_" + i in adata.obs.columns else "pred_" + i
             for i in labels
         ]
-        _, axs = plt.subplots(len(color), 1, figsize=(16, len(color) * 8))
+        fig, axs = plt.subplots(len(color), 1, figsize=(16, len(color) * 8))
         for i, col in enumerate(color):
             sc.pl.umap(
                 adata,
@@ -157,7 +157,8 @@ def make_adata(
             axs[i].set_xlabel("UMAP1")
             axs[i].set_ylabel("UMAP2")
     adata.write(mdir + "/step_" + str(step) + "_" + name + ".h5ad")
-    return adata
+    plt.show()
+    return adata, fig
 
 
 def _init_weights(
