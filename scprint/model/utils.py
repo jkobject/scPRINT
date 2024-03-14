@@ -22,6 +22,7 @@ def make_adata(
     labels: List[str],
     step: int = 0,
     label_decoders: Optional[Dict] = None,
+    cls_hierarchy: Dict = {},
     gtclass: Optional[Tensor] = None,
     name: str = "",
     mdir: str = "/tmp",
@@ -73,15 +74,32 @@ def make_adata(
             columns=colname,
         ),
     )
-
-    for n in labels:
+    accuracy = {}
+    for label in labels:
         if gtclass is not None:
-            tr = translate(adata.obs[n].tolist(), n)
+            tr = translate(adata.obs[label].tolist(), label)
             if tr is not None:
-                adata.obs["conv_" + n] = adata.obs[n].replace(tr)
-        tr = translate(adata.obs["pred_" + n].tolist(), n)
+                adata.obs["conv_" + label] = adata.obs[label].replace(tr)
+        tr = translate(adata.obs["pred_" + label].tolist(), label)
         if tr is not None:
-            adata.obs["conv_pred_" + n] = adata.obs["pred_" + n].replace(tr)
+            adata.obs["conv_pred_" + label] = adata.obs["pred_" + label].replace(tr)
+        res = []
+        if label_decoders is not None:
+            class_topred = label_decoders[label].values()
+            for pred, true in adata.obs[["pred_" + label, label]].values:
+                if pred == true:
+                    res.append(True)
+                    continue
+                if label in cls_hierarchy:
+                    if true in cls_hierarchy[label]:
+                        res.append(pred in cls_hierarchy[label][true])
+                        continue
+                    elif true not in class_topred:
+                        raise ValueError(f"true label {true} not in available classes")
+                elif true not in class_topred:
+                    raise ValueError(f"true label {true} not in available classes")
+                res.append(False)
+            accuracy["pred_" + label] = sum(res) / len(res)
     sc.pp.neighbors(adata)
     sc.tl.umap(adata)
     sc.tl.leiden(adata)
@@ -113,12 +131,18 @@ def make_adata(
                 ax=axs[i // 2, i % 2],
                 show=False,
             )
+            acc = ""
+            if "_pred_" in col and col.split("conv_")[-1] in accuracy:
+                acc = " (accuracy: {:.2f})".format(accuracy[col.split("conv_")[-1]])
+            axs[i // 2, i % 2].set_title(col + " UMAP" + acc)
+            axs[i // 2, i % 2].set_xlabel("UMAP1")
+            axs[i // 2, i % 2].set_ylabel("UMAP2")
     else:
         color = [
             "conv_pred_" + i if "conv_pred_" + i in adata.obs.columns else "pred_" + i
             for i in labels
         ]
-        fig, axs = plt.subplots(len(color), 1, figsize=(16, len(color) * 8))
+        _, axs = plt.subplots(len(color), 1, figsize=(16, len(color) * 8))
         for i, col in enumerate(color):
             sc.pl.umap(
                 adata,
@@ -126,6 +150,12 @@ def make_adata(
                 ax=axs[i],
                 show=False,
             )
+            acc = ""
+            if "_pred_" in col and col.split("conv_")[-1] in accuracy:
+                acc = " (accuracy: {:.2f})".format(accuracy[col.split("conv_")[-1]])
+            axs[i].set_title(col + " UMAP" + acc)
+            axs[i].set_xlabel("UMAP1")
+            axs[i].set_ylabel("UMAP2")
     adata.write(mdir + "/step_" + str(step) + "_" + name + ".h5ad")
     return adata
 
