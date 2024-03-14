@@ -132,6 +132,7 @@ class Embedder:
         adata.obsm["scprint_pos"] = self.model.pos
         pred_adata.obs.index = adata.obs.index
         adata.obsm["scprint_umap"] = pred_adata.obsm["X_umap"]
+        adata.obsm["scprint_leiden"] = pred_adata.obsm["leiden"]
         adata.obsm[self.model_name] = pred_adata.X
         pred_adata.obs.index = adata.obs.index
         adata.obs = pd.concat([adata.obs, pred_adata.obs], axis=1)

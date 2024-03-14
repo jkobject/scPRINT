@@ -64,7 +64,7 @@ class GRNfer:
     def __call__(self, layers, cell_type=None, agg="mean"):
         # Add at least the organism you are working with
         if cell_type is not None:
-            subadata = self.adata[self.adata.obs.cell_type == "B cell"].copy()
+            subadata = self.adata[self.adata.obs.cell_type == cell_type].copy()
         else:
             subadata = self.adata.copy()
         if self.how == "most var":

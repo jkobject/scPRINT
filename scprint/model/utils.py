@@ -110,9 +110,9 @@ def make_adata(
                     res.append(False)
                 # else we pass
             accuracy["pred_" + label] = sum(res) / len(res)
-    sc.pp.neighbors(adata)
+    sc.pp.neighbors(adata, use_rep="X")
     sc.tl.umap(adata)
-    sc.tl.leiden(adata)
+    sc.tl.leiden(adata, key_added="sprint_leiden")
     adata.obs = adata.obs.astype("category")
     print(adata)
     if gtclass is not None:

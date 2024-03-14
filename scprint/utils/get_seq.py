@@ -76,7 +76,7 @@ def subset_fasta(
                         weird += 1
 
                         continue
-                if not gene_name.startswith("ENSG"):
+                if not gene_name.startswith("ENS"):
                     raise ValueError("issue", gene_name)
                 if gene_name in genes_found:
                     dup.add(gene_name)
