@@ -634,9 +634,6 @@ class scPrint(L.LightningModule):
         gene_pos = batch["genes"]
         total_count = batch["depth"]
         clss = batch.get("class", None)
-        import pdb
-
-        pdb.set_trace()
         batch_idx = batch.get("dataset", None)
         timepoint = None
 
