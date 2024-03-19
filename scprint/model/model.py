@@ -1078,6 +1078,7 @@ class scPrint(L.LightningModule):
         output = self.forward(
             gene_pos,
             expression,
+            depth_mult=expression.sum(1),
             full_depth=depth,
             get_attention_layer=self.get_attention_layer,
             do_class=True,
@@ -1116,7 +1117,7 @@ class scPrint(L.LightningModule):
             self.pos = gene_pos
             self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]]
             if len(self.get_attention_layer) > 0:
-                self.mean_attn = [i.mean(-1) for i in qkv]
+                self.mean_attn = qkv
         else:
             self.embs = torch.cat([self.embs, torch.mean(cell_embs[:, ind, :], dim=1)])
             self.pred = torch.cat(
@@ -1137,9 +1138,7 @@ class scPrint(L.LightningModule):
                 torch.cat([self.expr_pred[2], output["zero_logits"]]),
             ]
             if len(self.get_attention_layer) > 0:
-                self.mean_attn = [
-                    j + qkv[i].mean(-1) for i, j in enumerate(self.mean_attn)
-                ]
+                self.mean_attn = [j + qkv[i] for i, j in enumerate(self.mean_attn)]
         self.n_c_batch += 1
 
     def on_predict_epoch_end(self):

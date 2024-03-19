@@ -1,8 +1,6 @@
 import networkx as nx
 import collections
 import numpy as np
-from functools import partial
-import operator
 
 
 def _calculate_new_faces(faces, new, old_set):

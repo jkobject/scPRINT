@@ -30,7 +30,7 @@ class GRNfer:
             "NCBITaxon:9606",
         ],
         model_name: str = "scprint",
-        filtration="sinkhorn",
+        preprocess="sinkhorn",
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -57,17 +57,17 @@ class GRNfer:
         self.model_name = model_name
         self.adata = adata
         self.precision = precision
-        self.filtration = filtration
+        self.preprocess = preprocess
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, layers, cell_type=None, agg="mean"):
         # Add at least the organism you are working with
         if cell_type is not None:
-            subadata = self.adata[self.adata.obs.cell_type == cell_type].copy()
+            subadata = self.adata[self.adata.obs.cell_type == cell_type].copy()[:1]
         else:
             subadata = self.adata.copy()
-        if self.how == "most var":
+        if self.how == "most var within":
             sc.pp.highly_variable_genes(
                 subadata, n_top_genes=self.num_genes, flavor="seurat_v3"
             )
@@ -76,6 +76,9 @@ class GRNfer:
                 "number of expressed genes in this cell type: "
                 + str((subadata.X.sum(0) > 1).sum())
             )
+        elif self.how == "most var across": 
+            import pdb
+            pdb.set_trace()
         elif self.how == "random expr":
             pass
         else:
@@ -99,21 +102,22 @@ class GRNfer:
         )
         self.model.get_attention_layer = layers
         self.trainer.predict(self.model, dataloader)
-        return self.model.mean_attn
-"""
+
         attn = self.model.mean_attn[0][8:][:, 0, :, :].permute(
             1, 0, 2
         ) @ self.model.mean_attn[0][8:][:, 1, :, :].permute(1, 2, 0)
         scale = self.model.mean_attn[0].shape[-1] ** -0.5
         attn = attn * scale
-        if self.filtration == "sinkhorn":
+        if self.preprocess == "sinkhorn":
             sink = SinkhornDistance(0.1, max_iter=200)
-            a = sink(attn)[0]
-            a = a * a.shape[-1]
-        elif self.filtration == "softmax":
-            a = torch.nn.functional.softmax(attn, dim=-1)
+            attn = sink(attn)[0]
+            attn = attn * attn.shape[-1]
+        elif self.preprocess == "softmax":
+            attn = torch.nn.functional.softmax(attn, dim=-1)
+        elif self.preprocess == "none":
+            pass
         else:
-            raise ValueError("filtration must be one of 'sinkhorn', 'softmax'")
+            raise ValueError("preprocess must be one of 'sinkhorn', 'softmax', 'none'")
 
         if agg == "mean":
             a = a.mean(0).detach().cpu().numpy()
@@ -152,7 +156,11 @@ class GRNfer:
         print(
             "avg link count: " + str((a > (1 / attn.shape[-1])).sum() / attn.shape[-1])
         )
-        a[a < (1 / a.shape[-1])] = 0
+        if self.filtration == "thresh":
+            a[a < (1 / a.shape[-1])] = 0
+        elif self.filtration == "none":
+            pass
+        elif self.filtration == ""
         grn = GRNAnnData(
             subadata[:, col.accepted_genes[self.organisms[0]]][
                 :, col.to_subset[self.organisms[0]]

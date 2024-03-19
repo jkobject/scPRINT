@@ -151,3 +151,5 @@ step_*_.*
 data/main/embeddings.parquet
 slurm-*.out
 notebooks/assessments/step_0_.h5ad
+data/main/gene_embeddings.parquet
+*.h5ad
