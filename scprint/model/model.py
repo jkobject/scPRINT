@@ -882,7 +882,7 @@ class scPrint(L.LightningModule):
         if self.grad_reverse_discriminator_loss is not None and batch_idx is not None:
             mean_emb = torch.mean(output["cell_embs"][:, 2:, :].clone(), dim=1)
             loss_adv = self.grad_reverse_discriminator_loss(mean_emb, batch_idx) * (
-                self.class_scale / 4
+                self.class_scale / 8
             )
             total_loss += loss_adv
             losses.update({"adv_batch": loss_adv})
