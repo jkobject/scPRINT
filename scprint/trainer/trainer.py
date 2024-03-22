@@ -14,6 +14,7 @@ class TrainingMode(Callback):
         ecs_threshold: float = 0.3,
         ecs_scale: float = 0.05,
         do_mvc: bool = False,
+        mvc_scale: float = 0.05,
         do_adv_cls: bool = False,
         do_next_tp: bool = False,
         do_generate: bool = False,
@@ -24,6 +25,7 @@ class TrainingMode(Callback):
         weight_decay: float = 0.01,
         fused_adam: bool = True,
         lr_patience: int = 1,
+        do_cls: bool = True,
     ):
         """
         TrainingMode a callback to set the training specific info to the model.
@@ -54,6 +56,8 @@ class TrainingMode(Callback):
         self.fused_adam = fused_adam
         self.lr_patience = lr_patience
         self.optim = optim
+        self.mvc_scale = mvc_scale
+        self.do_cls = do_cls
 
     def on_fit_start(self, trainer, model):
         # do something with all training_step outputs, for example:
@@ -76,3 +80,5 @@ class TrainingMode(Callback):
         model.lr_patience = self.lr_patience
         model.do_generate = self.do_generate
         model.optim = self.optim
+        model.mvc_scale = self.mvc_scale
+        model.do_cls = self.do_cls
