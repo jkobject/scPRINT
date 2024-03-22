@@ -106,8 +106,9 @@ class scPrint(L.LightningModule):
         self.ecs_threshold = 0.3
         self.ecs_scale = 0.05
         self.do_mvc = False
-        self.mvc_scale = 0.4
+        self.mvc_scale = 0.05
         self.do_adv_cls = False
+        self.do_cls = True
         self.do_next_tp = False
         self.do_generate = False
         self.class_scale = 0.1
@@ -651,7 +652,7 @@ class scPrint(L.LightningModule):
                 expression,
                 mask,
                 total_count,
-                do_class=True,
+                do_class=self.do_cls,
             )
             l, tot = self._compute_loss(
                 output,
@@ -677,7 +678,7 @@ class scPrint(L.LightningModule):
                     depth_mult=expression.sum(1),
                     full_depth=total_count,
                     do_mvc=do_mvc,
-                    do_class=True,
+                    do_class=self.do_cls,
                 )
                 l, tot = self._compute_loss(
                     output,
@@ -701,8 +702,8 @@ class scPrint(L.LightningModule):
                 gene_pos,
                 expression,
                 full_depth=total_count,
-                do_mvc=do_mvc,
-                do_class=True,
+                do_mvc=False,
+                do_class=False,
             )
             l, tloss = self._compute_loss(
                 output,
@@ -711,7 +712,7 @@ class scPrint(L.LightningModule):
                 batch_idx,
                 do_ecs,
                 do_adv_cls=do_adv_cls,
-                do_mvc=do_mvc,
+                do_mvc=False,
             )
             losses.update({"pregen_" + k: v for k, v in l.items()})
             total_loss += tloss
@@ -721,7 +722,7 @@ class scPrint(L.LightningModule):
                 gene_pos,
                 full_depth=total_count,
                 depth_mult=expression.sum(1),
-                do_class=True,
+                do_class=self.do_cls,
                 do_mvc=False,
             )
             cell_embs.append(output["cell_emb"].clone())
