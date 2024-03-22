@@ -146,7 +146,7 @@ def make_adata(
                 acc = " (accuracy: {:.2f})".format(accuracy[col.split("conv_")[-1]])
             axs[i // 2, i % 2].set_title(col + " UMAP" + acc)
             if "cell_type" in col:
-                axs[i // 2, i % 2].legend(fontsize='x-small')
+                axs[i // 2, i % 2].legend(fontsize="x-small")
             axs[i // 2, i % 2].set_xlabel("UMAP1")
             axs[i // 2, i % 2].set_ylabel("UMAP2")
     else:
@@ -226,13 +226,13 @@ def _init_weights(
                 )
 
 
-def downsample_profile(mat: Tensor, renoise: float):
+def downsample_profile(mat: Tensor, dropout: float):
     """
     This function downsamples the expression profile of a given single cell RNA matrix.
 
     The noise is applied based on the renoise parameter,
     the total counts of the matrix, and the number of genes. The function first calculates the noise
-    threshold (tnoise) based on the renoise parameter. It then generates an initial matrix count by
+    threshold (scaler) based on the renoise parameter. It then generates an initial matrix count by
     applying a Poisson distribution to a random tensor scaled by the total counts and the number of genes.
     The function then models the sampling zeros by applying a Poisson distribution to a random tensor
     scaled by the noise threshold, the total counts, and the number of genes. The function also models
@@ -244,9 +244,7 @@ def downsample_profile(mat: Tensor, renoise: float):
 
     Args:
         mat (torch.Tensor): The input matrix.
-        renoise (float): The renoise parameter.
-        totcounts (torch.Tensor): The total counts of the matrix.
-        ngenes (int): The number of genes.
+        dropout (float): The renoise parameter.
 
     Returns:
         torch.Tensor: The matrix count after applying noise.
@@ -254,25 +252,32 @@ def downsample_profile(mat: Tensor, renoise: float):
     # Randomly drop on average N counts to each element of expression using a heavy tail Gaussian distribution
     # here we try to get the scale of the distribution so as to remove the right number of counts from each gene
     # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02601-5#:~:text=Zero%20measurements%20in%20scRNA%2Dseq,generation%20of%20scRNA%2Dseq%20data.
-    totcounts = mat.sum(1)
-    batch = mat.shape[0]
-    ngenes = mat.shape[1]
-    tnoise = 1 - (1 - renoise) ** (1 / 2)
-    # we model the sampling zeros (dropping 30% of the reads)
-    res = torch.poisson(
-        torch.rand((batch, ngenes)).to(device=mat.device)
-        * ((tnoise * totcounts.unsqueeze(1)) / (0.5 * ngenes))
-    ).int()
-    # we model the technical zeros (dropping 50% of the genes)
-    drop = (torch.rand((batch, ngenes)) > tnoise).int().to(device=mat.device)
-
-    mat = (mat - res) * drop
-    return torch.maximum(mat, torch.Tensor([[0]]).to(device=mat.device)).int()
+    scaler = (1 - dropout) ** (1 / 2)
+    notdrop = (torch.rand(mat.shape) < scaler).bool()
+    notdrop[mat == 0] = 0
+    return torch.poisson(notdrop * mat * scaler)
 
 
-def masker(
-    length: int,
-    batch_size: int = 1,
+def simple_masker(
+    shape: list[int],
+    mask_ratio: float = 0.15,
+) -> torch.Tensor:
+    """
+    Randomly mask a batch of data.
+
+    Args:
+        values (array-like):
+            A batch of tokenized data, with shape (batch_size, n_features).
+        mask_ratio (float): The ratio of genes to mask, default to 0.15.
+
+    Returns:
+        torch.Tensor: A tensor of masked data.
+    """
+    return torch.rand(shape) > mask_ratio
+
+
+def weighted_masker(
+    shape: list[int],
     mask_ratio: float = 0.15,
     mask_prob: Optional[Union[torch.Tensor, np.ndarray]] = None,  # n_features
     mask_value: int = 1,
@@ -291,10 +296,10 @@ def masker(
         torch.Tensor: A tensor of masked data.
     """
     mask = []
-    for _ in range(batch_size):
-        m = np.zeros(length)
+    for _ in range(shape[0]):
+        m = np.zeros(shape[1])
         loc = np.random.choice(
-            a=length, size=int(length * mask_ratio), replace=False, p=mask_prob
+            a=shape[1], size=int(shape[1] * mask_ratio), replace=False, p=mask_prob
         )
         m[loc] = mask_value
         mask.append(m)

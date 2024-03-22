@@ -33,7 +33,7 @@ from . import decoders
 # from .linear_transformer import FastTransformerEncoderWrapper as FastTransformerEncoder
 from .EGT import EGT
 from . import loss
-from .utils import masker
+from .utils import simple_masker
 from . import utils
 from .loss import grad_reverse
 
@@ -641,7 +641,7 @@ class scPrint(L.LightningModule):
         losses = {}
         cell_embs = []
         for i in mask_ratio:
-            mask = masker(
+            mask = simple_masker(
                 length=gene_pos.shape[1],
                 batch_size=gene_pos.shape[0],
                 mask_ratio=i,
@@ -1084,7 +1084,7 @@ class scPrint(L.LightningModule):
             do_class=True,
         )
         if len(self.get_attention_layer) > 0:
-            qkv = [i[:, :, :2, :].mean(0) for i in output[1]]
+            qkv = [i[:, :, :2, :] for i in output[1]]
             output = output[0]
 
         cell_embs = output["cell_embs"]
@@ -1138,7 +1138,7 @@ class scPrint(L.LightningModule):
                 torch.cat([self.expr_pred[2], output["zero_logits"]]),
             ]
             if len(self.get_attention_layer) > 0:
-                self.mean_attn = [j + qkv[i] for i, j in enumerate(self.mean_attn)]
+                self.mean_attn = [torch.cat((self.mean_attn[i], j), 0) for i,j in enumerate(qkv)]
         self.n_c_batch += 1
 
     def on_predict_epoch_end(self):
@@ -1154,7 +1154,7 @@ class scPrint(L.LightningModule):
         self.pos = self.pos.to(device="cpu", dtype=torch.int32)
         if len(self.get_attention_layer) > 0:
             self.mean_attn = [i / self.n_c_batch for i in self.mean_attn]
-        return self.log_adata()
+        # return self.log_adata()
 
     def get_cell_embs(self, layer_output):
         """
