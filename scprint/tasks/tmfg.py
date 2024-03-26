@@ -49,7 +49,7 @@ def _add_triangular_face(G, new, old_set, C, faces):
     -------
     None
     """
-    if isinstance(new, collections.Sized):
+    if isinstance(new, collections.abc.Sized):
         raise ValueError("New should be a scaler")
 
     if len(old_set) > 3:
@@ -110,6 +110,8 @@ def tmfg(corr, absolute=False, threshold_mean=True):
     faces.add(frozenset([ind[0], ind[1], ind[2]]))
 
     while len(not_in) > 0:
+        print(str(len(not_in)), end="\r")
+
         # to_check = permutations(starters_set, 3)
 
         max_corr = -np.inf

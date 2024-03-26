@@ -7,7 +7,7 @@ from collections import OrderedDict
 
 
 import functools
-import logging
+import bionty as bt
 import os
 import random
 import subprocess
@@ -19,6 +19,8 @@ from matplotlib import pyplot as plt
 from matplotlib import axes
 from IPython import get_ipython
 import urllib.request
+
+
 
 import io
 from biomart import BiomartServer
@@ -171,6 +173,28 @@ def isnotebook() -> bool:
             return False  # Other type (?)
     except NameError:
         return False  # Probably standard Python interpreter
+
+
+def load_genes(organisms: Union[str, list] = "NCBITaxon:9606"):  # "NCBITaxon:10090",
+    organismdf = []
+    if type(organisms) == str:
+        organisms = [organisms]
+    for organism in organisms:
+        genesdf = bt.Gene.filter(
+            organism_id=bt.Organism.filter(ontology_id=organism).first().id
+        ).df()
+        genesdf = genesdf[~genesdf["public_source_id"].isna()]
+        genesdf = genesdf.drop_duplicates(subset="ensembl_gene_id")
+        genesdf = genesdf.set_index("ensembl_gene_id").sort_index()
+        # mitochondrial genes
+        genesdf["mt"] = genesdf.symbol.astype(str).str.startswith("MT-")
+        # ribosomal genes
+        genesdf["ribo"] = genesdf.symbol.astype(str).str.startswith(("RPS", "RPL"))
+        # hemoglobin genes.
+        genesdf["hb"] = genesdf.symbol.astype(str).str.contains(("^HB[^(P)]"))
+        genesdf["organism"] = organism
+        organismdf.append(genesdf)
+    return pd.concat(organismdf)
 
 
 def get_free_gpu():
