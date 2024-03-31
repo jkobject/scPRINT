@@ -94,7 +94,7 @@ data:
   gene_embeddings: ./data/main/gene_embeddings.parquet
   collection_name: preprocessed dataset
   how: random expr
-  max_len: 1200
+  max_len: 2400
   weight_scaler: 10
   do_gene_pos: ./data/main/biomart_pos.parquet
   add_zero_genes: 0
