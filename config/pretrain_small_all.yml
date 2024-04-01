@@ -44,8 +44,7 @@ trainer:
         weight_decay: 0.01
         fused_adam: True
         lr_patience: 1
-        mask_ratio: 
-          - 0.3
+        mask_ratio: []
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
         swa_lrs: 0.01
@@ -92,7 +91,7 @@ data:
     - NCBITaxon:10090
   gene_position_tolerance: 10_000
   gene_embeddings: ./data/main/gene_embeddings.parquet
-  collection_name: preprocessed dataset
+  collection_name: all no zhang13M
   how: random expr
   max_len: 1200
   weight_scaler: 10

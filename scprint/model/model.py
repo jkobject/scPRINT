@@ -111,7 +111,7 @@ class scPrint(L.LightningModule):
         self.do_cls = True
         self.do_next_tp = False
         self.do_generate = False
-        self.class_scale = 0.1
+        self.class_scale = 0.4
         self.mask_ratio = [0.3]
         self.warmup_duration = 500
         self.weight_decay = 0.01

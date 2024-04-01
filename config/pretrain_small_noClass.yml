@@ -38,7 +38,7 @@ trainer:
         do_generate: True
         do_adv_cls: False
         do_next_tp: False
-        do_cls: True
+        do_cls: False
         # class_scale: 500.0
         warmup_duration: 500
         weight_decay: 0.01

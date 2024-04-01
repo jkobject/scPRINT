@@ -1,5 +1,5 @@
 # lightning.pytorch==2.2.0.post0
-seed_everything: 0
+seed_everything: 42
 trainer:
   accelerator: auto
   strategy: auto
@@ -47,23 +47,24 @@ trainer:
       noise:
       - 0.3
       do_cce: true
-      cce_sim: 0.4
+      cce_sim: 0.5
       cce_scale: 0.002
       do_ecs: true
-      ecs_threshold: 0.6
+      ecs_threshold: 0.3
       ecs_scale: 0.05
       do_mvc: false
+      mvc_scale: 0.05
       do_adv_cls: false
       do_next_tp: false
       do_generate: true
-      class_scale: 0.2
+      class_scale: 0.4
       optim: adamW
-      mask_ratio:
-      - 0.3
+      mask_ratio: []
       warmup_duration: 500
       weight_decay: 0.01
       fused_adam: true
       lr_patience: 1
+      do_cls: true
   - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
     init_args:
       swa_lrs: 0.01
@@ -159,7 +160,7 @@ model:
   - self_reported_ethnicity_ontology_term_id
   - sex_ontology_term_id
   cell_emb_style: cls
-  lr: 0.001
+  lr: 0.002
   residual_in_fp32: true
   num_heads_kv: null
   checkpointing: false
@@ -174,15 +175,6 @@ model:
   weight_init: ''
 data:
   collection_name: preprocessed dataset
-  organisms:
-  - NCBITaxon:9606
-  weight_scaler: 10
-  train_oversampling: 2.0
-  validation_split: 0.05
-  test_split: 0.05
-  gene_embeddings: ./data/main/embeddings.parquet
-  use_default_col: true
-  gene_position_tolerance: 10000
   label_to_weight:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -190,6 +182,16 @@ data:
   - self_reported_ethnicity_ontology_term_id
   - sex_ontology_term_id
   - organism_ontology_term_id
+  organisms:
+  - NCBITaxon:9606
+  - NCBITaxon:10090
+  weight_scaler: 10
+  train_oversampling_per_epoch: 1.0
+  validation_split: 0.05
+  test_split: 0.05
+  gene_embeddings: ./data/main/gene_embeddings.parquet
+  use_default_col: true
+  gene_position_tolerance: 10000
   label_to_pred:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -204,10 +206,6 @@ data:
   - self_reported_ethnicity_ontology_term_id
   - sex_ontology_term_id
   - organism_ontology_term_id
-  - heat_diff
-  - total_counts
-  - nnz
-  - dpt_group
   hierarchical_labels:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -217,8 +215,13 @@ data:
   organism_name: organism_ontology_term_id
   max_len: 1200
   add_zero_genes: 0
-  do_gene_pos: ./data/main/biomart.parquet
-  tp_name: heat_diff
+  do_gene_pos: ./data/main/biomart_pos.parquet
+  tp_name: null
+  assays_to_drop:
+  - EFO:0008853
+  - EFO:0010961
+  - EFO:0030007
+  - EFO:0030062
   batch_size: 64
   shuffle: null
   batch_sampler: null

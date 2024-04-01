@@ -5,7 +5,7 @@ from typing import List
 class TrainingMode(Callback):
     def __init__(
         self,
-        do_denoise: bool = True,
+        do_denoise: bool = False,
         noise: List[float] = [0.3],
         do_cce: bool = True,
         cce_sim: float = 0.5,
@@ -18,9 +18,9 @@ class TrainingMode(Callback):
         do_adv_cls: bool = False,
         do_next_tp: bool = False,
         do_generate: bool = False,
-        class_scale: float = 0.2,
+        class_scale: float = 0.4,
         optim: str = "adamW",
-        mask_ratio: List[float] = [0.15, 0.3],
+        mask_ratio: List[float] = [0.3],
         warmup_duration: int = 500,
         weight_decay: float = 0.01,
         fused_adam: bool = True,
