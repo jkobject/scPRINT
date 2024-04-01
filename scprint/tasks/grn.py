@@ -49,7 +49,7 @@ class GRNfer:
         cell_type_col="cell_type",
         model_name: str = "scprint",
         how: str = "random expr",  # random expr, most var withing, most var across, given
-        preprocess="sinkhorn",  # sinkhorn, softmax, none
+        preprocess="softmax",  # sinkhorn, softmax, none
         head_agg="mean",  # mean, sum, none
         cell_agg="mean",  # mean, consensus, none
         filtration="thresh",  # thresh, top-k, mst, known, none
@@ -58,6 +58,7 @@ class GRNfer:
         doplot=False,
         max_cells=64,
         genes: list = [],
+        loc="./",
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -96,6 +97,7 @@ class GRNfer:
         self.doplot = doplot
         self.genes = genes
         self.k = k
+        self.loc = loc
         self.known_grn = known_grn
         self.head_agg = head_agg
         self.max_cells = max_cells
@@ -107,22 +109,37 @@ class GRNfer:
         # Add at least the organism you are working with
         self.curr_genes = None
         self.model.get_attention_layer = layer
-        self.run_predict(cell_type)
+        subadata = self.predict(cell_type)
         adjacencies = self.aggregate(self.model.mean_attn[0])
         if self.head_agg == "none" or self.cell_agg == "none":
-            return [save(filter(subadj), subadata) for subadj in adjacencies]
+            return [
+                save(filter(subadj), subadata, self.loc + str(i))
+                for i, subadj in enumerate(adjacencies)
+            ]
         elif self.cell_agg == "consensus":
-            return save(np.sum([filter(subadj) for subadh in adjacencies]), subadata)
+            return save(
+                np.sum([filter(subadj)[8:, 8:] for subadj in adjacencies]),
+                subadata,
+                self.loc,
+            )
         else:
-            return save(filter(adjacencies), subadata)
+            return save(filter(adjacencies)[8:, 8:], subadata, self.loc)
 
     def predict(self, cell_type):
         if cell_type is not None:
-            subadata = self.adata[
-                self.adata.obs[self.cell_type_col] == cell_type
-            ].copy()[: self.max_cells]
+            subadata = (
+                self.adata[self.adata.obs[self.cell_type_col] == cell_type].copy()[
+                    : self.max_cells
+                ]
+                if self.max_cells
+                else self.adata[self.adata.obs[self.cell_type_col] == cell_type].copy()
+            )
         else:
-            subadata = self.adata.copy()
+            subadata = (
+                self.adata.copy()[: self.max_cells]
+                if self.max_cells
+                else self.adata.copy()
+            )
         if self.how == "most var within":
             sc.pp.highly_variable_genes(
                 subadata, n_top_genes=self.num_genes, flavor="seurat_v3"
@@ -164,6 +181,7 @@ class GRNfer:
             shuffle=False,
         )
         self.trainer.predict(self.model, dataloader)
+        return subadata
 
     def aggregate(self, attn):
         if self.cell_agg == "mean":
@@ -249,7 +267,7 @@ class GRNfer:
             raise ValueError("head_agg must be one of 'mean', 'max' or 'None'")
         return attn
 
-    def filter(self, adj):
+    def filter(self, adj, gt=None):
         if self.filtration == "thresh":
             adj[adj < (1 / adj.shape[-1])] = 0
             adj = scipy.sparse.csr_matrix(adj)
@@ -259,10 +277,18 @@ class GRNfer:
             args = np.argsort(adj)
             adj[args[np.arange(adj.shape[-1])[:, None], : -self.k]] = 0
             adj = scipy.sparse.csr_matrix(adj)
-        elif self.filtration == "known":
-            adj[args[:, : -self.k]] = 0
+            return adj
+        elif self.filtration == "known" and gt is not None:
+            gt = gt.reindex(sorted(gt.columns), axis=1)
+            gt = gt.reindex(sorted(gt.columns), axis=0)
+            gt = gt[gt.index.isin(self.curr_genes)].iloc[
+                :, gt.columns.isin(self.curr_genes)
+            ]
+
+            loc = np.isin(self.curr_genes, gt.index)
+            adj = adj[8:, 8:][loc][:, loc]
+            adj[gt.values != 1] = 0
             adj = scipy.sparse.csr_matrix(adj)
-            pass
         elif self.filtration == "tmfg":
             adj = nx.to_scipy_sparse_array(tmfg(adj[i]))
         elif self.filtration == "mst":
@@ -273,7 +299,7 @@ class GRNfer:
         print(f"avg link count: {res}")
         return adj
 
-    def save(self, grn, subadata):
+    def save(self, grn, subadata, loc="./"):
         grn = GRNAnnData(
             subadata[:, subadata.var.index.isin(self.curr_genes)].copy(),
             grn=grn,
@@ -283,18 +309,24 @@ class GRNfer:
 
         grn.var_names = grn.var["symbol"]
         grn.var["TFs"] = [True if i in utils.TF else False for i in grn.var_names]
-
-        grn.var = grn.var.drop(columns=["stable_id", "created_at", "updated_at"])
+        grn.uns["grn_scprint_params"] = {
+            "filtration": self.filtration,
+            "how": self.how,
+            "cell_agg": self.cell_agg,
+            "preprocess": self.preprocess,
+            "head_agg": self.head_agg,
+        }
+        grn.write_h5ad(loc + "grn_fromscprint.h5ad")
         return grn
 
 
 def get_GTdb(db="omnipath"):
     if db == "omnipath":
-        if not os.path.exists(FILEDIR + "/../../data/omnipath.parquet"):
+        if not os.path.exists(FILEDIR + "/../../data/main/omnipath.parquet"):
             interactions = AllInteractions()
             net = interactions.get(exclude=["small_molecule", "lncrna_mrna"])
             hgnc = Annotations.get(resources="HGNC")
-            rename = {v.uniprot: v.genesymbol for k, v in hgnc.iterrows()}
+            rename = {v.uniprot: v.genesymbol for _, v in hgnc.iterrows()}
             net = net.replace({"source": rename, "target": rename})
             genedf = load_genes()
             rn = {
@@ -308,9 +340,11 @@ def get_GTdb(db="omnipath"):
             for i, j in net.iloc[:, :2].values:
                 da[varnames.index(i), varnames.index(j)] = 1
             net = pd.DataFrame(data=da, index=varnames, columns=varnames)
-            net.to_parquet(FILEDIR + "/../../data/omnipath.parquet")
+            net.to_parquet(FILEDIR + "/../../data/main/omnipath.parquet")
         else:
-            net = pd.read_parquet(FILEDIR + "/../../data/omnipath.parquet")
+            net = pd.read_parquet(FILEDIR + "/../../data/main/omnipath.parquet")
     if db == "scenic+":
-        
+        net = pd.read_parquet(FILEDIR + "/../../data/main/main_scenic+.parquet")
+    if db == "stringdb":
+        net = pd.read_parquet(FILEDIR + "/../../data/main/stringdb_bias.parquet")
     return net
