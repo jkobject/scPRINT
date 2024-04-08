@@ -122,6 +122,9 @@ class scPrint(L.LightningModule):
         self.n_c_batch = 0
         self.get_attention_layer = []
         self.embs = None
+        self.pred_log_adata = True
+        self.predict_depth_mult = 3
+        self.predict_mode = "none"
         # should be stored somehow
         self.d_model = d_model
         self.edge_dim = edge_dim
@@ -643,8 +646,7 @@ class scPrint(L.LightningModule):
         cell_embs = []
         for i in mask_ratio:
             mask = simple_masker(
-                length=gene_pos.shape[1],
-                batch_size=gene_pos.shape[0],
+                shape=gene_pos.shape,
                 mask_ratio=i,
             ).to(gene_pos.device)
             output = self.forward(
@@ -671,7 +673,7 @@ class scPrint(L.LightningModule):
         # TASK 3. denoising
         if do_denoise:
             for i in noise:
-                expr = utils.downsample_profile(expression, renoise=i)
+                expr = utils.downsample_profile(expression, dropout=i)
                 output = self.forward(
                     gene_pos,
                     expr,
@@ -1076,14 +1078,44 @@ class scPrint(L.LightningModule):
         if not self.trainer.is_global_zero:
             print("you are not on the main node. cancelling predict step")
             return
-        output = self.forward(
-            gene_pos,
-            expression,
-            depth_mult=expression.sum(1),
-            full_depth=depth,
-            get_attention_layer=self.get_attention_layer,
-            do_class=True,
-        )
+        if self.predict_mode == "none":
+            output = self.forward(
+                gene_pos,
+                expression,
+                depth_mult=expression.sum(1),
+                full_depth=depth,
+                get_attention_layer=self.get_attention_layer,
+                do_class=True,
+            )
+        elif self.predict_mode == "denoise":
+            output = self.forward(
+                gene_pos,
+                expression,
+                depth_mult=expression.sum(1) * self.predict_depth_mult,
+                full_depth=depth * self.predict_depth_mult,
+                get_attention_layer=self.get_attention_layer,
+                do_class=True,
+            )
+        elif self.predict_mode == "generate":
+            output = self.forward(
+                gene_pos,
+                expression,
+                full_depth=depth,
+                do_mvc=False,
+                do_class=False,
+            )
+            output = self._generate(
+                output["cell_embs"],
+                gene_pos,
+                full_depth=depth,
+                depth_mult=expression.sum(1),
+                do_class=self.do_cls,
+                do_mvc=False,
+            )
+        else:
+            raise ValueError(
+                "predict_mode needs to be one of ['none', 'denoise', 'generate']"
+            )
         if len(self.get_attention_layer) > 0:
             qkv = [i[:, :, :2, :] for i in output[1]]
             output = output[0]
@@ -1139,7 +1171,9 @@ class scPrint(L.LightningModule):
                 torch.cat([self.expr_pred[2], output["zero_logits"]]),
             ]
             if len(self.get_attention_layer) > 0:
-                self.mean_attn = [torch.cat((self.mean_attn[i], j), 0) for i,j in enumerate(qkv)]
+                self.mean_attn = [
+                    torch.cat((self.mean_attn[i], j), 0) for i, j in enumerate(qkv)
+                ]
         self.n_c_batch += 1
 
     def on_predict_epoch_end(self):
@@ -1155,7 +1189,8 @@ class scPrint(L.LightningModule):
         self.pos = self.pos.to(device="cpu", dtype=torch.int32)
         if len(self.get_attention_layer) > 0:
             self.mean_attn = [i / self.n_c_batch for i in self.mean_attn]
-        # return self.log_adata()
+        if self.pred_log_adata:
+            return self.log_adata()
 
     def get_cell_embs(self, layer_output):
         """

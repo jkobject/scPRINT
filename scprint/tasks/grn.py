@@ -14,7 +14,8 @@ from anndata import AnnData
 from scprint.utils.sinkhorn import SinkhornDistance
 from scprint.utils import load_genes
 
-from grnndata import GRNAnnData
+from grnndata import GRNAnnData, from_anndata
+
 import umap
 import hdbscan
 
@@ -55,8 +56,9 @@ class GRNfer:
         filtration="thresh",  # thresh, top-k, mst, known, none
         k=10,
         known_grn=None,
-        doplot=False,
-        max_cells=64,
+        doplot=True,
+        max_cells=0,
+        forward_mode="none",
         genes: list = [],
         loc="./",
     ):
@@ -79,6 +81,8 @@ class GRNfer:
         self.model = model
         self.batch_size = batch_size
         self.num_workers = num_workers
+        if how == "random expr" and cell_agg == "consensus":
+            raise ValueError("cannot have random expr with consensus")
         self.how = how
         assert self.how in [
             "most var within",
@@ -96,6 +100,7 @@ class GRNfer:
         self.cell_agg = cell_agg
         self.doplot = doplot
         self.genes = genes
+        self.forward_mode = forward_mode
         self.k = k
         self.loc = loc
         self.known_grn = known_grn
@@ -108,22 +113,26 @@ class GRNfer:
     def __call__(self, layer, cell_type=None):
         # Add at least the organism you are working with
         self.curr_genes = None
-        self.model.get_attention_layer = layer
+        self.model.pred_log_adata = False
+        self.model.get_attention_layer = layer if type(layer) is list else [layer]
         subadata = self.predict(cell_type)
         adjacencies = self.aggregate(self.model.mean_attn[0])
         if self.head_agg == "none" or self.cell_agg == "none":
             return [
-                save(filter(subadj), subadata, self.loc + str(i))
+                self.save(self.filter(subadj), subadata, self.loc + str(i))
                 for i, subadj in enumerate(adjacencies)
             ]
         elif self.cell_agg == "consensus":
-            return save(
-                np.sum([filter(subadj)[8:, 8:] for subadj in adjacencies]),
+            return self.save(
+                np.sum(
+                    np.array([self.filter(subadj)[8:, 8:] for subadj in adjacencies]),
+                    axis=0,
+                ),
                 subadata,
                 self.loc,
             )
         else:
-            return save(filter(adjacencies)[8:, 8:], subadata, self.loc)
+            return self.save(self.filter(adjacencies)[8:, 8:], subadata, self.loc)
 
     def predict(self, cell_type):
         if cell_type is not None:
@@ -157,6 +166,7 @@ class GRNfer:
                 : self.num_genes
             ].tolist()
         elif self.how == "random expr":
+            self.curr_genes = self.model.genes
             # raise ValueError("cannot do it yet")
             pass
         elif self.how == "given" and len(self.genes) > 0:
@@ -180,6 +190,7 @@ class GRNfer:
             num_workers=self.num_workers,
             shuffle=False,
         )
+        self.model.predict_mode = self.forward_mode
         self.trainer.predict(self.model, dataloader)
         return subadata
 
@@ -204,26 +215,27 @@ class GRNfer:
                 attn = attn / div
                 goodloc = div.sum((1, 2, 3)) > 0
                 attn = attn[goodloc]
-                self.curr_genes = np.array(self.model.genes)[goodloc[8:]]
+                self.curr_genes = np.array(self.curr_genes)[goodloc[8:]]
             else:
                 attn = self.model.mean_attn[0].mean(0)
+                self.curr_genes = [i for i in self.curr_genes if i in self.model.genes]
             if self.doplot:
                 sns.set(
                     style="white", context="poster", rc={"figure.figsize": (14, 10)}
                 )
                 fit = umap.UMAP()
-                mm = fit.fit_transform(attn[:, 0, 0, :])
+                mm = fit.fit_transform(attn[:, 0, 0, :].detach().cpu().numpy())
                 labels = hdbscan.HDBSCAN(
                     min_samples=10,
-                    min_cluster_size=500,
+                    min_cluster_size=100,
                 ).fit_predict(mm)
                 plt.scatter(mm[:, 0], mm[:, 1], c=labels)
                 plt.title(f"Qs @H{0}")
                 plt.show()
-                mm = fit.fit_transform(attn[:, 1, 0, :])
+                mm = fit.fit_transform(attn[:, 1, 0, :].detach().cpu().numpy())
                 labels = hdbscan.HDBSCAN(
                     min_samples=10,
-                    min_cluster_size=500,
+                    min_cluster_size=100,
                 ).fit_predict(mm)
                 plt.scatter(mm[:, 0], mm[:, 1], c=labels)
                 plt.title(f"Ks @H{0}")
@@ -234,6 +246,7 @@ class GRNfer:
             attn = attn[:, :, 0, :, :].permute(2, 0, 1, 3) @ attn[
                 :, :, 1, :, :
             ].permute(2, 0, 3, 1)
+            self.curr_genes = [i for i in self.curr_genes if i in self.model.genes]
         else:
             raise ValueError("cell_agg must be one of 'mean', 'consensus' or 'none'")
         # return attn
@@ -253,8 +266,15 @@ class GRNfer:
             raise ValueError("preprocess must be one of 'sinkhorn', 'softmax', 'none'")
 
         if self.head_agg == "mean":
+            if len(attn.shape) == 4:
+                attn = attn.mean(0)
             attn = attn.mean(0).detach().cpu().numpy()
         elif self.head_agg == "max":
+            if len(attn.shape) == 4:
+                attn = attn.mean(0)
+            import pdb
+
+            pdb.set_trace()
             attn = attn.max(0)[0].detach().cpu().numpy()
         elif self.head_agg == "none":
             attn = attn.detach().cpu().numpy()
@@ -270,14 +290,15 @@ class GRNfer:
     def filter(self, adj, gt=None):
         if self.filtration == "thresh":
             adj[adj < (1 / adj.shape[-1])] = 0
-            adj = scipy.sparse.csr_matrix(adj)
+            # res = (adj != 0).sum()
+            # if res / adj.shape[0] ** 2 < 0.01:
+            #   adj = scipy.sparse.csr_matrix(adj)
         elif self.filtration == "none":
             pass
         elif self.filtration == "top-k":
             args = np.argsort(adj)
-            adj[args[np.arange(adj.shape[-1])[:, None], : -self.k]] = 0
+            adj[np.arange(adj.shape[0])[:, None], args[:, : -self.k]] = 0
             adj = scipy.sparse.csr_matrix(adj)
-            return adj
         elif self.filtration == "known" and gt is not None:
             gt = gt.reindex(sorted(gt.columns), axis=1)
             gt = gt.reindex(sorted(gt.columns), axis=0)
@@ -286,26 +307,27 @@ class GRNfer:
             ]
 
             loc = np.isin(self.curr_genes, gt.index)
+            self.curr_genes = np.array(self.curr_genes)[loc]
             adj = adj[8:, 8:][loc][:, loc]
             adj[gt.values != 1] = 0
             adj = scipy.sparse.csr_matrix(adj)
         elif self.filtration == "tmfg":
-            adj = nx.to_scipy_sparse_array(tmfg(adj[i]))
+            adj = nx.to_scipy_sparse_array(tmfg(adj))
         elif self.filtration == "mst":
             pass
         else:
             raise ValueError("filtration must be one of 'thresh', 'none' or 'top-k'")
         res = (adj != 0).sum() if self.filtration != "none" else adj.shape[0] ** 2
-        print(f"avg link count: {res}")
+        print(f"avg link count: {res}, sparsity: {res / adj.shape[0] ** 2}")
         return adj
 
     def save(self, grn, subadata, loc="./"):
+        res = (grn != 0).sum() if self.filtration != "none" else grn.shape[0] ** 2
         grn = GRNAnnData(
             subadata[:, subadata.var.index.isin(self.curr_genes)].copy(),
             grn=grn,
         )
-        top_central_genes = utils.get_centrality(grn)
-        grn.var.loc[[i[0] for i in top_central_genes], "symbol"]
+        grn = grn[:, (grn.X != 0).sum(0) > (self.max_cells / 20)]
 
         grn.var_names = grn.var["symbol"]
         grn.var["TFs"] = [True if i in utils.TF else False for i in grn.var_names]
@@ -317,7 +339,7 @@ class GRNfer:
             "head_agg": self.head_agg,
         }
         grn.write_h5ad(loc + "grn_fromscprint.h5ad")
-        return grn
+        return from_anndata(grn)
 
 
 def get_GTdb(db="omnipath"):

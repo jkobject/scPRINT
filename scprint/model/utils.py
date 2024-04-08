@@ -253,8 +253,15 @@ def downsample_profile(mat: Tensor, dropout: float):
     # here we try to get the scale of the distribution so as to remove the right number of counts from each gene
     # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02601-5#:~:text=Zero%20measurements%20in%20scRNA%2Dseq,generation%20of%20scRNA%2Dseq%20data.
     scaler = (1 - dropout) ** (1 / 2)
-    notdrop = (torch.rand(mat.shape) < scaler).bool()
+    notdrop = (
+        torch.rand(
+            mat.shape,
+            device=mat.device,
+        )
+        < scaler
+    ).bool()
     notdrop[mat == 0] = 0
+    # apply the dropout after the poisson, right?
     return torch.poisson(notdrop * mat * scaler)
 
 
