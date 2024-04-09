@@ -1,12 +1,12 @@
 project: scprint_scale
-seed_everything: 42
+# seed_everything: 42
 ckpt_path: null
 set_float32_matmul_precision: True
 wandblog: all
 log_freq: 200
 log_graph: True
 trainer:
-  precision: 16-mixed
+  precision: 16
   # profiler: simple
   gradient_clip_val: 10
   #strategy: ddp
@@ -43,7 +43,7 @@ trainer:
         warmup_duration: 500
         weight_decay: 0.01
         fused_adam: True
-        lr_patience: 1
+        lr_patience: 2
         mask_ratio: 
           - 0.3
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
@@ -56,7 +56,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.EarlyStopping
       init_args:
         monitor: val_loss
-        patience: 10
+        patience: 3
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: epoch
@@ -67,6 +67,7 @@ trainer:
   #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
   #    requeue_signal: signal.SIGHUP
 model:
+  lr: 0.002
   nhead: 4
   nlayers: 4
   layers_cls: [128]

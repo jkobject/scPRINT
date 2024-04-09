@@ -39,6 +39,7 @@ trainer:
       sync_tensorboard: null
       monitor_gym: null
       save_code: null
+      fork_from: null
       settings: null
   callbacks:
   - class_path: scprint.trainer.TrainingMode
@@ -48,26 +49,30 @@ trainer:
       - 0.3
       do_cce: true
       cce_sim: 0.5
-      cce_scale: 0.002
+      cce_scale: 0.02
       do_ecs: true
       ecs_threshold: 0.3
-      ecs_scale: 0.05
+      ecs_scale: 0.1
       do_mvc: false
-      mvc_scale: 0.05
+      mvc_scale: 0.2
       do_adv_cls: false
+      adv_class_scale: 0.005
       do_next_tp: false
-      do_generate: true
+      do_generate: false
       class_scale: 0.4
-      optim: adamW
+      optim: adam
       mask_ratio: []
       warmup_duration: 500
       weight_decay: 0.01
       fused_adam: true
-      lr_patience: 1
+      lr_reduce_patience: 2
+      lr_reduce_factor: 0.66
       do_cls: true
+      do_adv_batch: true
+      run_full_forward: false
   - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
     init_args:
-      swa_lrs: 0.01
+      swa_lrs: 0.05
       swa_epoch_start: 0.8
       annealing_epochs: 10
       annealing_strategy: cos
@@ -93,7 +98,7 @@ trainer:
     init_args:
       monitor: val_loss
       min_delta: 0.0
-      patience: 10
+      patience: 3
       verbose: false
       mode: min
       strict: true
@@ -112,9 +117,9 @@ trainer:
   min_epochs: null
   max_steps: -1
   min_steps: null
-  max_time: '{''hours'': 4}'
+  max_time: '{''hours'': 48}'
   limit_train_batches: 5000
-  limit_val_batches: 1000
+  limit_val_batches: 2000
   limit_test_batches: null
   limit_predict_batches: null
   overfit_batches: 0.0
@@ -140,14 +145,14 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   default_root_dir: null
 model:
-  d_model: 128
+  d_model: 256
   nhead: 4
   d_hid: 512
   edge_dim: 12
-  nlayers: 4
+  nlayers: 6
   expr_encoder_layers: 2
   layers_cls:
-  - 128
+  - 256
   dropout: 0.1
   transformer: flash
   expr_emb_style: continuous
@@ -174,7 +179,7 @@ model:
   drop_path_rate: 0.02
   weight_init: ''
 data:
-  collection_name: preprocessed dataset
+  collection_name: all no zhang13M
   label_to_weight:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -186,7 +191,7 @@ data:
   - NCBITaxon:9606
   - NCBITaxon:10090
   weight_scaler: 10
-  train_oversampling_per_epoch: 1.0
+  train_oversampling_per_epoch: 0.05
   validation_split: 0.05
   test_split: 0.05
   gene_embeddings: ./data/main/gene_embeddings.parquet
@@ -213,7 +218,7 @@ data:
   - self_reported_ethnicity_ontology_term_id
   how: random expr
   organism_name: organism_ontology_term_id
-  max_len: 1200
+  max_len: 2200
   add_zero_genes: 0
   do_gene_pos: ./data/main/biomart_pos.parquet
   tp_name: null

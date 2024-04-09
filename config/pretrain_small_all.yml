@@ -16,7 +16,7 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 1
   max_time:
-    hours: 4
+    hours: 12
   logger:
     - class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
@@ -43,7 +43,7 @@ trainer:
         warmup_duration: 500
         weight_decay: 0.01
         fused_adam: True
-        lr_patience: 1
+        lr_patience: 2
         mask_ratio: []
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
@@ -55,7 +55,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.EarlyStopping
       init_args:
         monitor: val_loss
-        patience: 10
+        patience: 3
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: epoch
@@ -66,6 +66,7 @@ trainer:
   #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
   #    requeue_signal: signal.SIGHUP
 model:
+  lr: 0.002
   nhead: 4
   nlayers: 4
   layers_cls: [128]
@@ -97,7 +98,7 @@ data:
   weight_scaler: 10
   do_gene_pos: ./data/main/biomart_pos.parquet
   add_zero_genes: 0
-  train_oversampling_per_epoch: 1
+  train_oversampling_per_epoch: 0.1
   validation_split: 0.05
   test_split: 0.05
   batch_size: 64

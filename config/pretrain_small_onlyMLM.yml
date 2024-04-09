@@ -16,35 +16,35 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 1
   max_time:
-    hours: 4
+    hours: 12
   logger:
     - class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
         project: ${project}
         save_dir: ./data/logs/
+        offline: True
   callbacks:
     - class_path: scprint.trainer.TrainingMode
       init_args:
         do_denoise: False
         noise: []
-        do_cce: True
+        do_cce: False
         # cce_sim: 0.4
-        do_ecs: True
+        do_ecs: False
         # ecs_threshold: 0.6
         # ecs_scale: 10.0
         do_mvc: False
         mvc_scale: 0.05
-        do_generate: True
+        do_generate: False
         do_adv_cls: False
         do_next_tp: False
-        do_cls: True
+        do_cls: False
         # class_scale: 500.0
         warmup_duration: 500
         weight_decay: 0.01
         fused_adam: True
         lr_patience: 1
-        mask_ratio: 
-          - 0.3
+        mask_ratio: [0.3]
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
         swa_lrs: 0.01
@@ -66,13 +66,14 @@ trainer:
   #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
   #    requeue_signal: signal.SIGHUP
 model:
+  lr: 0.001
   nhead: 4
-  nlayers: 4
+  nlayers: 6
   layers_cls: [128]
   dropout: 0.1
   transformer: flash
   mvc_decoder: inner product
-  d_model: 128
+  d_model: 256
   residual_in_fp32: True
   num_heads_kv: null
   fused_dropout_add_ln: False

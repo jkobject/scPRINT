@@ -8,7 +8,6 @@ from scdataloader import DataModule
 from lightning.pytorch.cli import SaveConfigCallback
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch import LightningModule, Trainer
-
 from lightning.pytorch.cli import ArgsType
 
 
@@ -27,9 +26,8 @@ class MySaveConfig(SaveConfigCallback):
                     log_graph=self.config.get("wandblog_graph", False),
                 )
                 # trainer.logger.log_hyperparams({'datamodule':trainer.datamodule})
-                print(trainer.datamodule)
-            else:
-                print(trainer.datamodule)
+            print(trainer.datamodule)
+            print(trainer.callbacks)
         return super().setup(trainer, pl_module, stage)
 
 

@@ -9,23 +9,27 @@ class TrainingMode(Callback):
         noise: List[float] = [0.3],
         do_cce: bool = True,
         cce_sim: float = 0.5,
-        cce_scale: float = 0.002,
+        cce_scale: float = 0.02,
         do_ecs: bool = True,
         ecs_threshold: float = 0.3,
-        ecs_scale: float = 0.05,
+        ecs_scale: float = 0.1,
         do_mvc: bool = False,
-        mvc_scale: float = 0.05,
+        mvc_scale: float = 0.2,
         do_adv_cls: bool = False,
+        adv_class_scale: float = 0.005,
         do_next_tp: bool = False,
         do_generate: bool = False,
         class_scale: float = 0.4,
-        optim: str = "adamW",
+        optim: str = "adam",
         mask_ratio: List[float] = [0.3],
         warmup_duration: int = 500,
         weight_decay: float = 0.01,
         fused_adam: bool = True,
-        lr_patience: int = 1,
+        lr_reduce_patience: int = 1,
+        lr_reduce_factor: float = .6,
         do_cls: bool = True,
+        do_adv_batch: bool = False,
+        run_full_forward: bool = False,
     ):
         """
         TrainingMode a callback to set the training specific info to the model.
@@ -47,6 +51,7 @@ class TrainingMode(Callback):
         self.ecs_scale = ecs_scale
         self.do_mvc = do_mvc
         self.do_adv_cls = do_adv_cls
+        self.adv_class_scale = adv_class_scale
         self.do_next_tp = do_next_tp
         self.do_generate = do_generate
         self.class_scale = class_scale
@@ -54,11 +59,43 @@ class TrainingMode(Callback):
         self.warmup_duration = warmup_duration
         self.weight_decay = weight_decay
         self.fused_adam = fused_adam
-        self.lr_patience = lr_patience
+        self.lr_reduce_patience = lr_reduce_patience
+        self.lr_reduce_factor = lr_reduce_factor
         self.optim = optim
         self.mvc_scale = mvc_scale
         self.do_cls = do_cls
+        self.do_adv_batch = do_adv_batch
+        self.run_full_forward = run_full_forward
 
+    def __repr__(self):
+        return (
+            f"TrainingMode("
+            f"do_denoise={self.do_denoise}, "
+            f"noise={self.noise}, "
+            f"do_cce={self.do_cce}, "
+            f"cce_sim={self.cce_sim}, "
+            f"cce_scale={self.cce_scale}, "
+            f"do_ecs={self.do_ecs}, "
+            f"ecs_threshold={self.ecs_threshold}, "
+            f"ecs_scale={self.ecs_scale}, "
+            f"do_mvc={self.do_mvc}, "
+            f"do_adv_cls={self.do_adv_cls}, "
+            f"adv_class_scale={self.adv_class_scale}, "
+            f"do_next_tp={self.do_next_tp}, "
+            f"do_generate={self.do_generate}, "
+            f"class_scale={self.class_scale}, "
+            f"mask_ratio={self.mask_ratio}, "
+            f"warmup_duration={self.warmup_duration}, "
+            f"weight_decay={self.weight_decay}, "
+            f"fused_adam={self.fused_adam}, "
+            f"lr_reduce_patience={self.lr_reduce_patience}, "
+            f"lr_reduce_factor={self.lr_reduce_factor}, "
+            f"optim={self.optim}, "
+            f"mvc_scale={self.mvc_scale}, "
+            f"do_cls={self.do_cls}, "
+            f"do_adv_batch={self.do_adv_batch}, "
+            f"run_full_forward={self.run_full_forward})"
+        )
     def on_fit_start(self, trainer, model):
         # do something with all training_step outputs, for example:
         model.do_denoise = self.do_denoise
@@ -71,14 +108,20 @@ class TrainingMode(Callback):
         model.ecs_scale = self.ecs_scale
         model.do_mvc = self.do_mvc
         model.do_adv_cls = self.do_adv_cls
+        model.adv_class_scale = self.adv_class_scale
         model.do_next_tp = self.do_next_tp
         model.class_scale = self.class_scale
         model.mask_ratio = self.mask_ratio
         model.warmup_duration = self.warmup_duration
         model.weight_decay = self.weight_decay
         model.fused_adam = self.fused_adam
-        model.lr_patience = self.lr_patience
+        model.lr_reduce_patience = self.lr_reduce_patience
+        model.lr_reduce_factor = self.lr_reduce_factor
         model.do_generate = self.do_generate
         model.optim = self.optim
         model.mvc_scale = self.mvc_scale
         model.do_cls = self.do_cls
+        model.do_adv_batch = self.do_adv_batch
+        model.run_full_forward = self.run_full_forward
+
+    
