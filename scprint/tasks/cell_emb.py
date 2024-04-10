@@ -41,6 +41,7 @@ class Embedder:
         model_name: str = "scprint",
         output_expression: str = "sample",  # one of "all" "sample" "none"
         plot_corr_size: int = 64,
+        doplot: bool = True,
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -70,6 +71,7 @@ class Embedder:
         self.output_expression = output_expression
         self.plot_corr_size = plot_corr_size
         self.precision = precision
+        self.doplot = doplot
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
@@ -137,6 +139,7 @@ class Embedder:
         pred_adata.obs.index = adata.obs.index
         adata.obs = pd.concat([adata.obs, pred_adata.obs], axis=1)
         print("metrics for this dataset of size:", adata.shape[0])
+        metrics = {}
         for label in self.model.labels:
             res = []
             if label not in adata.obs.columns:
@@ -177,9 +180,11 @@ class Embedder:
                 elif true != "unknown":
                     res.append(False)
                 # else we pass
-            print("    ", label)
-            print("     accuracy:", sum(res) / len(res))
-            print(" ")
+            if self.doplot:
+                print("    ", label)
+                print("     accuracy:", sum(res) / len(res))
+                print(" ")
+                metrics.update({label + "_accuracy": sum(res) / len(res)})
 
         # Compute correlation coefficient
         if self.plot_corr_size > 0:
@@ -225,12 +230,14 @@ class Embedder:
                     ["avg_expr", "avg_expr_wexpr"]
                 ].values
                 out = np.hstack([out.T, mean_expr])
+                add = 2
             except:
                 print(
                     "cannot read the mean expr file under scprint/data/avg_expr.parquet"
                 )
                 out = out.T
                 mean_expr = None
+                add = 0
 
             corr_coef, p_value = spearmanr(
                 out,
@@ -242,13 +249,34 @@ class Embedder:
             # compare a1-b1 corr with a1-b(n) corr. should be higher
 
             # Plot correlation coefficient
-            plt.figure(figsize=(10, 5))
-            plt.imshow(
-                corr_coef, cmap="coolwarm", interpolation="none", vmin=-1, vmax=1
+            metrics.update(
+                {
+                    "recons_corr": np.mean(
+                        corr_coef[
+                            self.plot_corr_size + add :, : self.plot_corr_size
+                        ].diagonal()
+                    )
+                }
             )
-            plt.colorbar()
-            plt.title('Correlation Coefficient of expr and i["x"]')
-            plt.show()
+            if add == 2:
+                metrics.update(
+                    {
+                        "mean_regress": np.mean(
+                            corr_coef[
+                                self.plot_corr_size : self.plot_corr_size + 2,
+                                : self.plot_corr_size,
+                            ].flatten()
+                        )
+                    }
+                )
+            if self.doplot:
+                plt.figure(figsize=(10, 5))
+                plt.imshow(
+                    corr_coef, cmap="coolwarm", interpolation="none", vmin=-1, vmax=1
+                )
+                plt.colorbar()
+                plt.title('Correlation Coefficient of expr and i["x"]')
+                plt.show()
             expr = np.array(res[0])
             expr[
                 np.random.binomial(
@@ -266,11 +294,12 @@ class Embedder:
             # compare a1-b1 corr with a1-b(n) corr. should be higher
 
             # Plot correlation coefficient
-            plt.figure(figsize=(10, 5))
-            plt.imshow(
-                corr_coef, cmap="coolwarm", interpolation="none", vmin=-1, vmax=1
-            )
-            plt.colorbar()
-            plt.title('Correlation Coefficient of expr and i["x"]')
-            plt.show()
-        return adata
+            if self.doplot:
+                plt.figure(figsize=(10, 5))
+                plt.imshow(
+                    corr_coef, cmap="coolwarm", interpolation="none", vmin=-1, vmax=1
+                )
+                plt.colorbar()
+                plt.title('Correlation Coefficient of expr and i["x"]')
+                plt.show()
+        return adata, metrics
