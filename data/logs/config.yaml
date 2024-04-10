@@ -54,25 +54,26 @@ trainer:
       ecs_threshold: 0.3
       ecs_scale: 0.1
       do_mvc: false
-      mvc_scale: 0.2
+      mvc_scale: 0.05
       do_adv_cls: false
       adv_class_scale: 0.005
       do_next_tp: false
-      do_generate: false
+      do_generate: true
       class_scale: 0.4
       optim: adam
-      mask_ratio: []
+      mask_ratio:
+      - 0.3
       warmup_duration: 500
       weight_decay: 0.01
       fused_adam: true
       lr_reduce_patience: 2
       lr_reduce_factor: 0.66
       do_cls: true
-      do_adv_batch: true
+      do_adv_batch: false
       run_full_forward: false
   - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
     init_args:
-      swa_lrs: 0.05
+      swa_lrs: 0.01
       swa_epoch_start: 0.8
       annealing_epochs: 10
       annealing_strategy: cos
@@ -119,7 +120,7 @@ trainer:
   min_steps: null
   max_time: '{''hours'': 48}'
   limit_train_batches: 5000
-  limit_val_batches: 2000
+  limit_val_batches: 1000
   limit_test_batches: null
   limit_predict_batches: null
   overfit_batches: 0.0
@@ -145,14 +146,14 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   default_root_dir: null
 model:
-  d_model: 256
+  d_model: 128
   nhead: 4
   d_hid: 512
   edge_dim: 12
-  nlayers: 6
+  nlayers: 4
   expr_encoder_layers: 2
   layers_cls:
-  - 256
+  - 128
   dropout: 0.1
   transformer: flash
   expr_emb_style: continuous
@@ -179,7 +180,7 @@ model:
   drop_path_rate: 0.02
   weight_init: ''
 data:
-  collection_name: all no zhang13M
+  collection_name: preprocessed dataset
   label_to_weight:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
@@ -191,7 +192,7 @@ data:
   - NCBITaxon:9606
   - NCBITaxon:10090
   weight_scaler: 10
-  train_oversampling_per_epoch: 0.05
+  train_oversampling_per_epoch: 1.0
   validation_split: 0.05
   test_split: 0.05
   gene_embeddings: ./data/main/gene_embeddings.parquet
@@ -218,7 +219,7 @@ data:
   - self_reported_ethnicity_ontology_term_id
   how: random expr
   organism_name: organism_ontology_term_id
-  max_len: 2200
+  max_len: 2400
   add_zero_genes: 0
   do_gene_pos: ./data/main/biomart_pos.parquet
   tp_name: null

@@ -254,6 +254,23 @@ def downsample_profile(mat: Tensor, dropout: float, jules=False):
     # Randomly drop on average N counts to each element of expression using a heavy tail Gaussian distribution
     # here we try to get the scale of the distribution so as to remove the right number of counts from each gene
     # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02601-5#:~:text=Zero%20measurements%20in%20scRNA%2Dseq,generation%20of%20scRNA%2Dseq%20data.
+    if True:
+        # Note: effectively, this is mostly doing dropout to 0! the torch.poisson is
+        # almost always 0, so we just do the dropout
+        totcounts = mat.sum(1)
+        batch = mat.shape[0]
+        ngenes = mat.shape[1]
+        tnoise = 1 - (1 - dropout) ** (1 / 2)
+        # we model the sampling zeros (dropping 30% of the reads)
+        res = torch.poisson(
+            torch.rand((batch, ngenes)).to(device=mat.device)
+            * ((tnoise * totcounts.unsqueeze(1)) / (0.5 * ngenes))
+        ).int()
+        # we model the technical zeros (dropping 50% of the genes)
+        drop = (torch.rand((batch, ngenes)) > tnoise).int().to(device=mat.device)
+
+        mat = (mat - res) * drop
+        return torch.maximum(mat, torch.Tensor([[0]]).to(device=mat.device)).int()
     if jules:
         scaler = (1 - dropout) ** (1 / 2)
         notdrop = (
@@ -294,7 +311,7 @@ def simple_masker(
     Returns:
         torch.Tensor: A tensor of masked data.
     """
-    return torch.rand(shape) > mask_ratio
+    return torch.rand(shape) < mask_ratio
 
 
 def weighted_masker(

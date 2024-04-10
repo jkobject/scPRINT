@@ -16,12 +16,13 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 1
   max_time:
-    hours: 4
+    hours: 48
   logger:
     - class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
         project: ${project}
         save_dir: ./data/logs/
+        offline: True
   callbacks:
     - class_path: scprint.trainer.TrainingMode
       init_args:
@@ -43,8 +44,9 @@ trainer:
         warmup_duration: 500
         weight_decay: 0.01
         fused_adam: True
-        lr_patience: 1
-        mask_ratio: 
+        lr_reduce_factor: .66
+        lr_reduce_patience: 2
+        mask_ratio:
           - 0.3
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
@@ -56,7 +58,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.EarlyStopping
       init_args:
         monitor: val_loss
-        patience: 10
+        patience: 3
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: epoch
@@ -67,6 +69,7 @@ trainer:
   #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
   #    requeue_signal: signal.SIGHUP
 model:
+  lr: 0.002
   nhead: 4
   nlayers: 4
   layers_cls: [128]

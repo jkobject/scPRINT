@@ -644,15 +644,13 @@ class scPrint(L.LightningModule):
         cell_embs = []
         for i in mask_ratio:
             mask = simple_masker(
-                length=gene_pos.shape[1],
-                batch_size=gene_pos.shape[0],
+                shape=gene_pos.shape,
                 mask_ratio=i,
             ).to(gene_pos.device)
             output = self.forward(
                 gene_pos,
                 expression,
                 mask=mask,
-                depth_mult=expression.sum(1),
                 full_depth=total_count,
                 do_mvc=do_mvc,
                 do_class=do_cls,
@@ -663,7 +661,7 @@ class scPrint(L.LightningModule):
                 clss,
                 batch_idx,
                 do_ecs,
-                do_adv_cls,
+                do_adv_cls & do_cls,
                 do_adv_batch & do_cls,
             )
             # we only want to do them once
@@ -694,7 +692,7 @@ class scPrint(L.LightningModule):
                     clss,
                     batch_idx,
                     do_ecs,
-                    do_adv_cls,
+                    do_adv_cls & do_cls,
                     do_adv_batch & do_cls,
                 )
                 cell_embs.append(output["cell_emb"].clone())
@@ -714,7 +712,6 @@ class scPrint(L.LightningModule):
                     gene_pos,
                     expression,
                     mask=None,
-                    depth_mult=expression.sum(1),
                     full_depth=total_count,
                     do_class=do_cls,
                     do_mvc=do_mvc,
@@ -736,7 +733,7 @@ class scPrint(L.LightningModule):
                 clss,
                 batch_idx,
                 do_ecs,
-                do_adv_cls=do_adv_cls,
+                do_adv_cls=do_adv_cls & do_cls,
                 do_adv_batch=do_adv_batch & do_cls,
             )
             losses.update({"gen_" + k: v for k, v in l.items()})
