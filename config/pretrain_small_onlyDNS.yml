@@ -38,6 +38,8 @@ trainer:
         do_generate: True
         do_adv_cls: False
         do_next_tp: False
+        do_adv_batch: True
+        run_full_forward: True
         do_cls: True
         # class_scale: 500.0
         warmup_duration: 500

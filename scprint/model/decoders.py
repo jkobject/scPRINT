@@ -51,7 +51,7 @@ class ExprDecoder(nn.Module):
             nn.LeakyReLU(),
             nn.Dropout(dropout),
             nn.Linear(d_model, d_model),
-            nn.LayerNorm(d_model),
+            # nn.LayerNorm(d_model),
             nn.LeakyReLU(),
         )
         self.pred_var_zero = nn.Linear(d_model, 3)

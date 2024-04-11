@@ -216,7 +216,7 @@ class scPrint(L.LightningModule):
         # always have [base_cell_emb, time_embedding, depth_embedding] + any other class info
         # base cell embedding will store other cell specific information
         self.label_encoder = encoders.CategoryValueEncoder(
-            self.cell_embs_count-1 , d_model
+            self.cell_embs_count, d_model
         )
         # self.time_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
         self.depth_encoder = encoders.ContinuousValueEncoder(
@@ -350,7 +350,7 @@ class scPrint(L.LightningModule):
             enc += self.pos_encoder(gene_pos)
         cell_embs = (
             self.label_encoder(
-                torch.Tensor([list(range(self.cell_embs_count-1))] * gene_pos.shape[0])
+                torch.Tensor([list(range(self.cell_embs_count))] * gene_pos.shape[0])
                 .int()
                 .to(gene_pos.device)
             )
@@ -360,9 +360,12 @@ class scPrint(L.LightningModule):
         if timepoint is not None:
             pass
             # cell_embs[:, 2, :] = self.time_encoder(timepoint)
-        if full_depth is not None:            
-            depth_encoded = self.depth_encoder(torch.log2(1 + full_depth)).unsqueeze(1)
-            cell_embs = torch.cat((cell_embs[:, :1, :], depth_encoded, cell_embs[:, 1:, :]), dim=1)
+        if full_depth is not None:
+            cell_embs = cell_embs.clone()
+            cell_embs[:, 1, :] += self.depth_encoder(torch.log2(1 + full_depth))
+            # cell_embs = torch.cat(
+            #    (cell_embs[:, :1, :], depth_encoded, cell_embs[:, 1:, :]), dim=1
+            # )
 
         enc = torch.cat([cell_embs, enc], dim=1)
         return enc  # self.norm_and_dropout(enc) # we already apply prenorm & dropout  # (minibatch, seq_len, embsize)
@@ -506,6 +509,16 @@ class scPrint(L.LightningModule):
                 amsgrad=False,
                 fused=self.fused_adam,
             )
+        elif self.optim == "adamW":
+            optimizer = optim.AdamW(
+                self.parameters(),
+                lr=self.hparams.lr,
+                betas=(0.9, 0.999),
+                eps=1e-08,
+                weight_decay=self.weight_decay,
+                amsgrad=False,
+                fused=self.fused_adam,
+            )
         elif self.optim == "galore":
             param_groups = [
                 {
@@ -527,7 +540,11 @@ class scPrint(L.LightningModule):
         else:
             raise ValueError(f"Unknown optimizer: {self.optim}")
         lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", patience=self.lr_reduce_patience, factor=self.lr_reduce_factor, verbose=True
+            optimizer,
+            mode="min",
+            patience=self.lr_reduce_patience,
+            factor=self.lr_reduce_factor,
+            verbose=True,
         )
         lr_dict = {
             "scheduler": lr_scheduler,
@@ -705,8 +722,8 @@ class scPrint(L.LightningModule):
                 )
                 # make sure that the cell embedding stay the same even if the expression is decreased
                 # we only want to do them once
-                do_mvc = False if do_mvc else do_mvc
-                do_cls = False if do_cls else do_cls
+                # do_mvc = False if do_mvc else do_mvc
+                # do_cls = False if do_cls else do_cls
 
         # TASK 6. expression generation
         if do_generate:
@@ -719,8 +736,19 @@ class scPrint(L.LightningModule):
                     do_class=do_cls,
                     do_mvc=do_mvc,
                 )
-                do_mvc = False if do_mvc else do_mvc
-                do_cls = False if do_cls else do_cls
+                l, tloss = self._compute_loss(
+                    output,
+                    expression,
+                    clss,
+                    batch_idx,
+                    do_ecs,
+                    do_adv_cls=do_adv_cls & do_cls,
+                    do_mvc=do_mvc,
+                )
+                # do_mvc = False if do_mvc else do_mvc
+                # do_cls = False if do_cls else do_cls
+                losses.update({"pregen_" + k: v for k, v in l.items()})
+                total_loss += tloss
             cell_embs.append(output["cell_emb"].clone())
             output = self._generate(
                 cell_embs=output["cell_embs"],
@@ -844,7 +872,11 @@ class scPrint(L.LightningModule):
                 total_loss += loss_adv_cls
                 losses.update({"adv_cls": loss_adv_cls})
 
-        if do_adv_batch and self.grad_reverse_discriminator_loss is not None and batch_idx is not None:
+        if (
+            do_adv_batch
+            and self.grad_reverse_discriminator_loss is not None
+            and batch_idx is not None
+        ):
             mean_emb = torch.mean(output["cell_embs"][:, 2:, :].clone(), dim=1)
             loss_adv = self.grad_reverse_discriminator_loss(mean_emb, batch_idx) * (
                 self.class_scale / 8

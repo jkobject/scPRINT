@@ -68,8 +68,8 @@ trainer:
       lr_reduce_patience: 1
       lr_reduce_factor: 0.6
       do_cls: true
-      do_adv_batch: false
-      run_full_forward: false
+      do_adv_batch: true
+      run_full_forward: true
   - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
     init_args:
       swa_lrs: 0.01
