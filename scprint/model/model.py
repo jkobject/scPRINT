@@ -722,8 +722,8 @@ class scPrint(L.LightningModule):
                 )
                 # make sure that the cell embedding stay the same even if the expression is decreased
                 # we only want to do them once
-                # do_mvc = False if do_mvc else do_mvc
-                # do_cls = False if do_cls else do_cls
+                do_mvc = False if do_mvc else do_mvc
+                do_cls = False if do_cls else do_cls
 
         # TASK 6. expression generation
         if do_generate:
@@ -743,10 +743,10 @@ class scPrint(L.LightningModule):
                     batch_idx,
                     do_ecs,
                     do_adv_cls=do_adv_cls & do_cls,
-                    do_mvc=do_mvc,
+                    do_adv_batch=do_adv_batch & do_cls,
                 )
-                # do_mvc = False if do_mvc else do_mvc
-                # do_cls = False if do_cls else do_cls
+                do_mvc = False if do_mvc else do_mvc
+                do_cls = False if do_cls else do_cls
                 losses.update({"pregen_" + k: v for k, v in l.items()})
                 total_loss += tloss
             cell_embs.append(output["cell_emb"].clone())
