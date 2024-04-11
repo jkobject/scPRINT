@@ -49,25 +49,24 @@ trainer:
       - 0.3
       do_cce: true
       cce_sim: 0.5
-      cce_scale: 0.02
+      cce_scale: 0.002
       do_ecs: true
       ecs_threshold: 0.3
-      ecs_scale: 0.1
+      ecs_scale: 0.05
       do_mvc: false
       mvc_scale: 0.05
       do_adv_cls: false
-      adv_class_scale: 0.005
+      adv_class_scale: 0.1
       do_next_tp: false
       do_generate: true
       class_scale: 0.4
       optim: adam
-      mask_ratio:
-      - 0.3
+      mask_ratio: []
       warmup_duration: 500
       weight_decay: 0.01
       fused_adam: true
-      lr_reduce_patience: 2
-      lr_reduce_factor: 0.66
+      lr_reduce_patience: 1
+      lr_reduce_factor: 0.6
       do_cls: true
       do_adv_batch: false
       run_full_forward: false
@@ -118,7 +117,7 @@ trainer:
   min_epochs: null
   max_steps: -1
   min_steps: null
-  max_time: '{''hours'': 48}'
+  max_time: '{''hours'': 12}'
   limit_train_batches: 5000
   limit_val_batches: 1000
   limit_test_batches: null
@@ -219,7 +218,7 @@ data:
   - self_reported_ethnicity_ontology_term_id
   how: random expr
   organism_name: organism_ontology_term_id
-  max_len: 2400
+  max_len: 1200
   add_zero_genes: 0
   do_gene_pos: ./data/main/biomart_pos.parquet
   tp_name: null

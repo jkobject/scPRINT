@@ -28,22 +28,22 @@ trainer:
       init_args:
         do_denoise: True
         noise: [0.3]
-        do_cce: False
+        do_cce: True
         # cce_sim: 0.4
-        do_ecs: False
+        do_ecs: True
         # ecs_threshold: 0.6
         # ecs_scale: 10.0
         do_mvc: False
         mvc_scale: 0.05
-        do_generate: False
+        do_generate: True
         do_adv_cls: False
         do_next_tp: False
-        do_cls: False
+        do_cls: True
         # class_scale: 500.0
         warmup_duration: 500
         weight_decay: 0.01
         fused_adam: True
-        lr_patience: 1
+        #lr_patience: 1
         mask_ratio: []
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
@@ -55,7 +55,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.EarlyStopping
       init_args:
         monitor: val_loss
-        patience: 10
+        patience: 3
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: epoch
@@ -66,14 +66,14 @@ trainer:
   #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
   #    requeue_signal: signal.SIGHUP
 model:
-  lr: 0.001
+  lr: 0.002
   nhead: 4
-  nlayers: 6
+  nlayers: 4
   layers_cls: [128]
   dropout: 0.1
   transformer: flash
   mvc_decoder: inner product
-  d_model: 256
+  d_model: 128
   residual_in_fp32: True
   num_heads_kv: null
   fused_dropout_add_ln: False

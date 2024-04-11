@@ -126,9 +126,11 @@ def make_adata(
                     for i in labels
                 ],
                 [
-                    "conv_pred_" + i
-                    if "conv_pred_" + i in adata.obs.columns
-                    else "pred_" + i
+                    (
+                        "conv_pred_" + i
+                        if "conv_pred_" + i in adata.obs.columns
+                        else "pred_" + i
+                    )
                     for i in labels
                 ],
             )
@@ -228,7 +230,7 @@ def _init_weights(
                 )
 
 
-def downsample_profile(mat: Tensor, dropout: float, jules=False):
+def downsample_profile(mat: Tensor, dropout: float, method="old"):
     """
     This function downsamples the expression profile of a given single cell RNA matrix.
 
@@ -254,7 +256,7 @@ def downsample_profile(mat: Tensor, dropout: float, jules=False):
     # Randomly drop on average N counts to each element of expression using a heavy tail Gaussian distribution
     # here we try to get the scale of the distribution so as to remove the right number of counts from each gene
     # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02601-5#:~:text=Zero%20measurements%20in%20scRNA%2Dseq,generation%20of%20scRNA%2Dseq%20data.
-    if True:
+    if method == "old":
         # Note: effectively, this is mostly doing dropout to 0! the torch.poisson is
         # almost always 0, so we just do the dropout
         totcounts = mat.sum(1)
@@ -271,7 +273,7 @@ def downsample_profile(mat: Tensor, dropout: float, jules=False):
 
         mat = (mat - res) * drop
         return torch.maximum(mat, torch.Tensor([[0]]).to(device=mat.device)).int()
-    if jules:
+    elif method == "jules":
         scaler = (1 - dropout) ** (1 / 2)
         notdrop = (
             torch.rand(
@@ -283,17 +285,20 @@ def downsample_profile(mat: Tensor, dropout: float, jules=False):
         notdrop[mat == 0] = 0
         # apply the dropout after the poisson, right?
         return notdrop * torch.poisson(mat * scaler)
-    batch = mat.shape[0]
-    ngenes = mat.shape[1]
-    dropout = dropout*1.1
-    # we model the sampling zeros (dropping 30% of the reads)
-    res = torch.poisson(
-        (mat * (dropout/2))
-    ).int()
-    # we model the technical zeros (dropping 50% of the genes)
-    notdrop = (torch.rand((batch, ngenes), device=mat.device) >= (dropout/2)).int()
-    mat = (mat - res) * notdrop
-    return torch.maximum(mat, torch.zeros((1,1), device=mat.device, dtype=torch.int))
+    elif method == "new":
+        batch = mat.shape[0]
+        ngenes = mat.shape[1]
+        dropout = dropout * 1.1
+        # we model the sampling zeros (dropping 30% of the reads)
+        res = torch.poisson((mat * (dropout / 2))).int()
+        # we model the technical zeros (dropping 50% of the genes)
+        notdrop = (
+            torch.rand((batch, ngenes), device=mat.device) >= (dropout / 2)
+        ).int()
+        mat = (mat - res) * notdrop
+        return torch.maximum(
+            mat, torch.zeros((1, 1), device=mat.device, dtype=torch.int)
+        )
 
 
 def simple_masker(

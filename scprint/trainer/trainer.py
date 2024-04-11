@@ -9,14 +9,14 @@ class TrainingMode(Callback):
         noise: List[float] = [0.3],
         do_cce: bool = True,
         cce_sim: float = 0.5,
-        cce_scale: float = 0.02,
+        cce_scale: float = 0.002,  # 0.002
         do_ecs: bool = True,
         ecs_threshold: float = 0.3,
-        ecs_scale: float = 0.1,
+        ecs_scale: float = 0.05,  # 0.05
         do_mvc: bool = False,
-        mvc_scale: float = 0.2,
+        mvc_scale: float = 0.05,  # 0.05
         do_adv_cls: bool = False,
-        adv_class_scale: float = 0.005,
+        adv_class_scale: float = 0.1,
         do_next_tp: bool = False,
         do_generate: bool = False,
         class_scale: float = 0.4,
@@ -26,7 +26,7 @@ class TrainingMode(Callback):
         weight_decay: float = 0.01,
         fused_adam: bool = True,
         lr_reduce_patience: int = 1,
-        lr_reduce_factor: float = .6,
+        lr_reduce_factor: float = 0.6,
         do_cls: bool = True,
         do_adv_batch: bool = False,
         run_full_forward: bool = False,
@@ -96,6 +96,7 @@ class TrainingMode(Callback):
             f"do_adv_batch={self.do_adv_batch}, "
             f"run_full_forward={self.run_full_forward})"
         )
+
     def on_fit_start(self, trainer, model):
         # do something with all training_step outputs, for example:
         model.do_denoise = self.do_denoise
@@ -123,5 +124,3 @@ class TrainingMode(Callback):
         model.do_cls = self.do_cls
         model.do_adv_batch = self.do_adv_batch
         model.run_full_forward = self.run_full_forward
-
-    
