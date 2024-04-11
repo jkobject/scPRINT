@@ -51,6 +51,7 @@ class ExprDecoder(nn.Module):
             nn.LeakyReLU(),
             nn.Dropout(dropout),
             nn.Linear(d_model, d_model),
+            nn.LayerNorm(d_model),
             nn.LeakyReLU(),
         )
         self.pred_var_zero = nn.Linear(d_model, 3)
@@ -96,6 +97,7 @@ class MVCDecoder(nn.Module):
         super(MVCDecoder, self).__init__()
         if arch_style == "inner product":
             self.gene2query = nn.Linear(d_model, d_model)
+            self.norm = nn.LayerNorm(d_model)
             self.query_activation = query_activation()
             self.pred_var_zero = nn.Linear(d_model, d_model * 3, bias=False)
         elif arch_style == "concat query":
@@ -128,7 +130,7 @@ class MVCDecoder(nn.Module):
             gene_embs: Tensor, shape (batch, seq_len, embsize=d_model)
         """
         if self.arch_style == "inner product":
-            query_vecs = self.query_activation(self.gene2query(gene_embs))
+            query_vecs = self.query_activation(self.norm(self.gene2query(gene_embs)))
             pred, var, zero_logits = self.pred_var_zero(query_vecs).split(
                 self.d_model, dim=-1
             )

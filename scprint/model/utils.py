@@ -2,7 +2,9 @@ import torch
 import numpy as np
 from typing import Optional, Union, List, Dict
 from torch.distributions import Poisson, Gamma
+
 import bionty as bt
+
 from collections import Counter
 import math
 import torch.nn as nn
@@ -124,9 +126,11 @@ def make_adata(
                     for i in labels
                 ],
                 [
-                    "conv_pred_" + i
-                    if "conv_pred_" + i in adata.obs.columns
-                    else "pred_" + i
+                    (
+                        "conv_pred_" + i
+                        if "conv_pred_" + i in adata.obs.columns
+                        else "pred_" + i
+                    )
                     for i in labels
                 ],
             )
@@ -146,7 +150,7 @@ def make_adata(
                 acc = " (accuracy: {:.2f})".format(accuracy[col.split("conv_")[-1]])
             axs[i // 2, i % 2].set_title(col + " UMAP" + acc)
             if "cell_type" in col:
-                axs[i // 2, i % 2].legend(fontsize='x-small')
+                axs[i // 2, i % 2].legend(fontsize="x-small")
             axs[i // 2, i % 2].set_xlabel("UMAP1")
             axs[i // 2, i % 2].set_ylabel("UMAP2")
     else:
@@ -226,7 +230,7 @@ def _init_weights(
                 )
 
 
-def downsample_profile(mat: Tensor, renoise: float):
+def downsample_profile(mat: Tensor, dropout: float, method="old"):
     """
     This function downsamples the expression profile of a given single cell RNA matrix.
 
@@ -254,23 +258,70 @@ def downsample_profile(mat: Tensor, renoise: float):
     # Randomly drop on average N counts to each element of expression using a heavy tail Gaussian distribution
     # here we try to get the scale of the distribution so as to remove the right number of counts from each gene
     # https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02601-5#:~:text=Zero%20measurements%20in%20scRNA%2Dseq,generation%20of%20scRNA%2Dseq%20data.
-    totcounts = mat.sum(1)
-    batch = mat.shape[0]
-    ngenes = mat.shape[1]
-    tnoise = 1 - (1 - renoise) ** (1 / 2)
-    # we model the sampling zeros (dropping 30% of the reads)
-    res = torch.poisson(
-        torch.rand((batch, ngenes)).to(device=mat.device)
-        * ((tnoise * totcounts.unsqueeze(1)) / (0.5 * ngenes))
-    ).int()
-    # we model the technical zeros (dropping 50% of the genes)
-    drop = (torch.rand((batch, ngenes)) > tnoise).int().to(device=mat.device)
+    if method == "old":
+        totcounts = mat.sum(1)
+        batch = mat.shape[0]
+        ngenes = mat.shape[1]
+        tnoise = 1 - (1 - dropout) ** (1 / 2)
+        # we model the sampling zeros (dropping 30% of the reads)
+        res = torch.poisson(
+            torch.rand((batch, ngenes)).to(device=mat.device)
+            * ((tnoise * totcounts.unsqueeze(1)) / (0.5 * ngenes))
+        ).int()
+        # we model the technical zeros (dropping 50% of the genes)
+        drop = (torch.rand((batch, ngenes)) > tnoise).int().to(device=mat.device)
 
-    mat = (mat - res) * drop
-    return torch.maximum(mat, torch.Tensor([[0]]).to(device=mat.device)).int()
+        mat = (mat - res) * drop
+        return torch.maximum(mat, torch.Tensor([[0]]).to(device=mat.device)).int()
+    elif method == "jules":
+        scaler = (1 - dropout) ** (1 / 2)
+        notdrop = (
+            torch.rand(
+                mat.shape,
+                device=mat.device,
+            )
+            < scaler
+        ).int()
+        notdrop[mat == 0] = 0
+        # apply the dropout after the poisson, right?
+        return notdrop * torch.poisson(mat * scaler)
+    elif method == "new":
+        batch = mat.shape[0]
+        ngenes = mat.shape[1]
+        dropout = dropout * 1.1
+        # we model the sampling zeros (dropping 30% of the reads)
+        res = torch.poisson((mat * (dropout / 2))).int()
+        # we model the technical zeros (dropping 50% of the genes)
+        notdrop = (
+            torch.rand((batch, ngenes), device=mat.device) >= (dropout / 2)
+        ).int()
+        mat = (mat - res) * notdrop
+        return torch.maximum(
+            mat, torch.zeros((1, 1), device=mat.device, dtype=torch.int)
+        )
+    else:
+        raise ValueError(f"method {method} not recognized")
 
 
-def masker(
+def simple_masker(
+    shape: list[int],
+    mask_ratio: float = 0.15,
+) -> torch.Tensor:
+    """
+    Randomly mask a batch of data.
+
+    Args:
+        values (array-like):
+            A batch of tokenized data, with shape (batch_size, n_features).
+        mask_ratio (float): The ratio of genes to mask, default to 0.15.
+
+    Returns:
+        torch.Tensor: A tensor of masked data.
+    """
+    return torch.rand(shape) < mask_ratio
+
+
+def weighted_masker(
     length: int,
     batch_size: int = 1,
     mask_ratio: float = 0.15,

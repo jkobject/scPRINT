@@ -33,7 +33,7 @@ from . import decoders
 # from .linear_transformer import FastTransformerEncoderWrapper as FastTransformerEncoder
 from .EGT import EGT
 from . import loss
-from .utils import masker
+from .utils import simple_masker
 from . import utils
 from .loss import grad_reverse
 
@@ -642,7 +642,7 @@ class scPrint(L.LightningModule):
         losses = {}
         cell_embs = []
         for i in mask_ratio:
-            mask = masker(
+            mask = simple_masker(
                 length=gene_pos.shape[1],
                 batch_size=gene_pos.shape[0],
                 mask_ratio=i,
@@ -671,7 +671,7 @@ class scPrint(L.LightningModule):
         # TASK 3. denoising
         if do_denoise:
             for i in noise:
-                expr = utils.downsample_profile(expression, renoise=i)
+                expr = utils.downsample_profile(expression, dropout=i)
                 output = self.forward(
                     gene_pos,
                     expr,

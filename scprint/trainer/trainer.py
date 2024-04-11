@@ -24,8 +24,12 @@ class TrainingMode(Callback):
         warmup_duration: int = 500,
         weight_decay: float = 0.01,
         fused_adam: bool = True,
-        lr_patience: int = 1,
+        adv_class_scale: float = 0.1,
+        lr_reduce_patience: int = 1,
+        lr_reduce_factor: float = 0.6,
         do_cls: bool = True,
+        do_adv_batch: bool = False,
+        run_full_forward: bool = False,
     ):
         """
         TrainingMode a callback to set the training specific info to the model.
@@ -58,6 +62,42 @@ class TrainingMode(Callback):
         self.optim = optim
         self.mvc_scale = mvc_scale
         self.do_cls = do_cls
+        self.adv_class_scale = adv_class_scale
+        self.lr_reduce_patience = lr_reduce_patience
+        self.lr_reduce_factor = lr_reduce_factor
+        self.do_cls = do_cls
+        self.do_adv_batch = do_adv_batch
+        self.run_full_forward = run_full_forward
+
+    def __repr__(self):
+        return (
+            f"TrainingMode("
+            f"do_denoise={self.do_denoise}, "
+            f"noise={self.noise}, "
+            f"do_cce={self.do_cce}, "
+            f"cce_sim={self.cce_sim}, "
+            f"cce_scale={self.cce_scale}, "
+            f"do_ecs={self.do_ecs}, "
+            f"ecs_threshold={self.ecs_threshold}, "
+            f"ecs_scale={self.ecs_scale}, "
+            f"do_mvc={self.do_mvc}, "
+            f"do_adv_cls={self.do_adv_cls}, "
+            f"adv_class_scale={self.adv_class_scale}, "
+            f"do_next_tp={self.do_next_tp}, "
+            f"do_generate={self.do_generate}, "
+            f"class_scale={self.class_scale}, "
+            f"mask_ratio={self.mask_ratio}, "
+            f"warmup_duration={self.warmup_duration}, "
+            f"weight_decay={self.weight_decay}, "
+            f"fused_adam={self.fused_adam}, "
+            f"lr_reduce_patience={self.lr_reduce_patience}, "
+            f"lr_reduce_factor={self.lr_reduce_factor}, "
+            f"optim={self.optim}, "
+            f"mvc_scale={self.mvc_scale}, "
+            f"do_cls={self.do_cls}, "
+            f"do_adv_batch={self.do_adv_batch}, "
+            f"run_full_forward={self.run_full_forward})"
+        )
 
     def on_fit_start(self, trainer, model):
         # do something with all training_step outputs, for example:
@@ -82,3 +122,9 @@ class TrainingMode(Callback):
         model.optim = self.optim
         model.mvc_scale = self.mvc_scale
         model.do_cls = self.do_cls
+        model.adv_class_scale = self.adv_class_scale
+        model.lr_reduce_patience = self.lr_reduce_patience
+        model.lr_reduce_factor = self.lr_reduce_factor
+        model.do_cls = self.do_cls
+        model.do_adv_batch = self.do_adv_batch
+        model.run_full_forward = self.run_full_forward
