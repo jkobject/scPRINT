@@ -158,3 +158,4 @@ scdataloader.out
 data/main/9606.protein.links.v12.0.txt.gz
 data/main/motifs-v10-nr.hgnc-m0.00001-o0.0.tbl
 data/main/main_scenic+_database.feather
+*.npy

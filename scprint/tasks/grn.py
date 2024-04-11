@@ -55,7 +55,9 @@ class GRNfer:
         cell_agg="mean",  # mean, consensus, none
         filtration="thresh",  # thresh, top-k, mst, known, none
         k=10,
+        apc=False,
         known_grn=None,
+        symmetrize=True,
         doplot=True,
         max_cells=0,
         forward_mode="none",
@@ -100,8 +102,10 @@ class GRNfer:
         self.cell_agg = cell_agg
         self.doplot = doplot
         self.genes = genes
+        self.apc = apc
         self.forward_mode = forward_mode
         self.k = k
+        self.symmetrize = symmetrize
         self.loc = loc
         self.known_grn = known_grn
         self.head_agg = head_agg
@@ -112,16 +116,22 @@ class GRNfer:
 
     def __call__(self, layer, cell_type=None):
         # Add at least the organism you are working with
-        self.curr_genes = None
-        self.model.pred_log_adata = False
-        self.model.get_attention_layer = layer if type(layer) is list else [layer]
-        subadata = self.predict(cell_type)
-        adjacencies = self.aggregate(self.model.mean_attn[0])
+        subadata = self.predict(cell_type, layer)
+        adjacencies = self.aggregate(self.model.mean_attn)
         if self.head_agg == "none" or self.cell_agg == "none":
-            return [
-                self.save(self.filter(subadj), subadata, self.loc + str(i))
-                for i, subadj in enumerate(adjacencies)
-            ]
+            adjacencies = adjacencies.reshape(
+                -1, adjacencies.shape[-2], adjacencies.shape[-1]
+            ).T
+            loc = np.array(
+                (subadata[:, subadata.var.index.isin(self.curr_genes)].X != 0).sum(0)
+                > 2
+            )[0]
+            self.curr_genes = subadata[
+                :, subadata.var.index.isin(self.curr_genes[loc])
+            ].var.symbol.tolist()
+            adj = adj[8:, 8:, :][loc, :, :][:, loc, :]
+            np.save("adj.npy", adj)
+            return adj
         elif self.cell_agg == "consensus":
             return self.save(
                 np.sum(
@@ -134,21 +144,16 @@ class GRNfer:
         else:
             return self.save(self.filter(adjacencies)[8:, 8:], subadata, self.loc)
 
-    def predict(self, cell_type):
+    def predict(self, layer, cell_type=None):
+        self.curr_genes = None
+        self.model.pred_log_adata = False
+        self.model.get_attention_layer = layer if type(layer) is list else [layer]
         if cell_type is not None:
-            subadata = (
-                self.adata[self.adata.obs[self.cell_type_col] == cell_type].copy()[
-                    : self.max_cells
-                ]
-                if self.max_cells
-                else self.adata[self.adata.obs[self.cell_type_col] == cell_type].copy()
-            )
+            subadata = self.adata[
+                self.adata.obs[self.cell_type_col] == cell_type
+            ].copy()
         else:
-            subadata = (
-                self.adata.copy()[: self.max_cells]
-                if self.max_cells
-                else self.adata.copy()
-            )
+            subadata = self.adata.copy()
         if self.how == "most var within":
             sc.pp.highly_variable_genes(
                 subadata, n_top_genes=self.num_genes, flavor="seurat_v3"
@@ -173,7 +178,7 @@ class GRNfer:
             self.curr_genes = self.genes
         else:
             raise ValueError("how must be one of 'most var', 'random expr'")
-
+        subadata = subadata[: self.max_cells] if self.max_cells else subadata
         adataset = SimpleAnnDataset(
             subadata, obs_to_output=["organism_ontology_term_id"]
         )
@@ -196,35 +201,36 @@ class GRNfer:
 
     def aggregate(self, attn):
         if self.cell_agg == "mean":
-            if self.how == "random expr":
-                attn = torch.zeros(
-                    [len(self.model.genes) + len(self.model.labels) + 2]
-                    + list(self.model.mean_attn[0].shape[2:])
-                )
-                div = torch.zeros(
-                    [len(self.model.genes) + len(self.model.labels) + 2]
-                    + list(self.model.mean_attn[0].shape[2:])
-                )
+            nattn = torch.zeros(
+                [
+                    len(self.model.get_attention_layer),
+                    len(self.model.genes) + len(self.model.labels) + 2,
+                ]
+                + list(attn[0].shape[2:])
+            )
+            div = torch.zeros(len(self.model.genes) + len(self.model.labels) + 2)
+            for i in range(attn[0].shape[0]):
+                loc = torch.cat(
+                    [torch.Tensor([r for r in range(8)]), self.model.pos[i] + 8]
+                ).int()
+                for j in range(len(self.model.get_attention_layer)):
+                    nattn[j, loc, :, :, :] += attn[j][i].detach().to("cpu")
+                div[loc] += 1
+            attn = nattn / div.view(1, div.shape[0], 1, 1, 1)
+            goodloc = div > 0
+            attn = attn[:, goodloc, :, :, :]
 
-                for i in range(self.model.mean_attn[0].shape[0]):
-                    loc = torch.cat(
-                        [torch.Tensor([r for r in range(8)]), self.model.pos[i]]
-                    ).int()
-                    attn[loc, :, :, :] += self.model.mean_attn[0][i].detach().to("cpu")
-                    div[loc, :, :, :] += 1
-                attn = attn / div
-                goodloc = div.sum((1, 2, 3)) > 0
-                attn = attn[goodloc]
-                self.curr_genes = np.array(self.curr_genes)[goodloc[8:]]
-            else:
-                attn = self.model.mean_attn[0].mean(0)
-                self.curr_genes = [i for i in self.curr_genes if i in self.model.genes]
+            self.curr_genes = (
+                np.array(self.curr_genes)[goodloc[8:]]
+                if self.how == "random expr"
+                else [i for i in self.curr_genes if i in self.model.genes]
+            )
             if self.doplot:
                 sns.set(
                     style="white", context="poster", rc={"figure.figsize": (14, 10)}
                 )
                 fit = umap.UMAP()
-                mm = fit.fit_transform(attn[:, 0, 0, :].detach().cpu().numpy())
+                mm = fit.fit_transform(attn[0, :, 0, 0, :].detach().cpu().numpy())
                 labels = hdbscan.HDBSCAN(
                     min_samples=10,
                     min_cluster_size=100,
@@ -232,7 +238,7 @@ class GRNfer:
                 plt.scatter(mm[:, 0], mm[:, 1], c=labels)
                 plt.title(f"Qs @H{0}")
                 plt.show()
-                mm = fit.fit_transform(attn[:, 1, 0, :].detach().cpu().numpy())
+                mm = fit.fit_transform(attn[0, :, 1, 0, :].detach().cpu().numpy())
                 labels = hdbscan.HDBSCAN(
                     min_samples=10,
                     min_cluster_size=100,
@@ -240,17 +246,19 @@ class GRNfer:
                 plt.scatter(mm[:, 0], mm[:, 1], c=labels)
                 plt.title(f"Ks @H{0}")
                 plt.show()
-            attn = attn[:, 0, :, :].permute(1, 0, 2) @ attn[:, 1, :, :].permute(1, 2, 0)
-        elif self.cell_agg == "consensus" or self.cell_agg == "none":
-            attn = self.model.mean_attn[0]
-            attn = attn[:, :, 0, :, :].permute(2, 0, 1, 3) @ attn[
+            attn = attn[:, :, 0, :, :].permute(0, 2, 1, 3) @ attn[
                 :, :, 1, :, :
-            ].permute(2, 0, 3, 1)
+            ].permute(0, 2, 3, 1)
+        elif self.cell_agg == "consensus" or self.cell_agg == "none":
+            attn = torch.cat(attn)
+            attn = attn[:, :, :, 0, :, :].permute(3, 0, 1, 2, 4) @ attn[
+                :, :, :, 1, :, :
+            ].permute(3, 0, 1, 4, 2)
             self.curr_genes = [i for i in self.curr_genes if i in self.model.genes]
         else:
             raise ValueError("cell_agg must be one of 'mean', 'consensus' or 'none'")
         # return attn
-        scale = self.model.mean_attn[0].shape[-1] ** -0.5
+        scale = attn.shape[-1] ** -0.5
         attn = attn * scale
         if self.preprocess == "sinkhorn":
             if attn.numel() > 100_000_000:
@@ -265,17 +273,19 @@ class GRNfer:
         else:
             raise ValueError("preprocess must be one of 'sinkhorn', 'softmax', 'none'")
 
+        if self.symmetrize:
+            print(attn.shape)
+            attn = (attn + attn.permute(0, 1, 3, 2)) / 2
+        if self.apc:
+            pass
+            # attn = attn - (
+            #    (attn.sum(-1).unsqueeze(-1) * attn.sum(-2).unsqueeze(-2))
+            #    / attn.sum(-1).sum(-1).unsqueeze(-1).unsqueeze(-1)
+            # )  # .view()
         if self.head_agg == "mean":
-            if len(attn.shape) == 4:
-                attn = attn.mean(0)
-            attn = attn.mean(0).detach().cpu().numpy()
+            attn = attn.mean(0).mean(0).detach().cpu().numpy()
         elif self.head_agg == "max":
-            if len(attn.shape) == 4:
-                attn = attn.mean(0)
-            import pdb
-
-            pdb.set_trace()
-            attn = attn.max(0)[0].detach().cpu().numpy()
+            attn = attn.max(0).max(0).detach().cpu().numpy()
         elif self.head_agg == "none":
             attn = attn.detach().cpu().numpy()
             if self.cell_agg == "none":
