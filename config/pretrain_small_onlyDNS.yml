@@ -37,7 +37,9 @@ trainer:
         mvc_scale: 0.05
         do_generate: True
         do_adv_cls: False
+        do_adv_batch: True
         do_next_tp: False
+        run_full_forward: True
         do_cls: True
         # class_scale: 500.0
         warmup_duration: 500

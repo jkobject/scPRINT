@@ -28,7 +28,7 @@ class TrainingMode(Callback):
         lr_reduce_patience: int = 1,
         lr_reduce_factor: float = 0.6,
         do_cls: bool = True,
-        do_adv_batch: bool = False,
+        do_adv_batch: bool = True,
         run_full_forward: bool = False,
     ):
         """
@@ -58,7 +58,6 @@ class TrainingMode(Callback):
         self.warmup_duration = warmup_duration
         self.weight_decay = weight_decay
         self.fused_adam = fused_adam
-        self.lr_patience = lr_patience
         self.optim = optim
         self.mvc_scale = mvc_scale
         self.do_cls = do_cls
@@ -117,7 +116,6 @@ class TrainingMode(Callback):
         model.warmup_duration = self.warmup_duration
         model.weight_decay = self.weight_decay
         model.fused_adam = self.fused_adam
-        model.lr_patience = self.lr_patience
         model.do_generate = self.do_generate
         model.optim = self.optim
         model.mvc_scale = self.mvc_scale
