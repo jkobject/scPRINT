@@ -39,7 +39,7 @@ trainer:
         do_next_tp: False
         run_full_forward: True
         do_cls: True
-        #class_scale: 1.5
+        class_scale: 1.5
         warmup_duration: 500
         weight_decay: 0.01
         fused_adam: True

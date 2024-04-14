@@ -58,7 +58,7 @@ trainer:
       do_adv_cls: false
       do_next_tp: false
       do_generate: true
-      class_scale: 0.4
+      class_scale: 1.5
       optim: adamW
       mask_ratio: []
       warmup_duration: 500

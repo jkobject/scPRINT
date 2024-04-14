@@ -81,13 +81,13 @@ class scPrint(L.LightningModule):
             nlayers (int, optional): The number of layers in the transformer model. Defaults to 6.
             nlayers_cls (int, optional): The number of layers in the classifier. Defaults to 3.
             classes (dict, optional): The classes to predict with number of classes for each. Defaults to {}.
-            classes_hierarchy (dict, optional): The class hierarchy for classes that have hierarchical classes. Defaults to {}.
+            labels_hierarchy (dict, optional): The class hierarchy for classes that have hierarchical classes. Defaults to {}.
             dropout (float, optional): The dropout value. Defaults to 0.5.
             transformer: (flag, optional) the transformer type to use. one of "linear", "flash", "flashsparse", "scprint". Defaults to "flash".
             domain_spec_batchnorm (str, optional): Whether to apply domain specific batch normalization. Defaults to False.
             expr_emb_style (str, optional): The style of input embedding (one of "continuous_concat", "binned_pos", "full_pos"). Defaults to "continuous_concat".
             mvc_decoder (str, optional): The style of MVC decoder one of "None", "inner product", "concat query", "sum query". Defaults to "inner product".
-            pred_embedding (list, optional): The list of labels to use for plotting embeddings. Defaults to [].
+            pred_embedding (list, optional): The list of classes to use for plotting embeddings. Defaults to [].
             cell_emb_style (str, optional): The style of cell embedding. one of "cls", "avg-pool", "w-pool". Defaults to "cls".
             lr (float, optional): The learning rate. Defaults to 0.001.
             label_decoders: (dict, optional) the label decoders to use for plotting the umap during validations. Defaults to None.
@@ -211,8 +211,8 @@ class scPrint(L.LightningModule):
                 d_model, max_len=max_len, token_to_pos=token_to_pos
             )
 
-        self.cell_embs_count = len(classes) + 2
-        # classes Encoder
+        self.cell_embs_count = len(self.classes) + 2
+        # Class Encoder
         # always have [base_cell_emb, time_embedding, depth_embedding] + any other class info
         # base cell embedding will store other cell specific information
         self.class_encoder = encoders.CategoryValueEncoder(
@@ -254,7 +254,7 @@ class scPrint(L.LightningModule):
                 feat_size=d_model,
                 edge_feat_size=edge_dim,
                 num_heads=nhead,
-                num_virtual_nodes=len(classes),
+                num_virtual_nodes=len(self.classes),
             )
         # regular or flash
         else:
@@ -287,7 +287,7 @@ class scPrint(L.LightningModule):
                 d_model, n_cls, layers=layers_cls, dropout=dropout
             )
 
-        # Batch effect correction via adversarial training on batch labels
+        # Batch effect correction via adversarial training on batch classes
         if num_batch_labels > 0:
             # self.batch_encoder = BatchLabelEncoder(num_batch_labels, d_model)
             # batch norm (dsbn) <- not doing, weird
@@ -692,6 +692,7 @@ class scPrint(L.LightningModule):
                 output = self.forward(
                     gene_pos,
                     expression=expr,
+                    mask=None,
                     depth_mult=expression.sum(1),
                     full_depth=total_count,
                     do_mvc=do_mvc,
@@ -721,6 +722,7 @@ class scPrint(L.LightningModule):
                 output = self.forward(
                     gene_pos,
                     expression,
+                    mask=None,
                     full_depth=total_count,
                     do_mvc=do_mvc,
                     do_class=False,
@@ -772,9 +774,10 @@ class scPrint(L.LightningModule):
                     loss_cce += loss.similarity(
                         cell_emb1, cell_emb2, cce_sim
                     )  # (nlabels, minibatch, minibatch)
-            total_loss += loss_cce * self.cce_scale / factorial(len(cell_embs))
+            fact = factorial(len(cell_embs))
+            total_loss += loss_cce * self.cce_scale / fact
             # TASK 3b. contrastive graph embedding
-            losses.update({"cce": loss_cce * self.cce_scale})
+            losses.update({"cce": loss_cce / fact})
 
         # TASK 8. KO profile prediction
         # if we have that information
@@ -797,7 +800,7 @@ class scPrint(L.LightningModule):
             output (dict): A dictionary containing the output of the forward pass.
             expression (Tensor): A tensor containing the expression levels of genes.
             mask (Tensor): A tensor indicating the masked positions in the input data.
-            clss (Tensor): A tensor containing the class labels for each cell.
+            clss (Tensor): A tensor containing the class classes for each cell.
             do_ecs (bool, optional): A flag to indicate whether to perform elastic cell similarity.
                 Defaults to False.
             do_adv_cls (bool, optional): A flag to indicate whether to perform adversarial classification.
@@ -832,14 +835,14 @@ class scPrint(L.LightningModule):
                 if "cls_output_" + clsname not in output:
                     continue
                 # setting the classes from index to one hot
-                loss_cls += self.class_scale * loss.classification(
+                loss_cls += loss.classification(
                     clsname,
                     pred=output["cls_output_" + clsname],
                     cl=clss[:, j],
                     maxsize=self.label_counts[clsname],
                     labels_hierarchy=self.mat_labels_hierarchy,
                 )
-            total_loss += loss_cls
+            total_loss += self.class_scale * loss_cls
             if loss_cls != 0:
                 losses.update({"cls": loss_cls})
             # TASK 2bis. adversarial label prediction
@@ -850,7 +853,7 @@ class scPrint(L.LightningModule):
                     mean_embs = torch.mean(embs[:, ind != j, :], dim=1)
                     mean_embs = grad_reverse(mean_embs, lambd=1.0)
                     adv_pred = self.cls_decoders[adv_cls](mean_embs)
-                    loss_adv_cls += (self.class_scale / 2) * loss.classification(
+                    loss_adv_cls += loss.classification(
                         adv_cls,
                         pred=adv_pred,
                         cl=clss[:, j],
@@ -858,7 +861,7 @@ class scPrint(L.LightningModule):
                         labels_hierarchy=self.mat_labels_hierarchy,
                     )
 
-                total_loss += loss_adv_cls
+                total_loss += self.adv_class_scale * loss_adv_cls
                 losses.update({"adv_cls": loss_adv_cls})
 
         if self.grad_reverse_discriminator_loss is not None and batch_idx is not None:
@@ -873,23 +876,18 @@ class scPrint(L.LightningModule):
         # add large timepoint and set the KO gene to a KO embedding instead of expression embedding
         # TODO: try to require the gene id to still be predictable (with weight tying)
         if "mvc_disp" in output:
-            loss_expr_mvc = (
-                loss.zinb(
-                    theta=output["mvc_disp"],
-                    pi=output["mvc_zero_logits"],
-                    mu=output["mvc_mean"],
-                    target=expression,
-                )
-                * self.mvc_scale
+            loss_expr_mvc = loss.zinb(
+                theta=output["mvc_disp"],
+                pi=output["mvc_zero_logits"],
+                mu=output["mvc_mean"],
+                target=expression,
             )
-            total_loss += loss_expr_mvc
+            total_loss += loss_expr_mvc * self.mvc_scale
             losses.update({"expr_mvc": loss_expr_mvc})
         # TASK 5. elastic cell similarity
         if do_ecs:
-            loss_ecs = self.ecs_scale * loss.ecs(
-                output["cell_emb"], ecs_threshold=self.ecs_threshold
-            )
-            total_loss += loss_ecs
+            loss_ecs = loss.ecs(output["cell_emb"], ecs_threshold=self.ecs_threshold)
+            total_loss += self.ecs_scale * loss_ecs
             losses.update({"ecs": loss_ecs})
         return losses, total_loss
 
