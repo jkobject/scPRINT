@@ -153,7 +153,7 @@ data:
   validation_split: 0.2
   test_split: 0.0
   use_default_col: true
-  all_labels:
+  all_clss:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
   - assay_ontology_term_id

@@ -99,14 +99,14 @@ data:
   batch_size: 64
   num_workers: 16
   # TODO: drop tissue & dev stage until part or is taken in account
-  hierarchical_labels:
+  hierarchical_clss:
     - cell_type_ontology_term_id
     # "tissue_ontology_term_id",
     - disease_ontology_term_id
     # "development_stage_ontology_term_id",
     - assay_ontology_term_id
     - self_reported_ethnicity_ontology_term_id
-  label_to_weight:
+  clss_to_weight:
     - cell_type_ontology_term_id
     # "tissue_ontology_term_id",
     - disease_ontology_term_id
@@ -115,8 +115,8 @@ data:
     - self_reported_ethnicity_ontology_term_id
     - sex_ontology_term_id
     - organism_ontology_term_id
-  label_to_pred: ${data.label_to_weight}
-  all_labels:
+  clss_to_pred: ${data.clss_to_weight}
+  all_clss:
     - cell_type_ontology_term_id
     # "tissue_ontology_term_id",
     - disease_ontology_term_id

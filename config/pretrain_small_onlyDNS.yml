@@ -29,23 +29,20 @@ trainer:
         do_denoise: True
         noise: [0.3]
         do_cce: True
-        # cce_sim: 0.4
         do_ecs: True
-        # ecs_threshold: 0.6
-        # ecs_scale: 10.0
+        #cce_scale: 0.01
+        #ecs_scale: 0.1
         do_mvc: False
-        mvc_scale: 0.05
         do_generate: True
         do_adv_cls: False
         do_adv_batch: True
         do_next_tp: False
         run_full_forward: True
         do_cls: True
-        # class_scale: 500.0
+        #class_scale: 1.5
         warmup_duration: 500
         weight_decay: 0.01
         fused_adam: True
-        #lr_patience: 1
         mask_ratio: []
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
@@ -106,14 +103,14 @@ data:
   batch_size: 64
   num_workers: 16
   # TODO: drop tissue & dev stage until part or is taken in account
-  hierarchical_labels:
+  hierarchical_clss:
     - cell_type_ontology_term_id
     # "tissue_ontology_term_id",
     - disease_ontology_term_id
     # "development_stage_ontology_term_id",
     - assay_ontology_term_id
     - self_reported_ethnicity_ontology_term_id
-  label_to_weight:
+  clss_to_weight:
     - cell_type_ontology_term_id
     # - tissue_ontology_term_id
     - disease_ontology_term_id
@@ -122,8 +119,8 @@ data:
     - self_reported_ethnicity_ontology_term_id
     - sex_ontology_term_id
     - organism_ontology_term_id
-  label_to_pred: ${data.label_to_weight}
-  all_labels:
+  clss_to_pred: ${data.clss_to_weight}
+  all_clss:
     - cell_type_ontology_term_id
     # - tissue_ontology_term_id
     - disease_ontology_term_id

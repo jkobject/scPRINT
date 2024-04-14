@@ -322,8 +322,7 @@ def simple_masker(
 
 
 def weighted_masker(
-    length: int,
-    batch_size: int = 1,
+    shape: list[int],
     mask_ratio: float = 0.15,
     mask_prob: Optional[Union[torch.Tensor, np.ndarray]] = None,  # n_features
     mask_value: int = 1,
@@ -342,10 +341,10 @@ def weighted_masker(
         torch.Tensor: A tensor of masked data.
     """
     mask = []
-    for _ in range(batch_size):
-        m = np.zeros(length)
+    for _ in range(shape[0]):
+        m = np.zeros(shape[1])
         loc = np.random.choice(
-            a=length, size=int(length * mask_ratio), replace=False, p=mask_prob
+            a=shape[1], size=int(shape[1] * mask_ratio), replace=False, p=mask_prob
         )
         m[loc] = mask_value
         mask.append(m)

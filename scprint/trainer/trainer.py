@@ -8,11 +8,11 @@ class TrainingMode(Callback):
         do_denoise: bool = False,
         noise: List[float] = [0.3],
         do_cce: bool = True,
-        cce_sim: float = 0.5,
-        cce_scale: float = 0.002,
+        cce_sim: float = 0.5,  # .6
+        cce_scale: float = 0.002,  # .01
         do_ecs: bool = True,
         ecs_threshold: float = 0.3,
-        ecs_scale: float = 0.05,
+        ecs_scale: float = 0.05,  # .1
         do_mvc: bool = False,
         mvc_scale: float = 0.05,
         do_adv_cls: bool = False,
@@ -25,8 +25,8 @@ class TrainingMode(Callback):
         weight_decay: float = 0.01,
         fused_adam: bool = True,
         adv_class_scale: float = 0.1,
-        lr_reduce_patience: int = 1,
-        lr_reduce_factor: float = 0.6,
+        lr_reduce_patience: int = 2,
+        lr_reduce_factor: float = 0.5,
         do_cls: bool = True,
         do_adv_batch: bool = True,
         run_full_forward: bool = False,

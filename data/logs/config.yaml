@@ -65,8 +65,8 @@ trainer:
       weight_decay: 0.01
       fused_adam: true
       adv_class_scale: 0.1
-      lr_reduce_patience: 1
-      lr_reduce_factor: 0.6
+      lr_reduce_patience: 2
+      lr_reduce_factor: 0.5
       do_cls: true
       do_adv_batch: true
       run_full_forward: true
@@ -180,7 +180,7 @@ model:
   weight_init: ''
 data:
   collection_name: preprocessed dataset
-  label_to_weight:
+  clss_to_weight:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
   - assay_ontology_term_id
@@ -197,21 +197,21 @@ data:
   gene_embeddings: ./data/main/gene_embeddings.parquet
   use_default_col: true
   gene_position_tolerance: 10000
-  label_to_pred:
+  clss_to_pred:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
   - assay_ontology_term_id
   - self_reported_ethnicity_ontology_term_id
   - sex_ontology_term_id
   - organism_ontology_term_id
-  all_labels:
+  all_clss:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
   - assay_ontology_term_id
   - self_reported_ethnicity_ontology_term_id
   - sex_ontology_term_id
   - organism_ontology_term_id
-  hierarchical_labels:
+  hierarchical_clss:
   - cell_type_ontology_term_id
   - disease_ontology_term_id
   - assay_ontology_term_id
