@@ -216,7 +216,7 @@ class scPrint(L.LightningModule):
         # always have [base_cell_emb, time_embedding, depth_embedding] + any other class info
         # base cell embedding will store other cell specific information
         self.class_encoder = encoders.CategoryValueEncoder(
-            self.cell_embs_count, d_model
+            self.cell_embs_count - 1, d_model
         )
         # self.time_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
         self.depth_encoder = encoders.ContinuousValueEncoder(
@@ -345,7 +345,9 @@ class scPrint(L.LightningModule):
             enc += self.pos_encoder(gene_pos)
         cell_embs = (
             self.class_encoder(
-                torch.Tensor([list(range(self.cell_embs_count))] * gene_pos.shape[0])
+                torch.Tensor(
+                    [list(range(self.cell_embs_count - 1))] * gene_pos.shape[0]
+                )
                 .int()
                 .to(gene_pos.device)
             )
@@ -356,8 +358,12 @@ class scPrint(L.LightningModule):
             pass
             # cell_embs[:, 2, :] = self.time_encoder(timepoint)
         if full_depth is not None:
-            cell_embs = cell_embs.clone()
-            cell_embs[:, 1, :] += self.depth_encoder(torch.log2(1 + full_depth))
+            # cell_embs = cell_embs.clone()
+            # cell_embs[:, 1, :] += self.depth_encoder(torch.log2(1 + full_depth))
+            depth_encoded = self.depth_encoder(torch.log2(1 + full_depth)).unsqueeze(1)
+            cell_embs = torch.cat(
+                (cell_embs[:, :1, :], depth_encoded, cell_embs[:, 1:, :]), dim=1
+            )
 
         enc = torch.cat([cell_embs, enc], dim=1)
         return enc  # self.norm_and_dropout(enc) # we already apply prenorm & dropout  # (minibatch, seq_len, embsize)
@@ -745,8 +751,8 @@ class scPrint(L.LightningModule):
             output = self._generate(
                 output["cell_embs"],
                 gene_pos,
-                full_depth=total_count,
                 depth_mult=expression.sum(1),
+                full_depth=None,
                 do_mvc=do_mvc,
                 do_class=do_cls,
             )
@@ -1061,14 +1067,44 @@ class scPrint(L.LightningModule):
         if not self.trainer.is_global_zero:
             print("you are not on the main node. cancelling predict step")
             return
-        output = self.forward(
-            gene_pos,
-            expression,
-            depth_mult=expression.sum(1),
-            full_depth=depth,
-            get_attention_layer=self.get_attention_layer,
-            do_class=True,
-        )
+        if self.predict_mode == "none":
+            output = self.forward(
+                gene_pos,
+                expression,
+                depth_mult=expression.sum(1),
+                full_depth=depth,
+                get_attention_layer=self.get_attention_layer,
+                do_class=True,
+            )
+        elif self.predict_mode == "denoise":
+            output = self.forward(
+                gene_pos,
+                expression,
+                depth_mult=expression.sum(1) * self.predict_depth_mult,
+                full_depth=depth * self.predict_depth_mult,
+                get_attention_layer=self.get_attention_layer,
+                do_class=True,
+            )
+        elif self.predict_mode == "generate":
+            output = self.forward(
+                gene_pos,
+                expression,
+                full_depth=depth,
+                do_mvc=False,
+                do_class=False,
+            )
+            output = self._generate(
+                output["cell_embs"],
+                gene_pos,
+                full_depth=depth,
+                depth_mult=expression.sum(1),
+                do_class=self.do_cls,
+                do_mvc=False,
+            )
+        else:
+            raise ValueError(
+                "predict_mode needs to be one of ['none', 'denoise', 'generate']"
+            )
         if len(self.get_attention_layer) > 0:
             qkv = [i[:, :, :2, :] for i in output[1]]
             output = output[0]
