@@ -18,9 +18,9 @@ class MyCLI(LightningCLI):
             "data.decoders", "model.label_decoders", apply_on="instantiate"
         )
         parser.link_arguments(
-            "data.cls_hierarchy", "model.cls_hierarchy", apply_on="instantiate"
+            "data.labels_hierarchy", "model.labels_hierarchy", apply_on="instantiate"
         )
-        parser.link_arguments("data.labels", "model.labels", apply_on="instantiate")
+        parser.link_arguments("data.classes", "model.classes", apply_on="instantiate")
         parser.link_arguments(
             "data.gene_embeddings", "model.precpt_gene_emb", apply_on="parse"
         )

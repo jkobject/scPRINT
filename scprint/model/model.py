@@ -51,8 +51,8 @@ class scPrint(L.LightningModule):
         nlayers: int = 6,
         expr_encoder_layers: int = 2,
         layers_cls: list[int] = [],
-        labels: Dict[str, int] = {},
-        cls_hierarchy: Dict[str, Dict[int, list[int]]] = {},
+        classes: Dict[str, int] = {},
+        labels_hierarchy: Dict[str, Dict[int, list[int]]] = {},
         dropout: float = 0.2,
         transformer: str = "fast",
         expr_emb_style: str = "continuous",  # "binned_pos", "cont_pos"
@@ -80,8 +80,8 @@ class scPrint(L.LightningModule):
             d_hid (int, optional): The dimension of the feedforward network model. Defaults to 512.
             nlayers (int, optional): The number of layers in the transformer model. Defaults to 6.
             nlayers_cls (int, optional): The number of layers in the classifier. Defaults to 3.
-            labels (dict, optional): The classes to predict with number of labels for each. Defaults to {}.
-            cls_hierarchy (dict, optional): The class hierarchy for classes that have hierarchical labels. Defaults to {}.
+            classes (dict, optional): The classes to predict with number of classes for each. Defaults to {}.
+            classes_hierarchy (dict, optional): The class hierarchy for classes that have hierarchical classes. Defaults to {}.
             dropout (float, optional): The dropout value. Defaults to 0.5.
             transformer: (flag, optional) the transformer type to use. one of "linear", "flash", "flashsparse", "scprint". Defaults to "flash".
             domain_spec_batchnorm (str, optional): Whether to apply domain specific batch normalization. Defaults to False.
@@ -139,23 +139,23 @@ class scPrint(L.LightningModule):
         # need to store
         self.n_input_bins = n_input_bins
         self.transformer = transformer
-        self.labels_counts = labels
-        self.labels = list(labels.keys())
+        self.label_counts = classes
+        self.classes = list(classes.keys())
         self.cell_emb_style = cell_emb_style
         self.label_decoders = label_decoders
         self.pred_embedding = pred_embedding
         self.lr = lr
-        # compute tensor for mat_cls_hierarchy
-        self.mat_cls_hierarchy = {}
-        self.cls_hierarchy = cls_hierarchy
+        # compute tensor for mat_labels_hierarchy
+        self.mat_labels_hierarchy = {}
+        self.labels_hierarchy = labels_hierarchy
         if "strict_loading" in flash_attention_kwargs:
             flash_attention_kwargs.pop("strict_loading")
 
-        for k, v in cls_hierarchy.items():
-            tens = torch.zeros((len(v), labels[k]))
+        for k, v in labels_hierarchy.items():
+            tens = torch.zeros((len(v), classes[k]))
             for k2, v2 in v.items():
-                tens[k2 - labels[k], v2] = 1
-            self.mat_cls_hierarchy[k] = tens.to(bool)
+                tens[k2 - classes[k], v2] = 1
+            self.mat_labels_hierarchy[k] = tens.to(bool)
         self.expr_emb_style = expr_emb_style
 
         if self.expr_emb_style not in ["category", "continuous", "none"]:
@@ -211,21 +211,16 @@ class scPrint(L.LightningModule):
                 d_model, max_len=max_len, token_to_pos=token_to_pos
             )
 
-        self.cell_embs_count = len(self.labels) + 2
-        # Label Encoder
+        self.cell_embs_count = len(classes) + 2
+        # classes Encoder
         # always have [base_cell_emb, time_embedding, depth_embedding] + any other class info
         # base cell embedding will store other cell specific information
-        self.label_encoder = encoders.CategoryValueEncoder(
+        self.class_encoder = encoders.CategoryValueEncoder(
             self.cell_embs_count, d_model
         )
         # self.time_encoder = encoders.ContinuousValueEncoder(d_model, dropout)
         self.depth_encoder = encoders.ContinuousValueEncoder(
             d_model, dropout, layers=expr_encoder_layers
-        )
-        # final encoder norm and dropout
-        self.norm_and_dropout = nn.Sequential(
-            nn.LayerNorm(d_model),
-            nn.Dropout(dropout),
         )
 
         # Transformer
@@ -259,7 +254,7 @@ class scPrint(L.LightningModule):
                 feat_size=d_model,
                 edge_feat_size=edge_dim,
                 num_heads=nhead,
-                num_virtual_nodes=len(self.labels),
+                num_virtual_nodes=len(classes),
             )
         # regular or flash
         else:
@@ -280,15 +275,15 @@ class scPrint(L.LightningModule):
         # expression
         self.expr_decoder = decoders.ExprDecoder(
             d_model,
-            nfirst_labels_to_skip=self.cell_embs_count,
+            nfirst_tokens_to_skip=self.cell_embs_count,
             dropout=dropout,
         )
         # cls decoder
         self.cls_decoders = nn.ModuleDict()
         # should be a very simple classifier for most things
         # (maybe scale with the number of classes) should be 1 layer...
-        for label, n_cls in labels.items():
-            self.cls_decoders[label] = decoders.ClsDecoder(
+        for clss, n_cls in classes.items():
+            self.cls_decoders[clss] = decoders.ClsDecoder(
                 d_model, n_cls, layers=layers_cls, dropout=dropout
             )
 
@@ -349,7 +344,7 @@ class scPrint(L.LightningModule):
         if self.gene_pos_enc:
             enc += self.pos_encoder(gene_pos)
         cell_embs = (
-            self.label_encoder(
+            self.class_encoder(
                 torch.Tensor([list(range(self.cell_embs_count))] * gene_pos.shape[0])
                 .int()
                 .to(gene_pos.device)
@@ -393,16 +388,16 @@ class scPrint(L.LightningModule):
 
         output["cell_embs"] = self.get_cell_embs(transformer_output)
         output["cell_emb"] = torch.mean(output["cell_embs"].clone(), dim=1)
-        if len(self.labels) > 0 and do_class:
+        if len(self.classes) > 0 and do_class:
             output.update(
                 {
                     "cls_output_"
-                    + labelname: self.cls_decoders[labelname](
+                    + clsname: self.cls_decoders[clsname](
                         output["cell_embs"][
                             :, 2 + i, :
                         ]  # the first elem is the base cell embedding
                     )
-                    for i, labelname in enumerate(self.labels)
+                    for i, clsname in enumerate(self.classes)
                 }
             )  # (minibatch, n_cls)
         if do_mvc:
@@ -569,8 +564,8 @@ class scPrint(L.LightningModule):
         if type(self.transformer) is FlashTransformerEncoder:
             for encoder_layers in self.transformer.blocks:
                 encoder_layers.set_seq_parallel(True)
-        for k, v in self.mat_cls_hierarchy.items():
-            self.mat_cls_hierarchy[k] = v.to(self.device)
+        for k, v in self.mat_labels_hierarchy.items():
+            self.mat_labels_hierarchy[k] = v.to(self.device)
 
     def training_step(
         self,
@@ -666,7 +661,7 @@ class scPrint(L.LightningModule):
             ).to(gene_pos.device)
             output = self.forward(
                 gene_pos,
-                expression,
+                expression=expression,
                 mask=mask,
                 full_depth=total_count,
                 do_mvc=do_mvc,
@@ -696,7 +691,7 @@ class scPrint(L.LightningModule):
                 expr = utils.downsample_profile(expression, dropout=i)
                 output = self.forward(
                     gene_pos,
-                    expr,
+                    expression=expr,
                     depth_mult=expression.sum(1),
                     full_depth=total_count,
                     do_mvc=do_mvc,
@@ -829,20 +824,20 @@ class scPrint(L.LightningModule):
         total_loss += loss_expr
         losses.update({"expr": loss_expr})
 
-        # TASK 2. predict labels
-        if len(self.labels) > 0:
+        # TASK 2. predict classes
+        if len(self.classes) > 0:
             loss_cls = 0
             loss_adv_cls = 0
-            for j, labelname in enumerate(self.labels):
-                if "cls_output_" + labelname not in output:
+            for j, clsname in enumerate(self.classes):
+                if "cls_output_" + clsname not in output:
                     continue
-                # setting the labels from index to one hot
+                # setting the classes from index to one hot
                 loss_cls += self.class_scale * loss.classification(
-                    labelname,
-                    pred=output["cls_output_" + labelname],
+                    clsname,
+                    pred=output["cls_output_" + clsname],
                     cl=clss[:, j],
-                    maxsize=self.labels_counts[labelname],
-                    cls_hierarchy=self.mat_cls_hierarchy,
+                    maxsize=self.label_counts[clsname],
+                    labels_hierarchy=self.mat_labels_hierarchy,
                 )
             total_loss += loss_cls
             if loss_cls != 0:
@@ -850,17 +845,17 @@ class scPrint(L.LightningModule):
             # TASK 2bis. adversarial label prediction
             if do_adv_cls:
                 embs = output["cell_embs"][:, 2:, :].clone()
-                for j, adv_label in enumerate(self.labels):
-                    ind = torch.arange(len(self.labels))
+                for j, adv_cls in enumerate(self.classes):
+                    ind = torch.arange(len(self.classes))
                     mean_embs = torch.mean(embs[:, ind != j, :], dim=1)
                     mean_embs = grad_reverse(mean_embs, lambd=1.0)
-                    adv_pred = self.cls_decoders[adv_label](mean_embs)
+                    adv_pred = self.cls_decoders[adv_cls](mean_embs)
                     loss_adv_cls += (self.class_scale / 2) * loss.classification(
-                        adv_label,
+                        adv_cls,
                         pred=adv_pred,
                         cl=clss[:, j],
-                        maxsize=self.labels_counts[adv_label],
-                        cls_hierarchy=self.mat_cls_hierarchy,
+                        maxsize=self.label_counts[adv_cls],
+                        labels_hierarchy=self.mat_labels_hierarchy,
                     )
 
                 total_loss += loss_adv_cls
@@ -939,8 +934,8 @@ class scPrint(L.LightningModule):
         pass
 
     def on_validation_start(self):
-        for k, v in self.mat_cls_hierarchy.items():
-            self.mat_cls_hierarchy[k] = v.to(self.device)
+        for k, v in self.mat_labels_hierarchy.items():
+            self.mat_labels_hierarchy[k] = v.to(self.device)
 
     def on_validation_epoch_start(self):
         self.embs = None
@@ -1050,7 +1045,7 @@ class scPrint(L.LightningModule):
         @see predict_step will save output of predict in multiple self variables
 
         - embs: the cell embeddings (means from label specific embeddings given by self.pred_embedding)
-        - pred: the predicted cell labels
+        - pred: the predicted cell classes
         - pos: the genes used
         - expr_pred: the expression prediction. [mean, disp, zero_logits]
         - mean_attn: the mean attention across cells for the given layer (in self.get_attention_layer)
@@ -1062,7 +1057,7 @@ class scPrint(L.LightningModule):
             other important arguments:
             keep_output (bool, optional): whether to keep the output in memory. Defaults to True.
             self.get_attention_layer (list, optional): the layers to get the attention from. Defaults to [].
-            self.pred_embedding (list, optional): the labels to predict. Defaults to [].
+            self.pred_embedding (list, optional): the classes to predict. Defaults to [].
 
         """
         if not self.trainer.is_global_zero:
@@ -1085,15 +1080,15 @@ class scPrint(L.LightningModule):
         #    cell_embs, gene_pos, depth_mult=expression.sum(1), full_depth=depth
         # )
         if len(self.pred_embedding) == 0:
-            self.pred_embedding = self.labels
-        ind = [self.labels.index(i) + 2 for i in self.pred_embedding]
+            self.pred_embedding = self.classes
+        ind = [self.classes.index(i) + 2 for i in self.pred_embedding]
         if not keep_output:
             return {
                 "embs": torch.mean(cell_embs[:, ind, :], dim=1),
                 "class": torch.stack(
                     [
-                        torch.argmax(output["cls_output_" + labelname], dim=1)
-                        for labelname in self.labels
+                        torch.argmax(output["cls_output_" + clsname], dim=1)
+                        for clsname in self.classes
                     ]
                 ).transpose(0, 1),
                 "pos": gene_pos,
@@ -1103,8 +1098,8 @@ class scPrint(L.LightningModule):
             self.embs = torch.mean(cell_embs[:, ind, :], dim=1)
             self.pred = torch.stack(
                 [
-                    torch.argmax(output["cls_output_" + labelname], dim=1)
-                    for labelname in self.labels
+                    torch.argmax(output["cls_output_" + clsname], dim=1)
+                    for clsname in self.classes
                 ]
             ).transpose(0, 1)
             self.pos = gene_pos
@@ -1118,8 +1113,8 @@ class scPrint(L.LightningModule):
                     self.pred,
                     torch.stack(
                         [
-                            torch.argmax(output["cls_output_" + labelname], dim=1)
-                            for labelname in self.labels
+                            torch.argmax(output["cls_output_" + clsname], dim=1)
+                            for clsname in self.classes
                         ]
                     ).transpose(0, 1),
                 ],
@@ -1165,9 +1160,9 @@ class scPrint(L.LightningModule):
         Returns:
             Tensor: The cell embeddings tensor.
         """
-        if self.cell_emb_style == "cls" and self.labels is not None:
+        if self.cell_emb_style == "cls" and self.classes is not None:
             # (minibatch, embsize)
-            cell_emb = layer_output[:, : 2 + len(self.labels)]
+            cell_emb = layer_output[:, : 2 + len(self.classes)]
         elif self.cell_emb_style == "avg-pool":
             cell_emb = torch.mean(layer_output, dim=1)
         else:
@@ -1196,7 +1191,7 @@ class scPrint(L.LightningModule):
             src(:obj:`Tensor`): A tensor representing the source data. It has a shape of (minibatch, seq_len).
             values(:obj:`Tensor`): An optional tensor representing the values. It has a shape of (minibatch, seq_len).
             gen_iters(:obj:`int`): An integer representing the number of generation iterations.
-            labels(:obj:`Tensor`): An optional tensor representing the labels. It has a shape of (batch,).
+            classes(:obj:`Tensor`): An optional tensor representing the classes. It has a shape of (batch,).
         """
         if tp is not None:
             tp = tp / gen_iters
@@ -1228,10 +1223,10 @@ class scPrint(L.LightningModule):
         adata, fig = utils.make_adata(
             self.pred,
             self.embs,
-            self.labels,
+            self.classes,
             self.trainer.global_step,
             self.label_decoders,
-            self.cls_hierarchy,
+            self.labels_hierarchy,
             gtclass,
             name,
             mdir,

@@ -30,7 +30,7 @@ class ExprDecoder(nn.Module):
     def __init__(
         self,
         d_model: int,
-        nfirst_labels_to_skip: int = 0,
+        nfirst_tokens_to_skip: int = 0,
         dropout: float = 0.1,
     ):
         """
@@ -40,11 +40,11 @@ class ExprDecoder(nn.Module):
 
         Args:
             d_model (int): The dimension of the model. This is the size of the input feature vector.
-            nfirst_labels_to_skip (int, optional): The number of initial labels to skip in the sequence. Defaults to 0.
+            nfirst_tokens_to_skip (int, optional): The number of initial labels to skip in the sequence. Defaults to 0.
             dropout (float, optional): The dropout rate applied during training to prevent overfitting. Defaults to 0.1.
         """
         super(ExprDecoder, self).__init__()
-        self.nfirst_labels_to_skip = nfirst_labels_to_skip
+        self.nfirst_tokens_to_skip = nfirst_tokens_to_skip
         self.fc = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.LayerNorm(d_model),
@@ -59,7 +59,7 @@ class ExprDecoder(nn.Module):
     def forward(self, x: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
         # we don't do it on the labels
-        x = self.fc(x[:, self.nfirst_labels_to_skip :, :])
+        x = self.fc(x[:, self.nfirst_tokens_to_skip :, :])
         pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
             1, dim=-1
         )  # (batch, seq_len)

@@ -216,19 +216,19 @@ def ecs(cell_emb, ecs_threshold=0.5):
     return torch.mean(1 - (cos_sim - ecs_threshold) ** 2)
 
 
-def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
+def classification(clsname, pred, cl, maxsize, labels_hierarchy={}):
     """
     Computes the classification loss for a given batch of predictions and ground truth labels.
 
     Args:
-        labelname (str): The name of the label.
+        clsname (str): The name of the label.
         pred (Tensor): The predicted logits for the batch.
         cl (Tensor): The ground truth labels for the batch.
         maxsize (int): The number of possible labels.
-        cls_hierarchy (dict, optional): The hierarchical structure of the labels. Defaults to {}.
+        labels_hierarchy (dict, optional): The hierarchical structure of the labels. Defaults to {}.
 
     Raises:
-        ValueError: If the labelname is not found in the cls_hierarchy dictionary.
+        ValueError: If the clsname is not found in the labels_hierarchy dictionary.
 
     Returns:
         Tensor: The computed binary cross entropy loss for the given batch.
@@ -247,8 +247,8 @@ def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
     # if we have non leaf values, we don't know so we don't compute grad and set weight to 0
     # and add labels that won't be counted but so that we can still use them
     if inv.any():
-        if labelname in cls_hierarchy.keys():
-            clhier = cls_hierarchy[labelname]
+        if clsname in labels_hierarchy.keys():
+            clhier = labels_hierarchy[clsname]
 
             inv_weight = weight[inv]
             # we set the weight of the elements that are not leaf to 0
@@ -277,7 +277,7 @@ def classification(labelname, pred, cl, maxsize, cls_hierarchy={}):
             pred = torch.cat([pred, addpred.unsqueeze(1)], dim=1)
             weight = torch.cat([weight, addweight.unsqueeze(1)], dim=1)
         else:
-            raise ValueError("need to use cls_hierarchy for this usecase")
+            raise ValueError("need to use labels_hierarchy for this usecase")
 
     myloss = torch.nn.functional.binary_cross_entropy_with_logits(
         pred, target=newcl, weight=weight
