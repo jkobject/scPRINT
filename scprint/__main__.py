@@ -26,8 +26,9 @@ class MySaveConfig(SaveConfigCallback):
                     log_graph=self.config.get("wandblog_graph", False),
                 )
                 # trainer.logger.log_hyperparams({'datamodule':trainer.datamodule})
-            print(trainer.datamodule)
-            print(trainer.callbacks)
+            if trainer.is_global_zero:
+                print(trainer.datamodule)
+                print(trainer.callbacks)
         return super().setup(trainer, pl_module, stage)
 
 

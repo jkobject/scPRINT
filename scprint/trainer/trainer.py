@@ -56,9 +56,7 @@ class TrainingMode(Callback):
         self.class_scale = class_scale
         self.mask_ratio = mask_ratio
         self.warmup_duration = warmup_duration
-        self.weight_decay = weight_decay
         self.fused_adam = fused_adam
-        self.optim = optim
         self.mvc_scale = mvc_scale
         self.do_cls = do_cls
         self.adv_class_scale = adv_class_scale
@@ -87,11 +85,9 @@ class TrainingMode(Callback):
             f"class_scale={self.class_scale}, "
             f"mask_ratio={self.mask_ratio}, "
             f"warmup_duration={self.warmup_duration}, "
-            f"weight_decay={self.weight_decay}, "
             f"fused_adam={self.fused_adam}, "
             f"lr_reduce_patience={self.lr_reduce_patience}, "
             f"lr_reduce_factor={self.lr_reduce_factor}, "
-            f"optim={self.optim}, "
             f"mvc_scale={self.mvc_scale}, "
             f"do_cls={self.do_cls}, "
             f"do_adv_batch={self.do_adv_batch}, "
@@ -114,10 +110,8 @@ class TrainingMode(Callback):
         model.class_scale = self.class_scale
         model.mask_ratio = self.mask_ratio
         model.warmup_duration = self.warmup_duration
-        model.weight_decay = self.weight_decay
         model.fused_adam = self.fused_adam
         model.do_generate = self.do_generate
-        model.optim = self.optim
         model.mvc_scale = self.mvc_scale
         model.do_cls = self.do_cls
         model.adv_class_scale = self.adv_class_scale

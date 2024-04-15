@@ -22,6 +22,7 @@ def make_adata(
     pred: Tensor,
     embs: Tensor,
     labels: List[str],
+    # attention: Optional[Tensor] = None,
     step: int = 0,
     label_decoders: Optional[Dict] = None,
     cls_hierarchy: Dict = {},
@@ -172,6 +173,7 @@ def make_adata(
             axs[i].set_title(col + " UMAP" + acc)
             axs[i].set_xlabel("UMAP1")
             axs[i].set_ylabel("UMAP2")
+    # adata.varm['QKs'] = attention
     adata.write(mdir + "/step_" + str(step) + "_" + name + ".h5ad")
     plt.show()
     return adata, fig

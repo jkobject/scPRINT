@@ -63,6 +63,8 @@ class scPrint(L.LightningModule):
         pred_embedding: list[str] = [],
         cell_emb_style: str = "cls",
         lr: float = 0.001,
+        optim: str = "adamW",
+        weight_decay: float = 0.01,
         label_decoders: Optional[Dict[str, Dict[int, str]]] = None,
         **flash_attention_kwargs,
     ):
@@ -110,6 +112,8 @@ class scPrint(L.LightningModule):
         self.do_adv_cls = False
         self.adv_class_scale = 0.1
         self.do_cls = True
+        self.mean_attn_tot = None
+        self.mean_attn_tot_c = 0
         self.do_adv_batch = True
         self.run_full_forward = True
         self.class_scale = 0.4
@@ -117,8 +121,8 @@ class scPrint(L.LightningModule):
         self.do_generate = False
         self.mask_ratio = [0.3]
         self.warmup_duration = 500
-        self.weight_decay = 0.01
-        self.optim = "adamW"
+        self.weight_decay = weight_decay
+        self.optim = optim
         self.fused_adam = False
         self.lr_reduce_patience = 1
         self.lr_reduce_factor = 0.6
@@ -680,7 +684,7 @@ class scPrint(L.LightningModule):
                 batch_idx,
                 do_ecs,
                 do_adv_cls & do_cls,
-                # do_adv_batch & do_cls,
+                do_adv_batch & do_cls,
             )
             # we only want to do them once
             # do_mvc = False if do_mvc else do_mvc
@@ -733,20 +737,22 @@ class scPrint(L.LightningModule):
                     do_mvc=do_mvc,
                     do_class=False,
                 )
-                l, tloss = self._compute_loss(
-                    output,
-                    expression,
-                    clss,
-                    batch_idx,
-                    do_ecs,
-                    do_adv_cls,
-                )
-                do_mvc = False if do_mvc else do_mvc
-                do_cls = False if do_cls else do_cls
+            ## TODO: to delete?
+            # l, tloss = self._compute_loss(
+            #    output,
+            #    expression,
+            #    clss,
+            #    batch_idx,
+            #    do_ecs,
+            #    do_adv_cls,
+            #    do_adv_batch & do_cls,
+            # )
+            # do_mvc = False if do_mvc else do_mvc
+            # do_cls = False if do_cls else do_cls
 
-                losses.update({"pregen_" + k: v for k, v in l.items()})
-                total_loss += tloss
-                cell_embs.append(output["cell_emb"].clone())
+            # losses.update({"pregen_" + k: v for k, v in l.items()})
+            # total_loss += tloss
+            # cell_embs.append(output["cell_emb"].clone())
 
             output = self._generate(
                 output["cell_embs"],
@@ -764,6 +770,7 @@ class scPrint(L.LightningModule):
                 batch_idx,
                 do_ecs,
                 do_adv_cls,
+                do_adv_batch & do_cls,
             )
             losses.update({"gen_" + k: v for k, v in l.items()})
             total_loss += tloss
@@ -798,6 +805,7 @@ class scPrint(L.LightningModule):
         batch_idx,
         do_ecs=False,
         do_adv_cls=False,
+        do_adv_batch=False,
     ):
         """
         _compute_loss compute the loss of the model given output from the forward pass
@@ -870,12 +878,14 @@ class scPrint(L.LightningModule):
                 total_loss += self.adv_class_scale * loss_adv_cls
                 losses.update({"adv_cls": loss_adv_cls})
 
-        if self.grad_reverse_discriminator_loss is not None and batch_idx is not None:
+        if (
+            do_adv_batch
+            and self.grad_reverse_discriminator_loss is not None
+            and batch_idx is not None
+        ):
             mean_emb = torch.mean(output["cell_embs"][:, 2:, :].clone(), dim=1)
-            loss_adv = self.grad_reverse_discriminator_loss(mean_emb, batch_idx) * (
-                self.class_scale / 8
-            )
-            total_loss += loss_adv
+            loss_adv = self.grad_reverse_discriminator_loss(mean_emb, batch_idx)
+            total_loss += loss_adv * self.class_scale / 8
             losses.update({"adv_batch": loss_adv})
         # TASK 2ter. cell KO effect prediction
         # (just use a novel class, cell state and predict if cell death or not from it)
@@ -1254,6 +1264,7 @@ class scPrint(L.LightningModule):
             mdir = self.logger.save_dir if self.logger.save_dir is not None else "/tmp"
         except:
             mdir = "/tmp"
+
         adata, fig = utils.make_adata(
             self.pred,
             self.embs,
