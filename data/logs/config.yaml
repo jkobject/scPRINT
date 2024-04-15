@@ -1,8 +1,8 @@
 # lightning.pytorch==2.2.0.post0
-seed_everything: 0
+seed_everything: 10
 trainer:
   accelerator: auto
-  strategy: ddp_find_unused_parameters_true
+  strategy: auto
   devices: auto
   num_nodes: 1
   precision: 16-mixed
@@ -61,18 +61,18 @@ trainer:
       class_scale: 1.5
       optim: adamW
       mask_ratio: []
-      warmup_duration: 1000
+      warmup_duration: 500
       weight_decay: 0.01
       fused_adam: true
       adv_class_scale: 0.1
       lr_reduce_patience: 2
-      lr_reduce_factor: 0.66
-      do_cls: false
+      lr_reduce_factor: 0.5
+      do_cls: true
       do_adv_batch: true
-      run_full_forward: false
+      run_full_forward: true
   - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
     init_args:
-      swa_lrs: 0.05
+      swa_lrs: 0.01
       swa_epoch_start: 0.8
       annealing_epochs: 10
       annealing_strategy: cos
@@ -117,20 +117,20 @@ trainer:
   min_epochs: null
   max_steps: -1
   min_steps: null
-  max_time: '{''hours'': 72}'
-  limit_train_batches: 10000
-  limit_val_batches: 4000
+  max_time: '{''hours'': 12}'
+  limit_train_batches: 5000
+  limit_val_batches: 1000
   limit_test_batches: null
   limit_predict_batches: null
   overfit_batches: 0.0
   val_check_interval: null
   check_val_every_n_epoch: 1
   num_sanity_val_steps: null
-  log_every_n_steps: 100
+  log_every_n_steps: 50
   enable_checkpointing: null
   enable_progress_bar: null
   enable_model_summary: null
-  accumulate_grad_batches: 8
+  accumulate_grad_batches: 1
   gradient_clip_val: 10
   gradient_clip_algorithm: null
   deterministic: null
@@ -145,14 +145,14 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   default_root_dir: null
 model:
-  d_model: 1280
-  nhead: 20
+  d_model: 128
+  nhead: 4
   d_hid: 512
   edge_dim: 12
-  nlayers: 33
+  nlayers: 4
   expr_encoder_layers: 2
   layers_cls:
-  - 512
+  - 128
   dropout: 0.1
   transformer: flash
   expr_emb_style: continuous
@@ -165,7 +165,7 @@ model:
   - self_reported_ethnicity_ontology_term_id
   - sex_ontology_term_id
   cell_emb_style: cls
-  lr: 0.0001
+  lr: 0.002
   optim: adamW
   weight_decay: 0.01
   residual_in_fp32: true
@@ -192,10 +192,10 @@ data:
   organisms:
   - NCBITaxon:9606
   - NCBITaxon:10090
-  weight_scaler: 100
-  train_oversampling_per_epoch: 0.05
+  weight_scaler: 10
+  train_oversampling_per_epoch: 1.0
   validation_split: 0.05
-  test_split: 0.02
+  test_split: 0.05
   gene_embeddings: ./data/main/gene_embeddings.parquet
   use_default_col: true
   gene_position_tolerance: 10000
@@ -220,7 +220,7 @@ data:
   - self_reported_ethnicity_ontology_term_id
   how: random expr
   organism_name: organism_ontology_term_id
-  max_len: 2400
+  max_len: 1200
   add_zero_genes: 0
   do_gene_pos: ./data/main/biomart_pos.parquet
   tp_name: null
@@ -229,10 +229,10 @@ data:
   - EFO:0010961
   - EFO:0030007
   - EFO:0030062
-  batch_size: 1
+  batch_size: 64
   shuffle: null
   batch_sampler: null
-  num_workers: 12
+  num_workers: 16
   pin_memory: false
   drop_last: false
   timeout: 0

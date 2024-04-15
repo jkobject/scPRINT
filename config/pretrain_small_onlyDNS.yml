@@ -35,12 +35,13 @@ trainer:
         do_mvc: False
         do_generate: True
         do_adv_cls: False
-        do_adv_batch: False
+        do_adv_batch: True
         do_next_tp: False
         run_full_forward: True
-        do_cls: False
+        do_cls: True
         class_scale: 1.5
         warmup_duration: 500
+        weight_decay: 0.01
         fused_adam: True
         mask_ratio: []
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging

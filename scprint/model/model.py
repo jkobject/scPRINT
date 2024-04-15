@@ -1005,7 +1005,7 @@ class scPrint(L.LightningModule):
         if self.trainer.state.stage != "sanity_check":
             sch = self.lr_schedulers()
             sch.step(self.trainer.callback_metrics["val_loss"])
-        self.log_adata(gtclass=self.info)
+            self.log_adata(gtclass=self.info)
 
     def test_step(self, batch, batch_idx):
         """

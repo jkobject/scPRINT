@@ -232,7 +232,7 @@ def _init_weights(
                 )
 
 
-def downsample_profile(mat: Tensor, dropout: float, method="old"):
+def downsample_profile(mat: Tensor, dropout: float, method="new"):
     """
     This function downsamples the expression profile of a given single cell RNA matrix.
 
