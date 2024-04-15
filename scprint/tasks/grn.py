@@ -57,12 +57,11 @@ class GRNfer:
         k=10,
         apc=False,
         known_grn=None,
-        symmetrize=True,
+        symmetrize=False,
         doplot=True,
         max_cells=0,
         forward_mode="none",
         genes: list = [],
-        loc="./",
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -93,7 +92,7 @@ class GRNfer:
             "given",
         ], "how must be one of 'most var within', 'most var across', 'random expr', 'given'"
         self.num_genes = num_genes
-        self.organisms = organisms
+        self.organisms = organisms if type(organisms) is list else [organisms]
         self.model_name = model_name
         self.adata = adata
         self.preprocess = preprocess
@@ -106,7 +105,6 @@ class GRNfer:
         self.forward_mode = forward_mode
         self.k = k
         self.symmetrize = symmetrize
-        self.loc = loc
         self.known_grn = known_grn
         self.head_agg = head_agg
         self.max_cells = max_cells
@@ -114,24 +112,15 @@ class GRNfer:
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
-    def __call__(self, layer, cell_type=None):
+    def __call__(self, layer, cell_type=None, locname=""):
         # Add at least the organism you are working with
         subadata = self.predict(cell_type, layer)
         adjacencies = self.aggregate(self.model.mean_attn)
-        if self.head_agg == "none" or self.cell_agg == "none":
+        if self.head_agg in ["none", "class"] or self.cell_agg == "none":
             adjacencies = adjacencies.reshape(
                 -1, adjacencies.shape[-2], adjacencies.shape[-1]
             ).T
-            loc = np.array(
-                (subadata[:, subadata.var.index.isin(self.curr_genes)].X != 0).sum(0)
-                > 2
-            )[0]
-            self.curr_genes = subadata[
-                :, subadata.var.index.isin(self.curr_genes[loc])
-            ].var.symbol.tolist()
-            adj = adj[8:, 8:, :][loc, :, :][:, loc, :]
-            np.save("adj.npy", adj)
-            return adj
+            self.save(adjacencies[8:, 8:, :], subadata, locname)
         elif self.cell_agg == "consensus":
             return self.save(
                 np.sum(
@@ -139,10 +128,10 @@ class GRNfer:
                     axis=0,
                 ),
                 subadata,
-                self.loc,
+                locname,
             )
         else:
-            return self.save(self.filter(adjacencies)[8:, 8:], subadata, self.loc)
+            return self.save(self.filter(adjacencies)[8:, 8:], subadata, locname)
 
     def predict(self, layer, cell_type=None):
         self.curr_genes = None
@@ -182,7 +171,7 @@ class GRNfer:
         adataset = SimpleAnnDataset(
             subadata, obs_to_output=["organism_ontology_term_id"]
         )
-        col = Collator(
+        self.col = Collator(
             organisms=self.organisms,
             valid_genes=self.model.genes,
             how="some" if self.how != "random expr" else "random expr",
@@ -190,7 +179,7 @@ class GRNfer:
         )
         dataloader = DataLoader(
             adataset,
-            collate_fn=col,
+            collate_fn=self.col,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=False,
@@ -337,7 +326,7 @@ class GRNfer:
             subadata[:, subadata.var.index.isin(self.curr_genes)].copy(),
             grn=grn,
         )
-        grn = grn[:, (grn.X != 0).sum(0) > (self.max_cells / 20)]
+        grn = grn[:, (grn.X != 0).sum(0) > (self.max_cells / 32)]
 
         grn.var_names = grn.var["symbol"]
         grn.var["TFs"] = [True if i in utils.TF else False for i in grn.var_names]

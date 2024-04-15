@@ -1004,7 +1004,7 @@ class scPrint(L.LightningModule):
     def on_validation_epoch_end(self):
         """@see pl.LightningModule"""
         if not self.trainer.is_global_zero:
-            print("you are not on the main node. cancelling logging step")
+            # print("you are not on the main node. cancelling logging step")
             return
         if self.trainer.state.stage != "sanity_check":
             sch = self.lr_schedulers()
@@ -1175,20 +1175,18 @@ class scPrint(L.LightningModule):
                     torch.cat((self.mean_attn[i], j), 0) for i, j in enumerate(qkv)
                 ]
         self.n_c_batch += 1
+        if self.n_c_batch % 1000 == 0:
+            self.log_adata()
+            self.pos = None
+            self.expr_pred = None
+            self.pred = None
+            self.embs = None
 
     def on_predict_epoch_end(self):
         """@see pl.LightningModule will"""
         if not self.trainer.is_global_zero:
             print("you are not on the main node. cancelling logging step")
             return
-        self.expr_pred = [
-            i.to(device="cpu", dtype=torch.float32) for i in self.expr_pred
-        ]
-        self.pred = self.pred.to(device="cpu", dtype=torch.float32)
-        self.embs = self.embs.to(device="cpu", dtype=torch.float32)
-        self.pos = self.pos.to(device="cpu", dtype=torch.int32)
-        if len(self.get_attention_layer) > 0:
-            self.mean_attn = [i / self.n_c_batch for i in self.mean_attn]
         if self.pred_log_adata:
             return self.log_adata()
 
@@ -1265,10 +1263,20 @@ class scPrint(L.LightningModule):
             mdir = self.logger.save_dir if self.logger.save_dir is not None else "/tmp"
         except:
             mdir = "/tmp"
+
+        if len(self.get_attention_layer) > 0:
+            self.mean_attn_tot = [
+                self.mean_attn_tot[i] + (v / self.n_c_batch)
+                for i, v in enumerate(self.mean_attn)
+            ]
+            self.mean_attn = None
+            self.mean_attn_tot_c += 1
+
         adata, fig = utils.make_adata(
             self.pred,
             self.embs,
-            self.labels,
+            self.classes,
+            self.mean_attn_tot / self.mean_attn_tot_c,
             self.trainer.global_step,
             self.label_decoders,
             self.cls_hierarchy,
