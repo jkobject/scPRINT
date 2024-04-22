@@ -160,3 +160,7 @@ data/main/motifs-v10-nr.hgnc-m0.00001-o0.0.tbl
 data/main/main_scenic+_database.feather
 *.npy
 *.joblib
+notebooks/assessments/collator_output.txt
+notebooks/assessments/curr_genes_mouse.csv
+notebooks/assessments/curr_genes.csv
+notebooks/assessments/precision_recall_plot.png
