@@ -15,17 +15,21 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 
+from scprint.tasks import generate
+
 
 def make_adata(
     pred: Tensor,
     embs: Tensor,
     labels: List[str],
+    attention: Optional[Tensor] = None,
     step: int = 0,
     label_decoders: Optional[Dict] = None,
     cls_hierarchy: Dict = {},
     gtclass: Optional[Tensor] = None,
     name: str = "",
     mdir: str = "/tmp",
+    doplot: bool = True,
 ):
     """
     This function creates an AnnData object from the given input parameters.
@@ -110,66 +114,102 @@ def make_adata(
                     res.append(False)
                 # else we pass
             accuracy["pred_" + label] = sum(res) / len(res)
-    sc.pp.neighbors(adata, use_rep="X")
-    sc.tl.umap(adata)
-    sc.tl.leiden(adata, key_added="sprint_leiden")
     adata.obs = adata.obs.astype("category")
+    if False:
+        adata.varm["Qs"] = (
+            attention[:, :, 0, :, :]
+            .permute(1, 3, 0, 2)
+            .view(
+                attention.shape[0],
+                attention.shape[1],
+                attention.shape[3] * attention.shape[4],
+            )
+            .detach()
+            .cpu()
+            .numpy()
+        )
+        adata.varm["Ks"] = (
+            attention[:, :, 1, :, :]
+            .permute(1, 3, 0, 2)
+            .view(
+                attention.shape[0],
+                attention.shape[1],
+                attention.shape[3] * attention.shape[4],
+            )
+            .detach()
+            .cpu()
+            .numpy()
+        )
     print(adata)
-    if gtclass is not None:
-        color = [
-            i
-            for pair in zip(
-                [
-                    "conv_" + i if "conv_" + i in adata.obs.columns else i
-                    for i in labels
-                ],
-                [
+    if doplot:
+        sc.pp.neighbors(adata, use_rep="X")
+        sc.tl.umap(adata)
+        sc.tl.leiden(adata, key_added="sprint_leiden")
+        if gtclass is not None:
+            color = [
+                i
+                for pair in zip(
+                    [
+                        "conv_" + i if "conv_" + i in adata.obs.columns else i
+                        for i in labels
+                    ],
+                    [
+                        (
+                            "conv_pred_" + i
+                            if "conv_pred_" + i in adata.obs.columns
+                            else "pred_" + i
+                        )
+                        for i in labels
+                    ],
+                )
+                for i in pair
+            ]
+            fig, axs = plt.subplots(
+                int(len(color) / 2), 2, figsize=(24, len(color) * 4)
+            )
+            plt.subplots_adjust(wspace=1)
+            for i, col in enumerate(color):
+                sc.pl.umap(
+                    adata,
+                    color=col,
+                    ax=axs[i // 2, i % 2],
+                    show=False,
+                )
+                acc = ""
+                if "_pred_" in col and col.split("conv_")[-1] in accuracy:
+                    acc = " (accuracy: {:.2f})".format(accuracy[col.split("conv_")[-1]])
+                axs[i // 2, i % 2].set_title(col + " UMAP" + acc)
+                if "cell_type" in col:
+                    axs[i // 2, i % 2].legend(fontsize="x-small")
+                axs[i // 2, i % 2].set_xlabel("UMAP1")
+                axs[i // 2, i % 2].set_ylabel("UMAP2")
+        else:
+            color = [
+                (
                     "conv_pred_" + i
                     if "conv_pred_" + i in adata.obs.columns
                     else "pred_" + i
-                    for i in labels
-                ],
-            )
-            for i in pair
-        ]
-        fig, axs = plt.subplots(int(len(color) / 2), 2, figsize=(24, len(color) * 4))
-        plt.subplots_adjust(wspace=1)
-        for i, col in enumerate(color):
-            sc.pl.umap(
-                adata,
-                color=col,
-                ax=axs[i // 2, i % 2],
-                show=False,
-            )
-            acc = ""
-            if "_pred_" in col and col.split("conv_")[-1] in accuracy:
-                acc = " (accuracy: {:.2f})".format(accuracy[col.split("conv_")[-1]])
-            axs[i // 2, i % 2].set_title(col + " UMAP" + acc)
-            if "cell_type" in col:
-                axs[i // 2, i % 2].legend(fontsize="x-small")
-            axs[i // 2, i % 2].set_xlabel("UMAP1")
-            axs[i // 2, i % 2].set_ylabel("UMAP2")
+                )
+                for i in labels
+            ]
+            fig, axs = plt.subplots(len(color), 1, figsize=(16, len(color) * 8))
+            for i, col in enumerate(color):
+                sc.pl.umap(
+                    adata,
+                    color=col,
+                    ax=axs[i],
+                    show=False,
+                )
+                acc = ""
+                if "_pred_" in col and col.split("conv_")[-1] in accuracy:
+                    acc = " (accuracy: {:.2f})".format(accuracy[col.split("conv_")[-1]])
+                axs[i].set_title(col + " UMAP" + acc)
+                axs[i].set_xlabel("UMAP1")
+                axs[i].set_ylabel("UMAP2")
+        plt.show()
     else:
-        color = [
-            "conv_pred_" + i if "conv_pred_" + i in adata.obs.columns else "pred_" + i
-            for i in labels
-        ]
-        fig, axs = plt.subplots(len(color), 1, figsize=(16, len(color) * 8))
-        for i, col in enumerate(color):
-            sc.pl.umap(
-                adata,
-                color=col,
-                ax=axs[i],
-                show=False,
-            )
-            acc = ""
-            if "_pred_" in col and col.split("conv_")[-1] in accuracy:
-                acc = " (accuracy: {:.2f})".format(accuracy[col.split("conv_")[-1]])
-            axs[i].set_title(col + " UMAP" + acc)
-            axs[i].set_xlabel("UMAP1")
-            axs[i].set_ylabel("UMAP2")
+        fig = None
     adata.write(mdir + "/step_" + str(step) + "_" + name + ".h5ad")
-    plt.show()
     return adata, fig
 
 
@@ -378,3 +418,29 @@ def translate(
         return {i: obj.loc[i]["name"] for i in set(val)}
     elif type(val) is dict or type(val) is Counter:
         return {obj.loc[k]["name"]: v for k, v in val.items()}
+
+
+class Attention:
+    def __init__(self, gene_dim):
+        self.data = None
+        self.gene_dim = gene_dim
+        self.div = None
+
+    def agg(self, x: list[Tensor], pos: Tensor):
+        pos = pos.detach().to("cpu")
+        if self.data is None:
+
+            self.data = torch.zeros([len(x), self.gene_dim] + list(x[0].shape[2:]))
+            self.div = torch.zeros(self.gene_dim)
+
+        for i in range(x[0].shape[0]):
+            loc = torch.cat([torch.Tensor([r for r in range(8)]), pos[i] + 8]).int()
+            for j in range(len(x)):
+                self.data[j, loc, :, :, :] += x[j][i].detach().to("cpu")
+            self.div[loc] += 1
+
+    def get(self):
+        if self.data is None:
+            return None
+        # shape is (layers, genes, qkv, heads, emb)
+        return self.data / self.div.view(1, self.div.shape[0], 1, 1, 1)
