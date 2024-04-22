@@ -135,7 +135,9 @@ class GRNfer:
             adatac = sc.pp.log1p(subadata, copy=True)
             sc.pp.highly_variable_genes(adatac)
             self.curr_genes = subadata.var.index[
-                np.argsort(adatac.var["dispersions_norm"].values)[::-1][: self.num_genes]
+                np.argsort(adatac.var["dispersions_norm"].values)[::-1][
+                    : self.num_genes
+                ]
             ].tolist()
             del adatac
             print(
@@ -182,9 +184,8 @@ class GRNfer:
     def aggregate(self, attn):
         badloc = torch.isnan(attn.sum((0, 2, 3, 4)))
         attn = attn[:, ~badloc, :, :, :]
-
         self.curr_genes = (
-            np.array(self.curr_genes)[badloc[8:]]
+            np.array(self.curr_genes)[~badloc[8:]]
             if self.how == "random expr"
             else [i for i in self.model.genes if i in self.curr_genes]
         )
