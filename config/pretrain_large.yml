@@ -8,11 +8,11 @@ log_graph: True
 trainer:
   precision: 16-mixed
   # profiler: simple
-  gradient_clip_val: 10
+  gradient_clip_val: 500
   strategy: ddp_find_unused_parameters_true
   log_every_n_steps: 100
   limit_train_batches: 5000
-  limit_val_batches: 2000
+  limit_val_batches: 8000
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 1
   max_time:
@@ -38,7 +38,7 @@ trainer:
         do_adv_batch: False
         run_full_forward: False
         do_cls: True
-        class_scale: 1.5
+        class_scale: 2
         warmup_duration: 500
         fused_adam: True
         lr_reduce_factor: .66
@@ -70,7 +70,7 @@ model:
   optim: "adamW"
   weight_decay: 0.02
   nhead: 8
-  nlayers: 12
+  nlayers: 16
   layers_cls: [512]
   dropout: 0.1
   transformer: flash
@@ -97,14 +97,14 @@ data:
   collection_name: all no zhang13M #preprocessed dataset
   how: random expr
   max_len: 2200
-  weight_scaler: 10
+  weight_scaler: 40
   do_gene_pos: ./data/main/biomart_pos.parquet
   add_zero_genes: 0
-  train_oversampling_per_epoch: 0.2
+  train_oversampling_per_epoch: 0.4
   validation_split: 0.02
   test_split: 0.02
-  batch_size: 64
-  num_workers: 16
+  batch_size: 16
+  num_workers: 12
   # TODO: drop tissue & dev stage until part or is taken in account
   hierarchical_clss:
     - cell_type_ontology_term_id
