@@ -58,6 +58,7 @@ wandb = "*"
 wandb-core = "*"
 pykeops = "*"
 louvain = "*"
+zarr = "*"
 galore = { git = "https://github.com/jiaweizzhao/GaLore", branch = "main" }
 
 [tool.poetry.group.flashattention.dependencies]

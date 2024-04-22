@@ -1,3 +1,4 @@
+from networkx import average_node_connectivity
 import scanpy as sc
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,6 +39,7 @@ class Embedder:
             "self_reported_ethnicity_ontology_term_id",
             "sex_ontology_term_id",
         ],
+        forward_mode="generate",
         model_name: str = "scprint",
         output_expression: str = "sample",  # one of "all" "sample" "none"
         plot_corr_size: int = 64,
@@ -67,16 +69,20 @@ class Embedder:
         self.add_zero_genes = add_zero_genes
         self.organisms = organisms
         self.model.pred_embedding = pred_embedding
+        self.forward_mode = forward_mode
+        self.model.predict_mode = self.forward_mode
         self.model_name = model_name
         self.output_expression = output_expression
         self.plot_corr_size = plot_corr_size
         self.precision = precision
         self.doplot = doplot
+        self.model.doplot = doplot
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, adata: AnnData):
         # Add at least the organism you are working with
+        self.model.predict_mode = self.forward_mode
         adataset = SimpleAnnDataset(adata, obs_to_output=["organism_ontology_term_id"])
         col = Collator(
             organisms=self.organisms,
@@ -138,7 +144,6 @@ class Embedder:
         adata.obsm[self.model_name] = pred_adata.X
         pred_adata.obs.index = adata.obs.index
         adata.obs = pd.concat([adata.obs, pred_adata.obs], axis=1)
-        print("metrics for this dataset of size:", adata.shape[0])
         metrics = {}
         for label in self.model.labels:
             res = []
@@ -184,122 +189,123 @@ class Embedder:
                 print("    ", label)
                 print("     accuracy:", sum(res) / len(res))
                 print(" ")
-                metrics.update({label + "_accuracy": sum(res) / len(res)})
+            metrics.update({label + "_accuracy": sum(res) / len(res)})
+        m = self.compute_reconstruction(adata, plot_corr_size=self.plot_corr_size)
+        metrics.update(m)
+        return adata, metrics
 
-        # Compute correlation coefficient
-        if self.plot_corr_size > 0:
-            sc.pp.highly_variable_genes(
-                adata, n_top_genes=self.max_len * 2, flavor="seurat_v3"
-            )
-            highly_variable = adata.var.index[adata.var.highly_variable].tolist()
-            random_indices = np.random.randint(
-                low=0, high=adata.shape[0], size=self.plot_corr_size
-            )
-            adataset = SimpleAnnDataset(
-                adata[random_indices], obs_to_output=["organism_ontology_term_id"]
-            )
-            col = Collator(
-                organisms=self.organisms,
-                valid_genes=self.model.genes,
-                how="some",
-                genelist=highly_variable,
-            )
-            dataloader = DataLoader(
-                adataset,
-                collate_fn=col,
-                batch_size=self.plot_corr_size,
-                num_workers=self.num_workers,
-                shuffle=False,
-            )
-            # self.trainer.num_predict_batches = 1
-            self.trainer.predict(self.model, dataloader)
+    def compute_reconstruction(self, adata, plot_corr_size=64):
+        if plot_corr_size < 1:
+            raise ValueError("plot_corr_size should be greater than 0")
+        adatac = sc.pp.log1p(adata, copy=True)
+        sc.pp.highly_variable_genes(adatac)
+        highly_variable = adata.var.index[
+            np.argsort(adatac.var["dispersions_norm"].values)[::-1][: self.max_len]
+        ].tolist()
+        del adatac
+        random_indices = np.random.randint(
+            low=0, high=adata.shape[0], size=plot_corr_size
+        )
+        adataset = SimpleAnnDataset(
+            adata[random_indices], obs_to_output=["organism_ontology_term_id"]
+        )
+        col = Collator(
+            organisms=self.organisms,
+            valid_genes=self.model.genes,
+            how="some",
+            genelist=highly_variable,
+        )
+        dataloader = DataLoader(
+            adataset,
+            collate_fn=col,
+            batch_size=plot_corr_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+        )
+        self.model.predict_mode = "generate"
 
-            res = self.model.expr_pred
-            # pos = adata.obsm["scprint_pos"][random_indices]
-            out = utils.zinb_sample(
+        # self.trainer.num_predict_batches = 1
+
+        self.trainer.predict(self.model, dataloader)
+
+        res = self.model.expr_pred
+        # pos = adata.obsm["scprint_pos"][random_indices]
+        out = (
+            utils.zinb_sample(
                 res[0],
                 res[1],
                 res[2],
-            ).numpy()
-            for i in dataloader:
-                break
-            try:
-                mean_expr = pd.read_parquet("../../data/avg_expr.parquet")
-                genes_used = [self.model.genes[int(i)] for i in self.model.pos[0]]
-                mean_expr = mean_expr[mean_expr.index.isin(genes_used)][
-                    ["avg_expr", "avg_expr_wexpr"]
-                ].values
-                out = np.hstack([out.T, mean_expr])
-                add = 2
-            except:
-                print(
-                    "cannot read the mean expr file under scprint/data/avg_expr.parquet"
-                )
-                out = out.T
-                mean_expr = None
-                add = 0
-
-            corr_coef, p_value = spearmanr(
-                out,
-                i["x"].T,
             )
-            corr_coef[p_value > 0.05] = 0
-            # corr_coef[]
-            # only on non zero values,
-            # compare a1-b1 corr with a1-b(n) corr. should be higher
+            .cpu()
+            .numpy()
+        )
+        try:
+            mean_expr = pd.read_parquet("../../data/avg_expr.parquet")
+            genes_used = [self.model.genes[int(i)] for i in self.model.pos[0]]
+            mean_expr = mean_expr[mean_expr.index.isin(genes_used)][
+                ["avg_expr", "avg_expr_wexpr"]
+            ].values
+            out = np.hstack([out.T, mean_expr])
+            add = 2
+        except:
+            print("cannot read the mean expr file under scprint/data/avg_expr.parquet")
+            out = out.T
+            mean_expr = None
+            add = 0
 
-            # Plot correlation coefficient
-            metrics.update(
-                {
-                    "recons_corr": np.mean(
-                        corr_coef[
-                            self.plot_corr_size + add :, : self.plot_corr_size
-                        ].diagonal()
-                    )
-                }
-            )
-            if add == 2:
-                metrics.update(
-                    {
-                        "mean_regress": np.mean(
-                            corr_coef[
-                                self.plot_corr_size : self.plot_corr_size + 2,
-                                : self.plot_corr_size,
-                            ].flatten()
-                        )
-                    }
-                )
-            if self.doplot:
-                plt.figure(figsize=(10, 5))
-                plt.imshow(
-                    corr_coef, cmap="coolwarm", interpolation="none", vmin=-1, vmax=1
-                )
-                plt.colorbar()
-                plt.title('Correlation Coefficient of expr and i["x"]')
-                plt.show()
-            expr = np.array(res[0])
-            expr[
-                np.random.binomial(
-                    1,
-                    p=np.array(torch.nn.functional.sigmoid(res[2].to(torch.float32))),
-                ).astype(bool)
-            ] = 0
-            corr_coef, p_value = spearmanr(
-                np.hstack([expr.T, mean_expr]) if mean_expr is not None else expr.T,
-                i["x"].T,
-            )
-            corr_coef[p_value > 0.05] = 0
-            # corr_coef[]
-            # only on non zero values,
-            # compare a1-b1 corr with a1-b(n) corr. should be higher
-
-            # Plot correlation coefficient
-            if self.doplot:
-                plt.figure(figsize=(10, 5))
-                plt.imshow(
-                    corr_coef, cmap="coolwarm", interpolation="none", vmin=-1, vmax=1
-                )
-                plt.colorbar()
-                plt.title('Correlation Coefficient of expr and i["x"]')
-                plt.show()
+        to = adata[
+            random_indices,
+            adata.var.index.isin(set(highly_variable) & set(self.model.genes)),
+        ].X.todense()
+        metrics = compute_corr(
+            out,
+            to,
+            doplot=self.doplot,
+            compute_mean_regress=add == 2,
+            plot_corr_size=plot_corr_size,
+        )
+        expr = np.array(res[0])
+        expr[
+            np.random.binomial(
+                1,
+                p=np.array(torch.nn.functional.sigmoid(res[2].to(torch.float32))),
+            ).astype(bool)
+        ] = 0
+        compute_corr(out, expr, doplot=self.doplot, plot_corr_size=plot_corr_size)
         return adata, metrics
+
+
+def compute_corr(out, to, doplot=True, compute_mean_regress=False, plot_corr_size=64):
+    metrics = {}
+    corr_coef, p_value = spearmanr(
+        out,
+        to.T,
+    )
+    corr_coef[p_value > 0.05] = 0
+    # corr_coef[]
+    # only on non zero values,
+    # compare a1-b1 corr with a1-b(n) corr. should be higher
+
+    # Plot correlation coefficient
+    val = plot_corr_size + 2 if compute_mean_regress else plot_corr_size
+    metrics.update(
+        {"recons_corr": np.mean(corr_coef[val:, :plot_corr_size].diagonal())}
+    )
+    if compute_mean_regress:
+        metrics.update(
+            {
+                "mean_regress": np.mean(
+                    corr_coef[
+                        plot_corr_size : plot_corr_size + 2,
+                        :plot_corr_size,
+                    ].flatten()
+                )
+            }
+        )
+    if doplot:
+        plt.figure(figsize=(10, 5))
+        plt.imshow(corr_coef, cmap="coolwarm", interpolation="none", vmin=-1, vmax=1)
+        plt.colorbar()
+        plt.title('Correlation Coefficient of expr and i["x"]')
+        plt.show()
+    return metrics

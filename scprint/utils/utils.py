@@ -21,7 +21,6 @@ from IPython import get_ipython
 import urllib.request
 
 
-
 import io
 from biomart import BiomartServer
 
@@ -131,6 +130,23 @@ def onto_to_name(ids, onto, schema="http://www.ebi.ac.uk/efo/"):
         else:
             names.append(res.label)
     return names
+
+
+def fileToList(filename, strconv=lambda x: x):
+    """
+    loads an input file with a\\n b\\n.. into a list [a,b,..]
+    """
+    with open(filename) as f:
+        return [strconv(val[:-1]) for val in f.readlines()]
+
+
+def listToFile(l, filename, strconv=lambda x: str(x)):
+    """
+    loads a list with [a,b,..] into an input file a\\n b\\n..
+    """
+    with open(filename, "w") as f:
+        for item in l:
+            f.write("%s\n" % strconv(item))
 
 
 def set_seed(seed):
