@@ -10,9 +10,9 @@ trainer:
   # profiler: simple
   gradient_clip_val: 10
   #strategy: ddp
-  log_every_n_steps: 50
-  limit_train_batches: 5000
-  limit_val_batches: 1000
+  log_every_n_steps: 10
+  limit_train_batches: 1000
+  limit_val_batches: 500
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 1
   max_time:
@@ -29,22 +29,19 @@ trainer:
         noise:
           - 0.3
         do_cce: True
-        # cce_sim: 0.4
         do_ecs: True
-        # ecs_threshold: 0.6
-        # ecs_scale: 10.0
-        do_mvc: False
+        do_mvc: True
         mvc_scale: 0.05
         do_generate: True
-        do_adv_cls: False
+        do_adv_cls: True
         do_next_tp: False
         do_cls: True
-        # class_scale: 500.0
         warmup_duration: 500
         weight_decay: 0.01
         fused_adam: True
         lr_patience: 2
-        mask_ratio: []
+        mask_ratio: 
+          - 0.3
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
         swa_lrs: 0.01

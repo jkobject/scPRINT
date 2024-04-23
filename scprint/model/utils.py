@@ -17,7 +17,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 
-from scprint.tasks import generate
+#from scprint.tasks import generate
 
 
 def make_adata(

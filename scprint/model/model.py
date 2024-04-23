@@ -1,7 +1,6 @@
 # from scprint.base.base_model import BaseModel
 from typing import Optional, Dict
 from torch import Tensor, optim, nn
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from lightning.pytorch.tuner.lr_finder import _LRCallback
 from lightning.pytorch.callbacks.lr_finder import LearningRateFinder
 import torch.distributed as dist
@@ -1008,64 +1007,64 @@ class scPrint(L.LightningModule):
             return
         else:
             # run the test function on specific dataset
-            def test(adata):
-                preprocessor = Preprocessor(
-                    use_layer="counts",
-                    is_symbol=True,
-                    force_preprocess=True,
-                    skip_validate=True,
-                    do_postp=False,
-                )
-                adata.obs["organism_ontology_term_id"] = "NCBITaxon:9606"
-                adata = preprocessor(adata.copy())
-                embedder = Embedder(
-                    self, pred_embedding=["cell_type_ontology_term_id"]
-                )  # ), 'sex_ontology_term_id', "disease_ontology_term_id"])
-                embed_adata, metrics = embedder(adata.copy())
-                bm = Benchmarker(
-                    embed_adata,
-                    batch_key="tech",
-                    label_key="celltype",
-                    embedding_obsm_keys=["X_pca", "scprint"],
-                    n_jobs=6,
-                )
-                bm.benchmark()
-                df = bm.get_results(min_max_scale=False)
-                metrics.update(df.T.to_dict()["scprint"])
-                grn_inferer = GRNfer(
-                    self,
-                    adata,
-                    how="most var across",
-                    preprocess="softmax",
-                    head_agg="none",
-                    filtration="none",
-                    forward_mode="none",
-                    max_cells=64,
-                    cell_type_col="celltype",
-                )
-                for celltype in list(set(adata.obs.cell_type))[1:]:
-                    grn = grn_inferer(
-                        layer=list(range(model.nlayers)), cell_type=celltype
-                    )
-                    grn, m = train_classifier(grn, C=0.4)
-                    grn.varp["GRN"] = grn.varp["classified"]
-                    metrics.update({celltype + "_scprint_grn": m})
-                    m = BenGRN(grn, do_auc=False).scprint_benchmark()
-                    metrics[celltype + "_scprint_grn"].update(m)
-                    subadata = adata[
-                        adata.obs.cell_type == celltype,
-                        adata.var.index.isin(grn_inferer.curr_genes),
-                    ]
-                    grn = compute_genie3(
-                        subadata,
-                        nthreads=32,
-                        regulators=adata.var[adata.var.isTF].index.tolist(),
-                    )
-                    m = BenGRN(grn).scprint_benchmark()
-                    metrics.update({celltype + "_genie3_tfonly": m})
-                    grn = compute_genie3(subadata, nthreads=32)
-                    m = BenGRN(grn).scprint_benchmark()
-                    metrics.update({celltype + "_genie3": m})
+            #def test(adata):
+            #    preprocessor = Preprocessor(
+            #        use_layer="counts",
+            #        is_symbol=True,
+            #        force_preprocess=True,
+            #        skip_validate=True,
+            #        do_postp=False,
+            #    )
+            #    adata.obs["organism_ontology_term_id"] = "NCBITaxon:9606"
+            #    adata = preprocessor(adata.copy())
+            #    embedder = Embedder(
+            #        self, pred_embedding=["cell_type_ontology_term_id"]
+            #    )  # ), 'sex_ontology_term_id', "disease_ontology_term_id"])
+            #    embed_adata, metrics = embedder(adata.copy())
+            #    bm = Benchmarker(
+            #        embed_adata,
+            #        batch_key="tech",
+            #        label_key="celltype",
+            #        embedding_obsm_keys=["X_pca", "scprint"],
+            #        n_jobs=6,
+            #    )
+            #    bm.benchmark()
+            #    df = bm.get_results(min_max_scale=False)
+            #    metrics.update(df.T.to_dict()["scprint"])
+            #    grn_inferer = GRNfer(
+            #        self,
+            #        adata,
+            #        how="most var across",
+            #        preprocess="softmax",
+            #        head_agg="none",
+            #        filtration="none",
+            #        forward_mode="none",
+            #        max_cells=64,
+            #        cell_type_col="celltype",
+            #    )
+            #    for celltype in list(set(adata.obs.cell_type))[1:]:
+            #        grn = grn_inferer(
+            #            layer=list(range(model.nlayers)), cell_type=celltype
+            #        )
+            #        grn, m = train_classifier(grn, C=0.4)
+            #        grn.varp["GRN"] = grn.varp["classified"]
+            #        metrics.update({celltype + "_scprint_grn": m})
+            #        m = BenGRN(grn, do_auc=False).scprint_benchmark()
+            #        metrics[celltype + "_scprint_grn"].update(m)
+            #        subadata = adata[
+            #            adata.obs.cell_type == celltype,
+            #            adata.var.index.isin(grn_inferer.curr_genes),
+            #        ]
+            #        grn = compute_genie3(
+            #            subadata,
+            #            nthreads=32,
+            #            regulators=adata.var[adata.var.isTF].index.tolist(),
+            #        )
+            #        m = BenGRN(grn).scprint_benchmark()
+            #        metrics.update({celltype + "_genie3_tfonly": m})
+            #        grn = compute_genie3(subadata, nthreads=32)
+            #        m = BenGRN(grn).scprint_benchmark()
+            #        metrics.update({celltype + "_genie3": m})
             self.log_adata(gtclass=self.info)
 
     def test_step(self, batch, batch_idx):
