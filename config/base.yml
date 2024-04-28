@@ -15,7 +15,7 @@ trainer:
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 1
   max_time:
-    hours: 72
+    hours: 71
   logger:
     - class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
@@ -37,7 +37,7 @@ trainer:
         do_adv_batch: False
         run_full_forward: False
         do_cls: True
-        class_scale: 2
+        class_scale: 1.5
         warmup_duration: 500
         fused_adam: True
         lr_reduce_factor: .66

@@ -1,9 +1,9 @@
 trainer:
   strategy: ddp_find_unused_parameters_true
-  # num_nodes: 2
+  num_nodes: 3
   log_every_n_steps: 100
-  limit_train_batches: 5000
-  limit_val_batches: 16000
+  limit_train_batches: 7000
+  limit_val_batches: 1000
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 1
   callbacks:
@@ -12,22 +12,35 @@ trainer:
         do_denoise: True
         noise: 
           - 0.3
+        do_cce: False
+        do_ecs: False
+        do_mvc: False
+        do_generate: True
+        do_adv_cls: False
+        do_next_tp: False
+        do_adv_batch: False
+        run_full_forward: False
         do_cls: True
-        class_scale: 2
-        warmup_duration: 1000
+        class_scale: 1.5
+        warmup_duration: 1500
+        fused_adam: True
+        lr_reduce_factor: .66
+        lr_reduce_patience: 2
+        mask_ratio: []
 model:
   lr: 0.0001
   optim: "adamW"
-  weight_decay: 0.02
+  weight_decay: 0.04
   nhead: 20
   nlayers: 32
   layers_cls: [512]
   d_model: 1280
+  freeze_embeddings: False
 data:
-  collection_name: preprocessed dataset #all no zhang13M
+  collection_name: all no zhang13M #preprocessed dataset #all no zhang13M
   how: random expr
-  max_len: 2400
-  weight_scaler: 10
-  train_oversampling_per_epoch: 0.4
-  batch_size: 8
-  num_workers: 12
+  max_len: 2200
+  weight_scaler: 40
+  train_oversampling_per_epoch: 0.05
+  batch_size: 3
+  num_workers: 6

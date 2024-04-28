@@ -1,29 +1,12 @@
-project: scprint_scale
-seed_everything: 42
-ckpt_path: null
-set_float32_matmul_precision: True
-wandblog: all
-log_freq: 200
-log_graph: True
 trainer:
-  precision: 16-mixed
-  # profiler: simple
-  gradient_clip_val: 500
-  strategy: ddp_find_unused_parameters_true
-  # num_nodes: 2
+  #strategy: ddp_find_unused_parameters_true
+  num_nodes: 4
   log_every_n_steps: 100
   limit_train_batches: 15000
-  limit_val_batches: 5000
+  limit_val_batches: 3000
   reload_dataloaders_every_n_epochs: 1
-  accumulate_grad_batches: 2
-  max_time:
-    hours: 72
-  logger:
-    - class_path: lightning.pytorch.loggers.WandbLogger
-      init_args:
-        project: ${project}
-        save_dir: /pasteur/zeus/projets/p02/ml4ig_hot/Users/jkalfon/
-        offline: True
+  accumulate_grad_batches: 3
+  precision: 16-mixed
   callbacks:
     - class_path: scprint.trainer.TrainingMode
       init_args:
@@ -39,104 +22,28 @@ trainer:
         do_adv_batch: False
         run_full_forward: False
         do_cls: True
-        class_scale: 2
-        warmup_duration: 1000
+        class_scale: 1.5
+        warmup_duration: 1500
         fused_adam: True
         lr_reduce_factor: .66
         lr_reduce_patience: 2
         mask_ratio: []
-    - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
-      init_args:
-        swa_lrs: 0.03
-    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
-      init_args:
-        monitor: val_loss
-        save_top_k: 2
-        save_last: True
-    - class_path: lightning.pytorch.callbacks.EarlyStopping
-      init_args:
-        monitor: val_loss
-        patience: 3
-    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
-      init_args:
-        logging_interval: epoch
-    #- class_path: lightning.pytorch.callbacks.LearningRateFinder
-    #init_args:
-    #  mode: exponential
-  #plugins:
-  #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
-  #    requeue_signal: signal.SIGHUP
 model:
   lr: 0.0001
   optim: "adamW"
   weight_decay: 0.02
-  nhead: 20
-  nlayers: 50
-  layers_cls: [1280]
-  dropout: 0.1
-  transformer: flash
-  mvc_decoder: inner product
+  nhead: 40
+  nlayers: 36
+  layers_cls: [1024]
   d_model: 2560
-  residual_in_fp32: True
-  num_heads_kv: null
-  fused_dropout_add_ln: False
-  prenorm: True
-  fused_mlp: False
-  fused_bias_fc: False
-  drop_path_rate: 0.02
-  pred_embedding:
-    - cell_type_ontology_term_id
-    - disease_ontology_term_id
-    - self_reported_ethnicity_ontology_term_id
-    - sex_ontology_term_id
+  freeze_embeddings: False
+  checkpointing: False
+  #num_heads_kv: 10
 data:
-  organisms:
-    - NCBITaxon:9606
-    - NCBITaxon:10090
-  gene_position_tolerance: 10_000
-  gene_embeddings: ./data/main/gene_embeddings.parquet
-  collection_name: preprocessed dataset #all no zhang13M
+  collection_name: preprocessed dataset #all no zhang13M #preprocessed dataset #all no zhang13M
   how: random expr
   max_len: 2400
-  weight_scaler: 10
-  do_gene_pos: ./data/main/biomart_pos.parquet
-  add_zero_genes: 0
-  train_oversampling_per_epoch: 0.3
-  validation_split: 0.02
-  test_split: 0.02
-  batch_size: 2
+  weight_scaler: 40
+  train_oversampling_per_epoch: 0.05
+  batch_size: 1
   num_workers: 6
-  # TODO: drop tissue & dev stage until part or is taken in account
-  hierarchical_clss:
-    - cell_type_ontology_term_id
-    #- tissue_ontology_term_id
-    - disease_ontology_term_id
-    #- development_stage_ontology_term_id
-    - assay_ontology_term_id
-    - self_reported_ethnicity_ontology_term_id
-  clss_to_weight:
-    - cell_type_ontology_term_id
-    # - tissue_ontology_term_id
-    - disease_ontology_term_id
-    # - development_stage_ontology_term_id
-    - assay_ontology_term_id
-    - self_reported_ethnicity_ontology_term_id
-    - sex_ontology_term_id
-    - organism_ontology_term_id
-    # - cell_culture
-  clss_to_pred: ${data.clss_to_weight}
-  all_clss:
-    - cell_type_ontology_term_id
-    # - tissue_ontology_term_id
-    - disease_ontology_term_id
-    # - development_stage_ontology_term_id
-    - assay_ontology_term_id
-    - self_reported_ethnicity_ontology_term_id
-    - sex_ontology_term_id
-    - organism_ontology_term_id
-    #- heat_diff
-    #- total_counts
-    #- nnz
-    #- dpt_group
-    #- dataset_id
-    #- cell_culture
