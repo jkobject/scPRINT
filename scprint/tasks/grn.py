@@ -117,9 +117,6 @@ class GRNfer:
         subadata = self.predict(layer, cell_type)
         adjacencies = self.aggregate(self.model.attn.get())
         if self.head_agg == "none":
-            adjacencies = adjacencies.reshape(
-                -1, adjacencies.shape[-2], adjacencies.shape[-1]
-            ).T
             return self.save(adjacencies[8:, 8:, :], subadata, locname)
         else:
             return self.save(self.filter(adjacencies)[8:, 8:], subadata, locname)
@@ -217,43 +214,72 @@ class GRNfer:
             plt.scatter(mm[:, 0], mm[:, 1], c=labels)
             plt.title(f"Ks @H{0}")
             plt.show()
-        attn = attn[:, :, 0, :, :].permute(0, 2, 1, 3) @ attn[:, :, 1, :, :].permute(
-            0, 2, 3, 1
+        # attn = attn[:, :, 0, :, :].permute(0, 2, 1, 3) @ attn[:, :, 1, :, :].permute(
+        #    0, 2, 3, 1
+        # )
+        attns = None
+        Qs = (
+            attn[:, :, 0, :, :]
+            .permute(0, 2, 1, 3)
+            .reshape(-1, attn.shape[1], attn.shape[-1])
         )
-        # return attn
-        scale = attn.shape[-1] ** -0.5
-        attn = attn * scale
-        if self.preprocess == "sinkhorn":
-            if attn.numel() > 100_000_000:
-                raise ValueError("you can't sinkhorn such a large matrix")
-            sink = SinkhornDistance(0.1, max_iter=200)
-            attn = sink(attn)[0]
-            attn = attn * attn.shape[-1]
-        elif self.preprocess == "softmax":
-            attn = torch.nn.functional.softmax(attn, dim=-1)
-        elif self.preprocess == "none":
-            pass
-        else:
-            raise ValueError("preprocess must be one of 'sinkhorn', 'softmax', 'none'")
+        Ks = (
+            attn[:, :, 1, :, :]
+            .permute(0, 2, 1, 3)
+            .reshape(-1, attn.shape[1], attn.shape[-1])
+        )
+        for i in range(Qs.shape[0]):
+            attn = Qs[i] @ Ks[i].T
+            # return attn
+            scale = Qs.shape[-1] ** -0.5
+            attn = attn * scale
+            if self.preprocess == "sinkhorn":
+                if attn.numel() > 100_000_000:
+                    raise ValueError("you can't sinkhorn such a large matrix")
+                sink = SinkhornDistance(0.1, max_iter=200)
+                attn = sink(attn)[0]
+                attn = attn * Qs.shape[-1]
+            elif self.preprocess == "softmax":
+                attn = torch.nn.functional.softmax(attn, dim=-1)
+            elif self.preprocess == "none":
+                pass
+            else:
+                raise ValueError(
+                    "preprocess must be one of 'sinkhorn', 'softmax', 'none'"
+                )
 
-        if self.symmetrize:
-            print(attn.shape)
-            attn = (attn + attn.permute(0, 1, 3, 2)) / 2
-        if self.apc:
-            pass
-            # attn = attn - (
-            #    (attn.sum(-1).unsqueeze(-1) * attn.sum(-2).unsqueeze(-2))
-            #    / attn.sum(-1).sum(-1).unsqueeze(-1).unsqueeze(-1)
-            # )  # .view()
-        if self.head_agg == "mean":
-            attn = attn.mean(0).mean(0).detach().cpu().numpy()
-        elif self.head_agg == "max":
-            attn = attn.max(0)[0].max(0)[0].detach().cpu().numpy()
-        elif self.head_agg == "none":
-            attn = attn.detach().cpu().numpy()
-        else:
-            raise ValueError("head_agg must be one of 'mean', 'max' or 'None'")
-        return attn
+            if self.symmetrize:
+                print(attn.shape)
+                attn = (attn + attn.T) / 2
+            if self.apc:
+                pass
+                # attn = attn - (
+                #    (attn.sum(-1).unsqueeze(-1) * attn.sum(-2).unsqueeze(-2))
+                #    / attn.sum(-1).sum(-1).unsqueeze(-1).unsqueeze(-1)
+                # )  # .view()
+            # if self.head_agg == "mean":
+            #    attns += attn.mean(0).mean(0).detach().cpu().numpy()
+            if self.head_agg == "max":
+                attns = (
+                    np.maximum(attn.detach().cpu().numpy(), attns)
+                    if attns is not None
+                    else attn.detach().cpu().numpy()
+                )
+            elif self.head_agg == "none":
+                if attns is not None:
+                    if len(attns.shape) > 2:
+                        attns = np.concatenate(
+                            [attns, attn.detach().cpu().numpy()[..., np.newaxis]],
+                            axis=-1,
+                        )
+                    else:
+                        attns = np.stack([attns, attn.detach().cpu().numpy()], axis=-1)
+
+                else:
+                    attns = attn.detach().cpu().numpy()
+            else:
+                raise ValueError("head_agg must be one of 'mean', 'max' or 'None'")
+        return attns
 
     def filter(self, adj, gt=None):
         if self.filtration == "thresh":
