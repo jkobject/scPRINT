@@ -17,7 +17,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 
-from scprint.tasks import generate
+#from scprint.tasks import generate
 
 
 def make_adata(
@@ -114,8 +114,9 @@ def make_adata(
                     raise ValueError(f"true label {true} not in available classes")
                 elif true != "unknown":
                     res.append(False)
-                # else we pass
-            accuracy["pred_" + label] = sum(res) / len(res)
+                else:
+                    pass
+            accuracy["pred_" + label] = sum(res) / len(res) if len(res) > 0 else 0
     adata.obs = adata.obs.astype("category")
     if False:
         adata.varm["Qs"] = (
@@ -143,7 +144,7 @@ def make_adata(
             .numpy()
         )
     print(adata)
-    if doplot:
+    if doplot and adata.shape[0] > 100:
         sc.pp.neighbors(adata, use_rep="X")
         sc.tl.umap(adata)
         sc.tl.leiden(adata, key_added="sprint_leiden")
