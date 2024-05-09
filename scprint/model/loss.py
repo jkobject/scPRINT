@@ -4,7 +4,14 @@ from torch import nn, Tensor
 from torch.autograd import Function
 
 
-def masked_mse_loss(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
+def mse(input: Tensor, target: Tensor) -> Tensor:
+    """
+    Compute the MSE loss between input and target.
+    """
+    return F.mse_loss(input, target, reduction="mean")
+
+
+def masked_mse(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     """
     Compute the masked MSE loss between input and target.
     """
@@ -13,7 +20,7 @@ def masked_mse_loss(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     return loss / mask.sum()
 
 
-def masked_mae_loss(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
+def masked_mae(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     """
     Compute the masked MAE loss between input and target.
     MAE = mean absolute error
@@ -23,7 +30,7 @@ def masked_mae_loss(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     return loss / mask.sum()
 
 
-def masked_nb_loss(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
+def masked_nb(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     """
     Compute the masked negative binomial loss between input and target.
     """
@@ -34,8 +41,6 @@ def masked_nb_loss(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
 
 
 # FROM SCVI
-
-
 def nb(x: Tensor, mu: Tensor, theta: Tensor, eps=1e-8):
     """
     This negative binomial function was taken from:
@@ -112,10 +117,11 @@ def zinb(
     -------
     If 'mean' is 'True' ZINB loss value gets returned, otherwise Torch tensor of losses gets returned.
     """
-    softplus_pi = F.softplus(-pi)  #  uses log(sigmoid(x)) = -softplus(-x)
-    log_theta_eps = torch.log(theta + eps)
+    #  uses log(sigmoid(x)) = -softplus(-x)
+    softplus_pi = F.softplus(-pi)
+    # eps to make it positive support and taking the log
     log_theta_mu_eps = torch.log(theta + mu + eps)
-    pi_theta_log = -pi + theta * (log_theta_eps - log_theta_mu_eps)
+    pi_theta_log = -pi + theta * (torch.log(theta + eps) - log_theta_mu_eps)
 
     case_zero = F.softplus(pi_theta_log) - softplus_pi
     mul_case_zero = torch.mul((target < eps).type(torch.float32), case_zero)
@@ -133,14 +139,6 @@ def zinb(
     res = mul_case_zero + mul_case_non_zero
     # we want to minize the loss but maximize the log likelyhood
     return -res.mean()
-
-
-def classifier_loss(pred: Tensor, target: Tensor) -> Tensor:
-    """
-    Compute the cross entropy loss between prediction and target.
-    """
-    loss = F.cross_entropy(pred, target)
-    return loss
 
 
 def criterion_neg_log_bernoulli(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
@@ -164,7 +162,7 @@ def masked_relative_error(
     return loss.mean()
 
 
-def graph_similarity_loss(input1: Tensor, input2: Tensor, mask: Tensor) -> Tensor:
+def graph_similarity(input1: Tensor, input2: Tensor, mask: Tensor) -> Tensor:
     """
     Compute the similarity of 2 generated graphs.
     """
@@ -173,7 +171,7 @@ def graph_similarity_loss(input1: Tensor, input2: Tensor, mask: Tensor) -> Tenso
     return loss / mask.sum()
 
 
-def graph_sparsity_loss(input: Tensor, mask: Tensor) -> Tensor:
+def graph_sparsity(input: Tensor, mask: Tensor) -> Tensor:
     """
     Compute the sparsity of generated graphs.
     """

@@ -67,6 +67,7 @@ class scPrint(L.LightningModule):
         weight_decay: float = 0.01,
         freeze_embeddings: bool = True,
         label_decoders: Optional[Dict[str, Dict[int, str]]] = None,
+        zinb: bool=True,
         **flash_attention_kwargs,
     ):
         """
@@ -283,6 +284,7 @@ class scPrint(L.LightningModule):
             d_model,
             nfirst_tokens_to_skip=self.cell_embs_count,
             dropout=dropout,
+            zinb=zinb
         )
         # cls decoder
         self.cls_decoders = nn.ModuleDict()
@@ -324,27 +326,42 @@ class scPrint(L.LightningModule):
         self.save_hyperparameters()
 
     def on_load_checkpoint(self, checkpoints):
-        if self.trainer.state.stage == "predict":
-            for name, clss in self.cls_decoders.items():
-                size = checkpoints['state_dict']['cls_decoders.'+name+'.out_layer.bias'].shape[0]
-                if size > clss.out_layer.bias.shape[0]:
-                    self.cls_decoders[name].out_layer = nn.Linear(clss.out_layer.weight.shape[1], size)
-            size = checkpoints['state_dict']['grad_reverse_discriminator_loss.out_layer.bias'].shape[0]
-            # we won't use it but still need to take care of it. for now will still add it to the model
-            if size > self.grad_reverse_discriminator_loss.out_layer.bias.shape[0]:
-                self.grad_reverse_discriminator_loss = loss.AdversarialDiscriminatorLoss(
-                    self.d_model,
-                    n_cls=size,
+        #import pdb
+        #pdb.set_trace()
+        for name, clss in self.cls_decoders.items():
+            size = checkpoints['state_dict']['cls_decoders.'+name+'.out_layer.bias'].shape[0]
+            if size > clss.out_layer.bias.shape[0]:
+                self.cls_decoders[name].out_layer = nn.Linear(clss.out_layer.weight.shape[1], size)
+        size = checkpoints['state_dict']['grad_reverse_discriminator_loss.out_layer.bias'].shape[0]
+        # we won't use it but still need to take care of it. for now will still add it to the model
+        if size > self.grad_reverse_discriminator_loss.out_layer.bias.shape[0]:
+            self.grad_reverse_discriminator_loss = loss.AdversarialDiscriminatorLoss(
+                self.d_model,
+                n_cls=size,
+            )
+        classes = checkpoints['hyper_parameters']['classes']
+        #self.classes = list(classes.keys())
+        self.label_decoders = checkpoints['hyper_parameters']['label_decoders']
+        self.labels_hierarchy = checkpoints['hyper_parameters']['labels_hierarchy']
+        for k, v in self.labels_hierarchy.items():
+            tens = torch.zeros((len(v), classes[k]))
+            for k2, v2 in v.items():
+                tens[k2 - classes[k], v2] = 1
+            self.mat_labels_hierarchy[k] = tens.to(bool)
+        
+        mencoders = {}
+        if self.trainer.datamodule.decoders != checkpoints['hyper_parameters']['label_decoders']:
+            # if we don't have the same decoders, we need to update the one on the datamodule side
+            for k, v in checkpoints['hyper_parameters']['label_decoders'].items():
+                mencoders[k] = {va: ke for ke, va in v.items()}
+            self.trainer.datamodule.dataset.mapped_dataset.encoders = mencoders
+            if self.trainer.datamodule.kwargs["collate_fn"].organism_name in mencoders:
+                self.trainer.datamodule.kwargs["collate_fn"].setup(
+                    mencoders[self.trainer.datamodule.kwargs["collate_fn"].organism_name], 
+                    valid_genes=self.genes
                 )
-            classes = checkpoints['hyper_parameters']['classes']
-            #self.classes = list(classes.keys())
-            self.label_decoders = checkpoints['hyper_parameters']['label_decoders']
-            self.labels_hierarchy = checkpoints['hyper_parameters']['labels_hierarchy']
-            for k, v in self.labels_hierarchy.items():
-                tens = torch.zeros((len(v), classes[k]))
-                for k2, v2 in v.items():
-                    tens[k2 - classes[k], v2] = 1
-                self.mat_labels_hierarchy[k] = tens.to(bool)
+
+
 
     def _encoder(
         self,
@@ -698,7 +715,7 @@ class scPrint(L.LightningModule):
             ).to(gene_pos.device)
             output = self.forward(
                 gene_pos,
-                expression=expression,
+                #expression=expression,
                 mask=mask,
                 full_depth=total_count,
                 do_mvc=do_mvc,
@@ -843,13 +860,18 @@ class scPrint(L.LightningModule):
         total_loss = 0
         losses = {}
         # TASK 1. reconstruct masked expression
-
-        loss_expr = loss.zinb(
-            theta=output["disp"],
-            pi=output["zero_logits"],
-            mu=output["mean"],
-            target=expression,
-        )
+        if "zero_logits" in output:
+            loss_expr = loss.zinb(
+                theta=output["disp"],
+                pi=output["zero_logits"],
+                mu=output["mean"],
+                target=expression,
+            )
+        else:
+            loss_expr = loss.mse(
+                input=output["mean"],
+                target=expression,
+            )
         total_loss += loss_expr
         losses.update({"expr": loss_expr})
 
@@ -940,17 +962,19 @@ class scPrint(L.LightningModule):
 
         # manually warm up lr without a scheduler
         # making sure that we don't do this during lrfinder
-        if (
-            self.trainer.global_step < self.warmup_duration + self.lrfinder_steps
-        ) and self.lrfinder_steps < self.trainer.global_step:
-            lr_scale = min(
-                1.0, float(self.trainer.global_step + 1) / self.warmup_duration
-            )
-            for pg in optimizer.param_groups:
+        for i, pg in enumerate(optimizer.param_groups):
+            if (
+                self.trainer.global_step < self.warmup_duration + self.lrfinder_steps
+            ) and self.lrfinder_steps < self.trainer.global_step:
+                lr_scale = min(
+                    1.0, float(self.trainer.global_step + 1) / self.warmup_duration
+                )
                 pg["lr"] = lr_scale * self.hparams.lr
-            self.log("lr", lr_scale * self.hparams.lr)
-        else:
-            self.log("lr", self.lr)
+        for i, pg in enumerate(optimizer.param_groups):
+            if pg["lr"] < 2e-5:
+                pg["lr"] = 2e-5
+            self.log("lr_"+str(i), pg["lr"])
+            
 
     def on_before_zero_grad(self, optimizer):
         pass
@@ -1217,7 +1241,7 @@ class scPrint(L.LightningModule):
                     ]
                 ).transpose(0, 1),
                 "pos": gene_pos,
-                "expr": [output["mean"], output["disp"], output["zero_logits"]],
+                "expr": [output["mean"], output["disp"], output["zero_logits"]] if "disp" in output else output["mean"],
             }
         if self.embs is None:
             self.embs = torch.mean(cell_embs[:, ind, :], dim=1)
@@ -1228,7 +1252,7 @@ class scPrint(L.LightningModule):
                 ]
             ).transpose(0, 1)
             self.pos = gene_pos
-            self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]]
+            self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]] if "disp" in output else output["mean"]
         else:
             self.embs = torch.cat([self.embs, torch.mean(cell_embs[:, ind, :], dim=1)])
             self.pred = torch.cat(
@@ -1247,7 +1271,7 @@ class scPrint(L.LightningModule):
                 torch.cat([self.expr_pred[0], output["mean"]]),
                 torch.cat([self.expr_pred[1], output["disp"]]),
                 torch.cat([self.expr_pred[2], output["zero_logits"]]),
-            ]
+            ] if "disp" in output else torch.cat([self.expr_pred, output["mean"]])
         if self.embs.shape[0] > max_size_in_mem:
             self.log_adata(name=name+"_part_"+str(self.counter))
             self.counter+=1

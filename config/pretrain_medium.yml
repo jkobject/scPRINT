@@ -22,4 +22,4 @@ data:
   validation_split: 0.02
   test_split: 0.02
   batch_size: 64
-  num_workers: 16
+  num_workers: 12

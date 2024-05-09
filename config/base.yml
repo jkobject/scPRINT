@@ -49,7 +49,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
       init_args:
         monitor: val_loss
-        save_top_k: 2
+        save_top_k: 6
         save_last: True
     - class_path: lightning.pytorch.callbacks.EarlyStopping
       init_args:
