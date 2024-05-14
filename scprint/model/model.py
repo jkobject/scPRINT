@@ -37,6 +37,10 @@ from .utils import simple_masker
 from . import utils
 from .loss import grad_reverse
 
+from ..tasks import cell_emb as embbed_task
+from ..tasks import grn as grn_task
+from ..tasks import denoise as denoise_task
+
 
 class scPrint(L.LightningModule):
     def __init__(
@@ -102,20 +106,20 @@ class scPrint(L.LightningModule):
         # training flags
         self.do_denoise = False
         self.noise = [0.3]
-        self.do_cce = True
+        self.do_cce = False
         self.cce_sim = 0.6
         self.cce_scale = 0.01
-        self.do_ecs = True
+        self.do_ecs = False
         self.ecs_threshold = 0.3
         self.ecs_scale = 0.05
         self.do_mvc = False
         self.mvc_scale = 0.05
         self.do_adv_cls = False
         self.adv_class_scale = 0.1
-        self.do_cls = True
+        self.do_cls = False
         self.mean_attn_tot = None
         self.mean_attn_tot_c = 0
-        self.do_adv_batch = True
+        self.do_adv_batch = False
         self.run_full_forward = True
         self.class_scale = 0.4
         self.do_next_tp = False
@@ -324,27 +328,26 @@ class scPrint(L.LightningModule):
         self.save_hyperparameters()
 
     def on_load_checkpoint(self, checkpoints):
-        if self.trainer.state.stage == "predict":
-            for name, clss in self.cls_decoders.items():
-                size = checkpoints['state_dict']['cls_decoders.'+name+'.out_layer.bias'].shape[0]
-                if size > clss.out_layer.bias.shape[0]:
-                    self.cls_decoders[name].out_layer = nn.Linear(clss.out_layer.weight.shape[1], size)
-            size = checkpoints['state_dict']['grad_reverse_discriminator_loss.out_layer.bias'].shape[0]
-            # we won't use it but still need to take care of it. for now will still add it to the model
-            if size > self.grad_reverse_discriminator_loss.out_layer.bias.shape[0]:
-                self.grad_reverse_discriminator_loss = loss.AdversarialDiscriminatorLoss(
-                    self.d_model,
-                    n_cls=size,
-                )
-            classes = checkpoints['hyper_parameters']['classes']
-            #self.classes = list(classes.keys())
-            self.label_decoders = checkpoints['hyper_parameters']['label_decoders']
-            self.labels_hierarchy = checkpoints['hyper_parameters']['labels_hierarchy']
-            for k, v in self.labels_hierarchy.items():
-                tens = torch.zeros((len(v), classes[k]))
-                for k2, v2 in v.items():
-                    tens[k2 - classes[k], v2] = 1
-                self.mat_labels_hierarchy[k] = tens.to(bool)
+        for name, clss in self.cls_decoders.items():
+            size = checkpoints['state_dict']['cls_decoders.'+name+'.out_layer.bias'].shape[0]
+            if size > clss.out_layer.bias.shape[0]:
+                self.cls_decoders[name].out_layer = nn.Linear(clss.out_layer.weight.shape[1], size)
+        size = checkpoints['state_dict']['grad_reverse_discriminator_loss.out_layer.bias'].shape[0]
+        # we won't use it but still need to take care of it. for now will still add it to the model
+        if size > self.grad_reverse_discriminator_loss.out_layer.bias.shape[0]:
+            self.grad_reverse_discriminator_loss = loss.AdversarialDiscriminatorLoss(
+                self.d_model,
+                n_cls=size,
+            )
+        classes = checkpoints['hyper_parameters']['classes']
+        #self.classes = list(classes.keys())
+        self.label_decoders = checkpoints['hyper_parameters']['label_decoders']
+        self.labels_hierarchy = checkpoints['hyper_parameters']['labels_hierarchy']
+        for k, v in self.labels_hierarchy.items():
+            tens = torch.zeros((len(v), classes[k]))
+            for k2, v2 in v.items():
+                tens[k2 - classes[k], v2] = 1
+            self.mat_labels_hierarchy[k] = tens.to(bool)
 
     def _encoder(
         self,
@@ -528,6 +531,7 @@ class scPrint(L.LightningModule):
     def configure_optimizers(self):
         """@see pl.LightningModule"""
         # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam
+        # not working because of poor weight decay implem
         if self.optim == "adam":
             optimizer = optim.Adam(
                 self.parameters(),
@@ -843,7 +847,8 @@ class scPrint(L.LightningModule):
         total_loss = 0
         losses = {}
         # TASK 1. reconstruct masked expression
-
+        #import pdb
+        #pdb.set_trace()
         loss_expr = loss.zinb(
             theta=output["disp"],
             pi=output["zero_logits"],
@@ -1014,7 +1019,7 @@ class scPrint(L.LightningModule):
         """@see pl.LightningModule"""
         self.embs = self.all_gather(self.embs).view(-1, self.embs.shape[-1])
         self.info = self.all_gather(self.info).view(-1, self.info.shape[-1])
-        self.pred = self.all_gather(self.pred).view(-1, self.pred.shape[-1])
+        self.pred = self.all_gather(self.pred).view(-1, self.pred.shape[-1]) if self.pred is not None else None
         self.pos = self.all_gather(self.pos).view(-1, self.pos.shape[-1])
         #self.expr_pred = [i.view(-1, self.expr_pred[0].shape[-1]) for i in self.all_gather(self.expr_pred)]
         # if len(self.get_attention_layer) > 0:
@@ -1025,93 +1030,20 @@ class scPrint(L.LightningModule):
         if self.trainer.state.stage != "sanity_check":
             sch = self.lr_schedulers()
             sch.step(self.trainer.callback_metrics["val_loss"])
-        # run the test function on specific dataset
-        #def test(embedding_adata, grn_adata=None):
-        #    preprocessor = Preprocessor(
-        #        use_layer="counts",
-        #        is_symbol=True,
-        #        force_preprocess=True,
-        #        skip_validate=True,
-        #        do_postp=False,
-        #    )
-        #    adata.obs["organism_ontology_term_id"] = "NCBITaxon:9606"
-        #    adata = preprocessor(adata.copy())
-        #    embedder = Embedder(
-        #        self, pred_embedding=["cell_type_ontology_term_id"]
-        #    )  # ), 'sex_ontology_term_id', "disease_ontology_term_id"])
-        #    embed_adata, metrics = embedder(adata.copy())
-        #    bm = Benchmarker(
-        #        embed_adata,
-        #        batch_key="tech",
-        #        label_key="celltype",
-        #        embedding_obsm_keys=["X_pca", "scprint"],
-        #        n_jobs=6,
-        #    )
-        #    bm.benchmark()
-        #    df = bm.get_results(min_max_scale=False)
-        #    metrics.update(df.T.to_dict()["scprint"])
-        #    grn_inferer = GRNfer(
-        #        self,
-        #        adata,
-        #        how="most var across",
-        #        preprocess="softmax",
-        #        head_agg="none",
-        #        filtration="none",
-        #        forward_mode="none",
-        #        max_cells=64,
-        #        cell_type_col="celltype",
-        #    )
-        #    for celltype in list(set(adata.obs.cell_type))[1:]:
-        #        grn = grn_inferer(
-        #            layer=list(range(model.nlayers)), cell_type=celltype
-        #        )
-        #        grn, m = train_classifier(grn, C=0.4)
-        #        grn.varp["GRN"] = grn.varp["classified"]
-        #        metrics.update({celltype + "_scprint_grn": m})
-        #        m = BenGRN(grn, do_auc=False).scprint_benchmark()
-        #        metrics[celltype + "_scprint_grn"].update(m)
-        #        subadata = adata[
-        #            adata.obs.cell_type == celltype,
-        #            adata.var.index.isin(grn_inferer.curr_genes),
-        #        ]
-        #        grn = compute_genie3(
-        #            subadata,
-        #            nthreads=32,
-        #            regulators=adata.var[adata.var.isTF].index.tolist(),
-        #        )
-        #        m = BenGRN(grn).scprint_benchmark()
-        #        metrics.update({celltype + "_genie3_tfonly": m})
-        #        grn = compute_genie3(subadata, nthreads=32)
-        #        m = BenGRN(grn).scprint_benchmark()
-        #        metrics.update({celltype + "_genie3": m})
+            #run the test function on specific dataset
         self.log_adata(gtclass=self.info, name="validation_part_"+str(self.counter))
 
-    def test_step(self, batch, batch_idx):
-        """
-        @see pl.LightningModule
+    def test(self):
+        metrics = {}
+        res = embbed_task.default_benchmark(self)
+        metrics.update(res)
 
-        Args:
-            batch @see training_step
-        """
-        total_loss, losses = self._full_training(
-            batch=batch,
-            do_denoise=self.do_denoise,
-            noise=self.noise,
-            do_next_tp=self.do_next_tp,
-            do_cce=self.do_cce,
-            cce_sim=self.cce_sim,
-            do_ecs=self.do_ecs,
-            do_mvc=self.do_mvc,
-            do_adv_cls=self.do_adv_cls,
-            do_adv_batch=self.do_adv_batch,
-            do_cls=self.do_cls,
-            do_generate=self.do_generate,
-            run_full_forward=self.run_full_forward,
-            mask_ratio=self.mask_ratio,
-        )
-        self.log("test_loss: ", total_loss)
-        self.log_dict(losses)
-        return total_loss
+        res = grn_task.default_benchmark(self, "../../data/yBCKp6HmXuHa0cZptMo7.h5ad")
+        metrics.update(res)
+
+        res = denoise_task.default_benchmark(self)
+        metrics.update(res)
+        return metrics
 
     def on_predict_epoch_start(self):
         """@see pl.LightningModule"""
@@ -1167,6 +1099,7 @@ class scPrint(L.LightningModule):
                 self.attn.agg([i[:, :, :2, :] for i in output[1]], gene_pos)
                 output = output[0]
             cell_embs = output["cell_embs"]
+            
         elif self.predict_mode == "denoise":
             output = self.forward(
                 gene_pos,
@@ -1188,10 +1121,11 @@ class scPrint(L.LightningModule):
                 do_mvc=False,
                 do_class=False,
             )
+            cell_embs = output["cell_embs"]
             output = self._generate(
                 output["cell_embs"],
                 gene_pos,
-                full_depth=depth,
+                full_depth=None, #otherwise we have 2 depths passed
                 depth_mult=expression.sum(1),
                 do_class=self.do_cls,
                 do_mvc=False,
@@ -1201,9 +1135,6 @@ class scPrint(L.LightningModule):
                 "predict_mode needs to be one of ['none', 'denoise', 'generate']"
             )
 
-        # output = self._generate(
-        #    cell_embs, gene_pos, depth_mult=expression.sum(1), full_depth=depth
-        # )
         if len(self.pred_embedding) == 0:
             self.pred_embedding = self.classes
         ind = [self.classes.index(i) + 2 for i in self.pred_embedding]
@@ -1215,7 +1146,7 @@ class scPrint(L.LightningModule):
                         torch.argmax(output["cls_output_" + clsname], dim=1)
                         for clsname in self.classes
                     ]
-                ).transpose(0, 1),
+                ).transpose(0, 1) if len(self.classes) > 0 else None,
                 "pos": gene_pos,
                 "expr": [output["mean"], output["disp"], output["zero_logits"]],
             }
@@ -1226,7 +1157,7 @@ class scPrint(L.LightningModule):
                     torch.argmax(output["cls_output_" + clsname], dim=1)
                     for clsname in self.classes
                 ]
-            ).transpose(0, 1)
+            ).transpose(0, 1) if len(self.classes) > 0 else None
             self.pos = gene_pos
             self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]]
         else:
@@ -1239,7 +1170,7 @@ class scPrint(L.LightningModule):
                             torch.argmax(output["cls_output_" + clsname], dim=1)
                             for clsname in self.classes
                         ]
-                    ).transpose(0, 1),
+                    ).transpose(0, 1) if len(self.classes) > 0 else None,
                 ],
             )
             self.pos = torch.cat([self.pos, gene_pos])
@@ -1249,6 +1180,7 @@ class scPrint(L.LightningModule):
                 torch.cat([self.expr_pred[2], output["zero_logits"]]),
             ]
         if self.embs.shape[0] > max_size_in_mem:
+            print("logging")
             self.log_adata(name=name+"_part_"+str(self.counter))
             self.counter+=1
             self.pos = None
@@ -1271,6 +1203,7 @@ class scPrint(L.LightningModule):
         if self.pos.shape[0] < 100:
             return
         if self.pred_log_adata:
+            print("adding on disk")
             return self.log_adata(name="predict_part_"+str(self.counter))
         # concat_on_disk(list, "data/step_0_predict.h5ad", uns_merge="same", index_unique="_")
 
@@ -1350,9 +1283,9 @@ class scPrint(L.LightningModule):
         if not os.path.exists(mdir):
             os.makedirs(mdir)
         adata, fig = utils.make_adata(
-            self.pred,
             self.embs,
             self.classes,
+            self.pred,
             self.attn.get(),
             self.trainer.global_step,
             self.label_decoders,

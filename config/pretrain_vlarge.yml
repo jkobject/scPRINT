@@ -10,8 +10,8 @@ trainer:
     - class_path: scprint.trainer.TrainingMode
       init_args:
         do_denoise: True
-        noise: 
-          - 0.3
+        noise:
+          - 0.4
         do_cce: False
         do_ecs: False
         do_mvc: False
@@ -21,7 +21,7 @@ trainer:
         do_adv_batch: False
         run_full_forward: False
         do_cls: True
-        class_scale: 1.5
+        class_scale: 0.8
         warmup_duration: 1500
         fused_adam: True
         lr_reduce_factor: .66
@@ -35,12 +35,12 @@ model:
   nlayers: 32
   layers_cls: [512]
   d_model: 1280
-  freeze_embeddings: False
+  freeze_embeddings: True
 data:
   collection_name: all no zhang13M #preprocessed dataset #all no zhang13M
   how: random expr
   max_len: 2200
-  weight_scaler: 40
-  train_oversampling_per_epoch: 0.05
+  weight_scaler: 20
+  train_oversampling_per_epoch: 0.2
   batch_size: 3
   num_workers: 6

@@ -82,8 +82,6 @@ class GRNfer:
         self.model = model
         self.batch_size = batch_size
         self.num_workers = num_workers
-        if how == "random expr" and cell_agg == "consensus":
-            raise ValueError("cannot have random expr with consensus")
         self.how = how
         assert self.how in [
             "most var within",
@@ -108,7 +106,6 @@ class GRNfer:
         self.head_agg = head_agg
         self.max_cells = max_cells
         self.curr_genes = None
-        self.model.doplot = False
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
@@ -169,7 +166,7 @@ class GRNfer:
             subadata, obs_to_output=["organism_ontology_term_id"]
         )
         self.col = Collator(
-            organisms=self.organisms,
+            organisms=[subadata.obs['organism_ontology_term_id'][0]],
             valid_genes=self.model.genes,
             how="some" if self.how != "random expr" else "random expr",
             genelist=self.curr_genes if self.how != "random expr" else [],
@@ -182,6 +179,7 @@ class GRNfer:
             shuffle=False,
         )
         self.model.predict_mode = self.forward_mode
+        self.model.doplot = self.doplot
         self.trainer.predict(self.model, dataloader)
         return subadata
 
@@ -360,3 +358,78 @@ def get_GTdb(db="omnipath"):
     if db == "stringdb":
         net = pd.read_parquet(FILEDIR + "/../../data/main/stringdb_bias.parquet")
     return net
+
+from bengrn.base import train_classifier
+from anndata.utils import make_index_unique
+from grnndata import utils as grnutils
+from bengrn import BenGRN, get_sroy_gt
+
+
+def default_benchmark(model, default_dataset="sroy", elem=[
+                                        'kidney collecting duct principal cell', 
+                                        'mesangial cell',
+                                        'blood vessel smooth muscle cell',
+                                        'podocyte',
+                                        'macrophage',
+                                        'leukocyte',
+                                        'kidney interstitial fibroblast',
+                                        'endothelial cell',
+                                        ]
+):
+    if default_dataset == 'sroy':
+        pass
+    else:
+        adata = sc.read_h5ad(default_dataset)
+        adata.var["isTF"]=False
+        adata.var.loc[adata.var.symbol.isin(grnutils.TF), "isTF"]=True
+        metrics = {}
+        for celltype in elem:
+            grn_inferer = GRNfer(model, adata,
+                how="random expr",
+                preprocess="softmax",
+                head_agg='max',
+                filtration="none",
+                forward_mode="none",
+                organisms=adata.obs['organism_ontology_term_id'][0],
+                apc=False,
+                symmetrize=False,
+                num_genes=3000,
+                max_cells=1024,
+                doplot=False,
+                batch_size=32,
+            )
+            #print(celltype)
+            #print("scprint\n")
+            grn = grn_inferer(layer=list(range(model.nlayers))[8:], cell_type=celltype)
+            grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
+            m = BenGRN(grn, doplot=False).scprint_benchmark()
+            metrics[celltype + '_scprint'] = m
+            #print(m)
+            #print("______________________________")
+            #print("now with classifier")
+            grn_inferer = GRNfer(model, adata,
+                how="most var across",
+                preprocess="softmax",
+                head_agg='none',
+                filtration="none",
+                forward_mode="none",
+                organisms=adata.obs['organism_ontology_term_id'][0],
+                apc=False,
+                symmetrize=False,
+                num_genes=6000,
+                max_cells=1024,
+                doplot=False,
+                batch_size=32,
+            )
+            #print("scprint\n")
+            grn = grn_inferer(layer=list(range(model.nlayers))[:], cell_type=celltype)
+            grn, m = train_classifier(grn, C=0.1, train_size=0.3, class_weight={1: 100, 0: 1}, shuffle=False, doplot=False)
+            grn.varp['GRN'] = grn.varp['classified']
+            grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
+            #print(m)
+            m = BenGRN(grn, doplot=False).scprint_benchmark()
+            #print(m)
+            metrics[celltype + '_scprint_class'] = m
+            #print("__________________________________")
+            return metrics
+

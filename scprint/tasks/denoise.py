@@ -8,7 +8,8 @@ from scdataloader import Collator
 from scprint.model import utils
 import bionty as bt
 from torch.utils.data import DataLoader
-
+from typing import Tuple
+import sklearn.metrics
 import pandas as pd
 
 from lightning.pytorch import Trainer
@@ -20,6 +21,8 @@ from scprint.tasks import compute_corr
 
 from scipy.stats import spearmanr
 import os
+
+FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 class Denoiser:
@@ -36,6 +39,7 @@ class Denoiser:
         plot_corr_size: int = 64,
         doplot: bool = True,
         predict_depth_mult: int = 4,
+        downsample: float = 0.4,
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -63,7 +67,7 @@ class Denoiser:
         self.plot_corr_size = plot_corr_size
         self.precision = precision
         self.doplot = doplot
-        self.model.doplot = doplot
+        self.downsample = downsample
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
@@ -87,7 +91,7 @@ class Denoiser:
             valid_genes=self.model.genes,
             how="some",
             genelist=genelist,
-            downsample=0.4,
+            downsample=self.downsample,
             save_output=True,
         )
         dataloader = DataLoader(
@@ -98,6 +102,7 @@ class Denoiser:
             shuffle=False,
         )
 
+        self.model.doplot = self.doplot
         self.trainer.predict(self.model, dataloader)
 
         reco = utils.zinb_sample(
@@ -110,8 +115,14 @@ class Denoiser:
             :, adata.var.index.isin(self.model.genes) & adata.var.index.isin(genelist)
         ]
 
+        true = true.todense()
+        reco = reco.cpu().numpy()
+        reco[true==0] = 0
+        #corr_coef = np.corrcoef(
+        #    np.vstack([reco, noisy, true])
+        #)
         corr_coef, p_value = spearmanr(
-            np.vstack([reco.cpu().numpy(), noisy, true.todense()]).T
+            np.vstack([reco, noisy, true]).T
         )
         corr_coef[p_value > 0.05] = 0
         if self.doplot:
@@ -123,15 +134,15 @@ class Denoiser:
             plt.title("Expression Correlation Coefficient")
             plt.show()
         metrics = {
-            "reco_self_noisy": np.mean(
+            "reco2noisy": np.mean(
                 corr_coef[
                     self.plot_corr_size : self.plot_corr_size * 2, : self.plot_corr_size
                 ].diagonal()
             ),
-            "reco_self_full": np.mean(
+            "reco2full": np.mean(
                 corr_coef[self.plot_corr_size * 2 :, : self.plot_corr_size].diagonal()
             ),
-            "reco_noisy_full": np.mean(
+            "noisy2full": np.mean(
                 corr_coef[
                     self.plot_corr_size * 2 :,
                     self.plot_corr_size : self.plot_corr_size * 2,
@@ -139,3 +150,69 @@ class Denoiser:
             ),
         }
         return metrics
+
+# testdatasets=['/R4ZHoQegxXdSFNFY5LGe.h5ad', '/SHV11AEetZOms4Wh7Ehb.h5ad', 
+# '/V6DPJx8rP3wWRQ43LMHb.h5ad', '/Gz5G2ETTEuuRDgwm7brA.h5ad', '/YyBdEsN89p2aF4xJY1CW.h5ad', 
+# '/SO5yBTUDBgkAmz0QbG8K.h5ad', '/r4iCehg3Tw5IbCLiCIbl.h5ad', '/SqvXr3i3PGXM8toXzUf9.h5ad', 
+# '/REIyQZE6OMZm1S3W2Dxi.h5ad', '/rYZ7gs0E0cqPOLONC8ia.h5ad', '/FcwMDDbAQPNYIjcYNxoc.h5ad', 
+# '/fvU5BAMJrm7vrgDmZM0z.h5ad', '/gNNpgpo6gATjuxTE7CCp.h5ad'],
+
+def default_benchmark(model, default_dataset=FILE_DIR+"../../data/r4iCehg3Tw5IbCLiCIbl.h5ad"):
+    adata = sc.read_h5ad(default_dataset)
+    denoise = Denoiser(
+        model,
+        batch_size=40,
+        max_len=5200,
+        plot_corr_size=480,
+        doplot=False,
+        predict_depth_mult=20,
+        downsample=0.7,
+    )
+    return denoise(adata)
+
+
+def mse(test_data, denoised_data, target_sum=1e4):
+    sc.pp.normalize_total(test_data, target_sum)
+    sc.pp.log1p(test_data)
+
+    sc.pp.normalize_total(denoised_data, target_sum)
+    sc.pp.log1p(denoised_data)
+
+    print("Compute mse value", flush=True)
+    return sklearn.metrics.mean_squared_error(
+        test_data.X.todense(), denoised_data.X
+    )
+
+
+# from molecular_cross_validation.mcv_sweep import poisson_nll_loss
+# copied from: https://github.com/czbiohub/molecular-cross-validation/blob/master/src/molecular_cross_validation/mcv_sweep.py
+def poisson_nll_loss(y_pred: np.ndarray, y_true: np.ndarray) -> float:
+    return (y_pred - y_true * np.log(y_pred + 1e-6)).mean()
+
+
+def split_molecules(
+    umis: np.ndarray,
+    data_split: float,
+    overlap_factor: float = 0.0,
+    random_state: np.random.RandomState = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Splits molecules into two (potentially overlapping) groups.
+    :param umis: Array of molecules to split
+    :param data_split: Proportion of molecules to assign to the first group
+    :param overlap_factor: Overlap correction factor, if desired
+    :param random_state: For reproducible sampling
+    :return: umis_X and umis_Y, representing ``split`` and ``~(1 - split)`` counts
+             sampled from the input array
+    """
+    if random_state is None:
+        random_state = np.random.RandomState()
+
+    umis_X_disjoint = random_state.binomial(umis, data_split - overlap_factor)
+    umis_Y_disjoint = random_state.binomial(
+        umis - umis_X_disjoint, (1 - data_split) / (1 - data_split + overlap_factor)
+    )
+    overlap_factor = umis - umis_X_disjoint - umis_Y_disjoint
+    umis_X = umis_X_disjoint + overlap_factor
+    umis_Y = umis_Y_disjoint + overlap_factor
+
+    return umis_X, umis_Y
