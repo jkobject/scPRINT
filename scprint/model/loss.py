@@ -8,6 +8,10 @@ def mse(input: Tensor, target: Tensor) -> Tensor:
     """
     Compute the MSE loss between input and target.
     """
+    input = torch.log2(input+1)
+    input = (input / torch.sum(input, dim=1, keepdim=True))*10000
+    target = torch.log2(target+1)
+    target = target / torch.sum(target, dim=1, keepdim=True)*10000
     return F.mse_loss(input, target, reduction="mean")
 
 
@@ -41,7 +45,7 @@ def masked_nb(input: Tensor, target: Tensor, mask: Tensor) -> Tensor:
 
 
 # FROM SCVI
-def nb(x: Tensor, mu: Tensor, theta: Tensor, eps=1e-8):
+def nb(target: Tensor, mu: Tensor, theta: Tensor, eps=1e-8):
     """
     This negative binomial function was taken from:
     Title: scvi-tools
@@ -55,7 +59,7 @@ def nb(x: Tensor, mu: Tensor, theta: Tensor, eps=1e-8):
     Computes negative binomial loss.
     Parameters
     ----------
-    x: Tensor
+    target: Tensor
          Torch Tensor of ground truth data.
     mu: Tensor
          Torch Tensor of means of the negative binomial (has to be positive support).
@@ -74,13 +78,13 @@ def nb(x: Tensor, mu: Tensor, theta: Tensor, eps=1e-8):
     log_theta_mu_eps = torch.log(theta + mu + eps)
     res = (
         theta * (torch.log(theta + eps) - log_theta_mu_eps)
-        + x * (torch.log(mu + eps) - log_theta_mu_eps)
-        + torch.lgamma(x + theta)
+        + target * (torch.log(mu + eps) - log_theta_mu_eps)
+        + torch.lgamma(target + theta)
         - torch.lgamma(theta)
-        - torch.lgamma(x + 1)
+        - torch.lgamma(target + 1)
     )
 
-    return res.sum(-1).mean()
+    return -res.mean()
 
 
 def nb_dist(x: Tensor, mu: Tensor, theta: Tensor, eps=1e-8):
@@ -93,7 +97,7 @@ def zinb(
     mu: Tensor,
     theta: Tensor,
     pi: Tensor,
-    eps=1e-6,
+    eps=1e-8,
 ):
     """
     This zero-inflated negative binomial function was taken from:

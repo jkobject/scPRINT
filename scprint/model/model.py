@@ -126,7 +126,7 @@ class scPrint(L.LightningModule):
         self.weight_decay = weight_decay
         self.optim = optim
         self.fused_adam = False
-        self.lr_reduce_patience = 1
+        self.lr_reduce_patience = 2
         self.lr_reduce_factor = 0.6
         self.lrfinder_steps = 0
         self.doplot = True
@@ -867,6 +867,12 @@ class scPrint(L.LightningModule):
                 mu=output["mean"],
                 target=expression,
             )
+        elif "disp" in output:
+            loss_expr = loss.nb(
+                theta=output["disp"],
+                mu=output["mean"],
+                target=expression,
+            )
         else:
             loss_expr = loss.mse(
                 input=output["mean"],
@@ -971,8 +977,8 @@ class scPrint(L.LightningModule):
                 )
                 pg["lr"] = lr_scale * self.hparams.lr
         for i, pg in enumerate(optimizer.param_groups):
-            if pg["lr"] < 2e-5:
-                pg["lr"] = 2e-5
+            #if pg["lr"] < 2e-5:
+            #    pg["lr"] = 2e-5
             self.log("lr_"+str(i), pg["lr"])
             
 

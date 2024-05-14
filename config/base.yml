@@ -26,7 +26,7 @@ trainer:
     - class_path: scprint.trainer.TrainingMode
       init_args:
         do_denoise: True
-        noise: 
+        noise:
           - 0.3
         do_cce: False
         do_ecs: False
@@ -40,8 +40,6 @@ trainer:
         class_scale: 1.5
         warmup_duration: 500
         fused_adam: True
-        lr_reduce_factor: .66
-        lr_reduce_patience: 2
         mask_ratio: []
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
@@ -73,6 +71,8 @@ model:
   mvc_decoder: inner product
   residual_in_fp32: True
   num_heads_kv: null
+  lr_reduce_factor: .66
+  lr_reduce_patience: 2
   fused_dropout_add_ln: False
   prenorm: True
   fused_mlp: False
