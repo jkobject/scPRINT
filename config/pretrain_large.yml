@@ -6,7 +6,7 @@ trainer:
     - class_path: scprint.trainer.TrainingMode
       init_args:
         do_denoise: True
-        noise: 
+        noise:
           - 0.3
         do_cce: False
         do_ecs: False
@@ -17,11 +17,9 @@ trainer:
         do_adv_batch: False
         run_full_forward: False
         do_cls: True
-        class_scale: 1.5
+        class_scale: 1
         warmup_duration: 500
         fused_adam: True
-        lr_reduce_factor: .66
-        lr_reduce_patience: 2
         mask_ratio: []
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
@@ -29,8 +27,10 @@ trainer:
 model:
   lr: 0.0001
   optim: "adamW"
-  weight_decay: 0.02
+  weight_decay: 0.01
   nhead: 8
+  lr_reduce_factor: .66
+  lr_reduce_patience: 2
   nlayers: 16 #used to be 12
   layers_cls: [512]
   d_model: 512

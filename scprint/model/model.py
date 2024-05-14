@@ -71,6 +71,7 @@ class scPrint(L.LightningModule):
         weight_decay: float = 0.01,
         freeze_embeddings: bool = True,
         label_decoders: Optional[Dict[str, Dict[int, str]]] = None,
+        zinb: bool=True,
         **flash_attention_kwargs,
     ):
         """
@@ -129,7 +130,7 @@ class scPrint(L.LightningModule):
         self.weight_decay = weight_decay
         self.optim = optim
         self.fused_adam = False
-        self.lr_reduce_patience = 1
+        self.lr_reduce_patience = 2
         self.lr_reduce_factor = 0.6
         self.lrfinder_steps = 0
         self.doplot = True
@@ -287,6 +288,7 @@ class scPrint(L.LightningModule):
             d_model,
             nfirst_tokens_to_skip=self.cell_embs_count,
             dropout=dropout,
+            zinb=zinb
         )
         # cls decoder
         self.cls_decoders = nn.ModuleDict()
@@ -348,6 +350,18 @@ class scPrint(L.LightningModule):
             for k2, v2 in v.items():
                 tens[k2 - classes[k], v2] = 1
             self.mat_labels_hierarchy[k] = tens.to(bool)
+
+        mencoders = {}
+        if self.trainer.datamodule.decoders != checkpoints['hyper_parameters']['label_decoders']:
+            # if we don't have the same decoders, we need to update the one on the datamodule side
+            for k, v in checkpoints['hyper_parameters']['label_decoders'].items():
+                mencoders[k] = {va: ke for ke, va in v.items()}
+            self.trainer.datamodule.dataset.mapped_dataset.encoders = mencoders
+            if self.trainer.datamodule.kwargs["collate_fn"].organism_name in mencoders:
+                self.trainer.datamodule.kwargs["collate_fn"].setup(
+                    mencoders[self.trainer.datamodule.kwargs["collate_fn"].organism_name], 
+                    valid_genes=self.genes
+                )
 
     def _encoder(
         self,
@@ -702,7 +716,7 @@ class scPrint(L.LightningModule):
             ).to(gene_pos.device)
             output = self.forward(
                 gene_pos,
-                expression=expression,
+                #expression=expression,
                 mask=mask,
                 full_depth=total_count,
                 do_mvc=do_mvc,
@@ -849,12 +863,24 @@ class scPrint(L.LightningModule):
         # TASK 1. reconstruct masked expression
         #import pdb
         #pdb.set_trace()
-        loss_expr = loss.zinb(
-            theta=output["disp"],
-            pi=output["zero_logits"],
-            mu=output["mean"],
-            target=expression,
-        )
+        if "zero_logits" in output:
+            loss_expr = loss.zinb(
+                theta=output["disp"],
+                pi=output["zero_logits"],
+                mu=output["mean"],
+                target=expression,
+            )
+        elif "disp" in output:
+            loss_expr = loss.nb(
+                theta=output["disp"],
+                mu=output["mean"],
+                target=expression,
+            )
+        else:
+            loss_expr = loss.mse(
+                input=output["mean"],
+                target=expression,
+            )
         total_loss += loss_expr
         losses.update({"expr": loss_expr})
 
@@ -945,17 +971,19 @@ class scPrint(L.LightningModule):
 
         # manually warm up lr without a scheduler
         # making sure that we don't do this during lrfinder
-        if (
-            self.trainer.global_step < self.warmup_duration + self.lrfinder_steps
-        ) and self.lrfinder_steps < self.trainer.global_step:
-            lr_scale = min(
-                1.0, float(self.trainer.global_step + 1) / self.warmup_duration
-            )
-            for pg in optimizer.param_groups:
+        for i, pg in enumerate(optimizer.param_groups):
+            if (
+                self.trainer.global_step < self.warmup_duration + self.lrfinder_steps
+            ) and self.lrfinder_steps < self.trainer.global_step:
+                lr_scale = min(
+                    1.0, float(self.trainer.global_step + 1) / self.warmup_duration
+                )
                 pg["lr"] = lr_scale * self.hparams.lr
-            self.log("lr", lr_scale * self.hparams.lr)
-        else:
-            self.log("lr", self.lr)
+        for i, pg in enumerate(optimizer.param_groups):
+            #if pg["lr"] < 2e-5:
+            #    pg["lr"] = 2e-5
+            self.log("lr_"+str(i), pg["lr"])
+            
 
     def on_before_zero_grad(self, optimizer):
         pass
@@ -1148,7 +1176,7 @@ class scPrint(L.LightningModule):
                     ]
                 ).transpose(0, 1) if len(self.classes) > 0 else None,
                 "pos": gene_pos,
-                "expr": [output["mean"], output["disp"], output["zero_logits"]],
+                "expr": [output["mean"], output["disp"], output["zero_logits"]] if "disp" in output else output["mean"],
             }
         if self.embs is None:
             self.embs = torch.mean(cell_embs[:, ind, :], dim=1)
@@ -1159,7 +1187,7 @@ class scPrint(L.LightningModule):
                 ]
             ).transpose(0, 1) if len(self.classes) > 0 else None
             self.pos = gene_pos
-            self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]]
+            self.expr_pred = [output["mean"], output["disp"], output["zero_logits"]] if "disp" in output else output["mean"]
         else:
             self.embs = torch.cat([self.embs, torch.mean(cell_embs[:, ind, :], dim=1)])
             self.pred = torch.cat(
@@ -1178,7 +1206,7 @@ class scPrint(L.LightningModule):
                 torch.cat([self.expr_pred[0], output["mean"]]),
                 torch.cat([self.expr_pred[1], output["disp"]]),
                 torch.cat([self.expr_pred[2], output["zero_logits"]]),
-            ]
+            ] if "disp" in output else torch.cat([self.expr_pred, output["mean"]])
         if self.embs.shape[0] > max_size_in_mem:
             print("logging")
             self.log_adata(name=name+"_part_"+str(self.counter))

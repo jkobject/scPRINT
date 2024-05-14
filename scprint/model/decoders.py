@@ -32,6 +32,7 @@ class ExprDecoder(nn.Module):
         d_model: int,
         nfirst_tokens_to_skip: int = 0,
         dropout: float = 0.1,
+        zinb: bool = True,
     ):
         """
         ExprDecoder Decoder for the gene expression prediction.
@@ -54,21 +55,26 @@ class ExprDecoder(nn.Module):
             nn.LayerNorm(d_model),
             nn.LeakyReLU(),
         )
-        self.pred_var_zero = nn.Linear(d_model, 3)
+        self.pred_var_zero = nn.Linear(d_model, 3 if zinb else 1)
+        self.zinb = zinb
 
     def forward(self, x: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
         # we don't do it on the labels
         x = self.fc(x[:, self.nfirst_tokens_to_skip :, :])
-        pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
-            1, dim=-1
-        )  # (batch, seq_len)
-        # The sigmoid function is used to map the zero_logits to a probability between 0 and 1.
-        return dict(
-            mean=F.softmax(pred_value.squeeze(-1), dim=-1),
-            disp=torch.exp(torch.clamp(var_value.squeeze(-1), max=15)),
-            zero_logits=zero_logits.squeeze(-1),
-        )
+        if self.zinb:
+            pred_value, var_value, zero_logits = self.pred_var_zero(x).split(
+                1, dim=-1
+            )  # (batch, seq_len)
+            # The sigmoid function is used to map the zero_logits to a probability between 0 and 1.
+            return dict(
+                mean=F.softmax(pred_value.squeeze(-1), dim=-1),
+                disp=torch.exp(torch.clamp(var_value.squeeze(-1), max=15)),
+                zero_logits=zero_logits.squeeze(-1),
+            )
+        else:
+            pred_value = self.pred_var_zero(x)
+            return dict(mean=F.softmax(pred_value.squeeze(-1), dim=-1))
 
 
 class MVCDecoder(nn.Module):
