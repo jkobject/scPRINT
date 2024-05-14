@@ -5,6 +5,8 @@ import datamapplot
 from anndata.experimental import concat_on_disk
 from umap import UMAP
 
+# srun
+
 #l = [
 #  "../data/step_0_predict_part_0_0.h5ad",
 #  "../data/step_0_predict_part_0_1.h5ad",

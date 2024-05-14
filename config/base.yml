@@ -8,7 +8,7 @@ log_graph: True
 trainer:
   precision: 16-mixed
   # profiler: simple
-  gradient_clip_val: 500
+  gradient_clip_val: 50
   log_every_n_steps: 100
   limit_train_batches: 5000
   limit_val_batches: 2000
@@ -26,7 +26,7 @@ trainer:
     - class_path: scprint.trainer.TrainingMode
       init_args:
         do_denoise: True
-        noise: 
+        noise:
           - 0.3
         do_cce: False
         do_ecs: False
@@ -40,8 +40,6 @@ trainer:
         class_scale: 1.5
         warmup_duration: 500
         fused_adam: True
-        lr_reduce_factor: .66
-        lr_reduce_patience: 2
         mask_ratio: []
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
       init_args:
@@ -49,7 +47,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
       init_args:
         monitor: val_loss
-        save_top_k: 2
+        save_top_k: 6
         save_last: True
     - class_path: lightning.pytorch.callbacks.EarlyStopping
       init_args:
@@ -65,9 +63,6 @@ trainer:
   #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
   #    requeue_signal: signal.SIGHUP
 model:
-  lr: 0.0001
-  optim: "adamW"
-  weight_decay: 0.02
   dropout: 0.1
   transformer: flash
   mvc_decoder: inner product

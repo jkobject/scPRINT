@@ -13,14 +13,19 @@ import sklearn.metrics
 import pandas as pd
 
 from lightning.pytorch import Trainer
-
+import anndata as ad
 
 from typing import List
 from anndata import AnnData
 from scprint.tasks import compute_corr
+from scdataloader import Preprocessor
+
+from scipy.sparse import issparse
 
 from scipy.stats import spearmanr
 import os
+
+from . import knn_smooth
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -31,7 +36,7 @@ class Denoiser:
         model: torch.nn.Module,
         batch_size: int = 10,
         num_workers: int = 1,
-        max_len: int = 20000,
+        max_len: int = 20_000,
         precision: str = "16-mixed",
         organisms: List[str] = [
             "NCBITaxon:9606",
@@ -72,20 +77,25 @@ class Denoiser:
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, adata: AnnData):
-        random_indices = np.random.randint(
-            low=0, high=adata.shape[0], size=self.plot_corr_size
-        )
         if os.path.exists("collator_output.txt"):
             os.remove("collator_output.txt")
-        adataset = SimpleAnnDataset(
-            adata[random_indices], obs_to_output=["organism_ontology_term_id"]
-        )
-        adatac = sc.pp.log1p(adata, copy=True)
-        sc.pp.highly_variable_genes(adatac)
-        genelist = adata.var.index[
-            np.argsort(adatac.var["dispersions_norm"].values)[::-1][: self.max_len]
-        ].tolist()
-        del adatac
+        random_indices = None
+        if self.plot_corr_size < adata.shape[0]:
+            random_indices = np.random.randint(
+                low=0, high=adata.shape[0], size=self.plot_corr_size
+            )
+            adataset = SimpleAnnDataset(
+                adata[random_indices], obs_to_output=[
+                    "organism_ontology_term_id"]
+            )
+        else:
+            adataset = SimpleAnnDataset(
+                adata, obs_to_output=["organism_ontology_term_id"]
+            )
+        sc.pp.highly_variable_genes(
+            adata, flavor="seurat_v3", n_top_genes=self.max_len)
+        genelist = adata.var.index[adata.var.highly_variable]
+        print(len(genelist))
         col = Collator(
             organisms=self.organisms,
             valid_genes=self.model.genes,
@@ -101,74 +111,148 @@ class Denoiser:
             num_workers=self.num_workers,
             shuffle=False,
         )
+        self.genes = list(set(self.model.genes) & set(genelist))
 
         self.model.doplot = self.doplot
         self.trainer.predict(self.model, dataloader)
+        if self.downsample is not None:
+            reco = self.model.expr_pred[0]
+            noisy = np.loadtxt("collator_output.txt")
+            true = adata.X[random_indices][
+                :, adata.var.index.isin(self.genes)
+            ] if random_indices is not None else adata.X[
+                :, adata.var.index.isin(self.genes)
+            ]
 
-        reco = utils.zinb_sample(
-            self.model.expr_pred[0],
-            self.model.expr_pred[1],
-            self.model.expr_pred[2],
-        )
-        noisy = np.loadtxt("collator_output.txt")
-        true = adata.X[random_indices][
-            :, adata.var.index.isin(self.model.genes) & adata.var.index.isin(genelist)
-        ]
-
-        true = true.todense()
-        reco = reco.cpu().numpy()
-        reco[true==0] = 0
-        #corr_coef = np.corrcoef(
-        #    np.vstack([reco, noisy, true])
-        #)
-        corr_coef, p_value = spearmanr(
-            np.vstack([reco, noisy, true]).T
-        )
-        corr_coef[p_value > 0.05] = 0
-        if self.doplot:
-            plt.figure(figsize=(10, 5))
-            plt.imshow(
-                corr_coef, cmap="coolwarm", interpolation="none", vmin=-1, vmax=1
+            true = true.toarray() if issparse(true) else true
+            # noisy[true==0]=0
+            reco = reco.cpu().numpy()
+            # reco[true==0] = 0
+            # import pdb
+            # pdb.set_trace()
+            # reco[reco!=0] = 2
+            # corr_coef = np.corrcoef(
+            #    np.vstack([reco[true!=0], noisy[true!=0], true[true!=0]])
+            # )
+            corr_coef, p_value = spearmanr(
+                np.vstack(
+                    [reco[true != 0], noisy[true != 0], true[true != 0]]).T
             )
-            plt.colorbar()
-            plt.title("Expression Correlation Coefficient")
-            plt.show()
-        metrics = {
-            "reco2noisy": np.mean(
-                corr_coef[
-                    self.plot_corr_size : self.plot_corr_size * 2, : self.plot_corr_size
-                ].diagonal()
-            ),
-            "reco2full": np.mean(
-                corr_coef[self.plot_corr_size * 2 :, : self.plot_corr_size].diagonal()
-            ),
-            "noisy2full": np.mean(
-                corr_coef[
-                    self.plot_corr_size * 2 :,
-                    self.plot_corr_size : self.plot_corr_size * 2,
-                ].diagonal()
-            ),
-        }
-        return metrics
+            metrics = {
+                "reco2noisy": corr_coef[0, 1],
+                "reco2full": corr_coef[0, 2],
+                "noisy2full": corr_coef[1, 2],
+            }
+            # corr_coef[p_value > 0.05] = 0
+            # if self.doplot:
+            #    plt.figure(figsize=(10, 5))
+            #    plt.imshow(
+            #        corr_coef, cmap="coolwarm", interpolation="none", vmin=-1, vmax=1
+            #    )
+            #    plt.colorbar()
+            #    plt.title("Expression Correlation Coefficient")
+            #    plt.show()
+            # metrics = {
+            #    "reco2noisy": np.mean(
+            #        corr_coef[
+            #            self.plot_corr_size : self.plot_corr_size * 2, : self.plot_corr_size
+            #        ].diagonal()
+            #    ),
+            #    "reco2full": np.mean(
+            #        corr_coef[self.plot_corr_size * 2 :, : self.plot_corr_size].diagonal()
+            #    ),
+            #    "noisy2full": np.mean(
+            #        corr_coef[
+            #            self.plot_corr_size * 2 :,
+            #            self.plot_corr_size : self.plot_corr_size * 2,
+            #        ].diagonal()
+            #    ),
+            # }
+            return metrics, random_indices, self.genes, self.model.expr_pred[0]
+        else:
+            return random_indices, self.genes, self.model.expr_pred[0]
 
-# testdatasets=['/R4ZHoQegxXdSFNFY5LGe.h5ad', '/SHV11AEetZOms4Wh7Ehb.h5ad', 
-# '/V6DPJx8rP3wWRQ43LMHb.h5ad', '/Gz5G2ETTEuuRDgwm7brA.h5ad', '/YyBdEsN89p2aF4xJY1CW.h5ad', 
-# '/SO5yBTUDBgkAmz0QbG8K.h5ad', '/r4iCehg3Tw5IbCLiCIbl.h5ad', '/SqvXr3i3PGXM8toXzUf9.h5ad', 
-# '/REIyQZE6OMZm1S3W2Dxi.h5ad', '/rYZ7gs0E0cqPOLONC8ia.h5ad', '/FcwMDDbAQPNYIjcYNxoc.h5ad', 
+# testdatasets=['/R4ZHoQegxXdSFNFY5LGe.h5ad', '/SHV11AEetZOms4Wh7Ehb.h5ad',
+# '/V6DPJx8rP3wWRQ43LMHb.h5ad', '/Gz5G2ETTEuuRDgwm7brA.h5ad', '/YyBdEsN89p2aF4xJY1CW.h5ad',
+# '/SO5yBTUDBgkAmz0QbG8K.h5ad', '/r4iCehg3Tw5IbCLiCIbl.h5ad', '/SqvXr3i3PGXM8toXzUf9.h5ad',
+# '/REIyQZE6OMZm1S3W2Dxi.h5ad', '/rYZ7gs0E0cqPOLONC8ia.h5ad', '/FcwMDDbAQPNYIjcYNxoc.h5ad',
 # '/fvU5BAMJrm7vrgDmZM0z.h5ad', '/gNNpgpo6gATjuxTE7CCp.h5ad'],
 
-def default_benchmark(model, default_dataset=FILE_DIR+"../../data/r4iCehg3Tw5IbCLiCIbl.h5ad"):
+
+def default_benchmark(model, default_dataset=FILE_DIR+"/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad"):
     adata = sc.read_h5ad(default_dataset)
     denoise = Denoiser(
         model,
         batch_size=40,
-        max_len=5200,
+        max_len=4000,
         plot_corr_size=480,
         doplot=False,
-        predict_depth_mult=20,
+        predict_depth_mult=10,
         downsample=0.7,
     )
     return denoise(adata)
+
+
+def open_benchmark(model):
+    adata = sc.read(
+        FILE_DIR+"/../../data/pancreas_atlas.h5ad",
+        backup_url="https://figshare.com/ndownloader/files/24539828",
+    )
+    adata = adata[adata.obs.tech == "inDrop1"]
+
+    train, test = split_molecules(
+        adata.layers['counts'].round().astype(int), 0.9)
+    is_missing = np.array(train.sum(axis=0) == 0)
+    true = adata.copy()
+    true.X = test
+    adata.layers['counts'] = train
+    test = test[:, ~is_missing.flatten()]
+    adata = adata[:, ~is_missing.flatten()]
+
+    adata.obs['organism_ontology_term_id'] = "NCBITaxon:9606"
+    preprocessor = Preprocessor(subset_hvg=3000, use_layer='counts', is_symbol=True,
+                                force_preprocess=True, skip_validate=True, do_postp=False)
+    nadata = preprocessor(adata.copy())
+
+    denoise = Denoiser(
+        model,
+        batch_size=32,
+        max_len=15_800,
+        plot_corr_size=10_000,
+        doplot=False,
+        predict_depth_mult=1.2,
+        downsample=None,
+    )
+    expr = denoise(nadata)
+    denoised = ad.AnnData(expr.cpu().numpy(), var=nadata.var.loc[np.array(
+        denoise.model.genes)[denoise.model.pos[0].cpu().numpy().astype(int)]])
+    denoised = denoised[:, denoised.var.symbol.isin(true.var.index)]
+    loc = true.var.index.isin(denoised.var.symbol)
+    true = true[:, loc]
+    train = train[:, loc]
+
+    # Ensure expr and adata are aligned by reordering expr to match adata's .var order
+    denoised = denoised[:, denoised.var.set_index(
+        'symbol').index.get_indexer(true.var.index)]
+    denoised.X = np.maximum(denoised.X - train.astype(float), 0)
+    # scaling and transformation
+    target_sum = 1e4
+
+    sc.pp.normalize_total(true, target_sum)
+    sc.pp.log1p(true)
+
+    sc.pp.normalize_total(denoised, target_sum)
+    sc.pp.log1p(denoised)
+
+    error_mse = sklearn.metrics.mean_squared_error(
+        true.X, denoised.X
+    )
+    # scaling
+    initial_sum = train.sum()
+    target_sum = true.X.sum()
+    denoised.X = denoised.X * target_sum / initial_sum
+    error_poisson = poisson_nll_loss(true.X, denoised.X)
+    return {"error_poisson": error_poisson, "error_mse": error_mse}
 
 
 def mse(test_data, denoised_data, target_sum=1e4):
@@ -182,6 +266,12 @@ def mse(test_data, denoised_data, target_sum=1e4):
     return sklearn.metrics.mean_squared_error(
         test_data.X.todense(), denoised_data.X
     )
+
+
+def withknn(adata, k=10, **kwargs):
+    adata.layers['denoised'] = knn_smooth.knn_smoothing(
+        adata.X.transpose(), k=k, **kwargs).transpose()
+    return adata
 
 
 # from molecular_cross_validation.mcv_sweep import poisson_nll_loss
@@ -209,7 +299,8 @@ def split_molecules(
 
     umis_X_disjoint = random_state.binomial(umis, data_split - overlap_factor)
     umis_Y_disjoint = random_state.binomial(
-        umis - umis_X_disjoint, (1 - data_split) / (1 - data_split + overlap_factor)
+        umis - umis_X_disjoint, (1 - data_split) /
+        (1 - data_split + overlap_factor)
     )
     overlap_factor = umis - umis_X_disjoint - umis_Y_disjoint
     umis_X = umis_X_disjoint + overlap_factor
