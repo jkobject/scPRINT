@@ -9,7 +9,7 @@ from scdataloader import Collator
 from scprint.model import utils
 import bionty as bt
 from torch.utils.data import DataLoader
-
+import os
 import pandas as pd
 
 from lightning.pytorch import Trainer
@@ -19,6 +19,7 @@ from scipy.stats import spearmanr
 from typing import List
 from anndata import AnnData
 
+FILE_LOC = os.path.dirname(os.path.realpath(__file__))
 
 class Embedder:
     def __init__(
@@ -32,6 +33,7 @@ class Embedder:
         precision: str = "16-mixed",
         organisms: List[str] = [
             "NCBITaxon:9606",
+            "NCBITaxon:10090",
         ],
         pred_embedding: List[str] = [
             "cell_type_ontology_term_id",
@@ -39,9 +41,7 @@ class Embedder:
             "self_reported_ethnicity_ontology_term_id",
             "sex_ontology_term_id",
         ],
-        forward_mode="generate",
         model_name: str = "scprint",
-        output_expression: str = "sample",  # one of "all" "sample" "none"
         plot_corr_size: int = 64,
         doplot: bool = True,
     ):
@@ -68,11 +68,8 @@ class Embedder:
         self.max_len = max_len
         self.add_zero_genes = add_zero_genes
         self.organisms = organisms
-        self.model.pred_embedding = pred_embedding
-        self.forward_mode = forward_mode
-        self.model.predict_mode = self.forward_mode
+        self.pred_embedding = pred_embedding
         self.model_name = model_name
-        self.output_expression = output_expression
         self.plot_corr_size = plot_corr_size
         self.precision = precision
         self.doplot = doplot
@@ -80,49 +77,69 @@ class Embedder:
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
-    def __call__(self, adata: AnnData):
-        # Add at least the organism you are working with
-        self.model.predict_mode = self.forward_mode
-        adataset = SimpleAnnDataset(adata, obs_to_output=["organism_ontology_term_id"])
-        col = Collator(
-            organisms=self.organisms,
-            valid_genes=self.model.genes,
-            how=self.how,
-            max_len=self.max_len,
-            add_zero_genes=self.add_zero_genes,
-        )
-        dataloader = DataLoader(
-            adataset,
-            collate_fn=col,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            shuffle=False,
-        )
-
-        self.trainer.predict(self.model, dataloader)
+    def __call__(self, adata: AnnData, cache=False, output_expression: str = "none"):
+        # one of "all" "sample" "none"
         try:
             mdir = (
                 self.model.logger.save_dir
                 if self.model.logger.save_dir is not None
-                else "/tmp"
+                else "data"
             )
         except:
-            mdir = "/tmp"
+            mdir = "data"
+        try:
+            file = mdir + "/step_" + str(self.model.global_step) + "_predict_part_"+str(self.model.counter)+"_"+str(self.model.global_rank) + ".h5ad"
+            hasfile = os.path.exists(file)
+        except:
+            hasfile = False
+        if not cache or not hasfile:
+            self.model.predict_mode="none"
+            # Add at least the organism you are working with
+            adataset = SimpleAnnDataset(adata, obs_to_output=["organism_ontology_term_id"])
+            col = Collator(
+                organisms=self.organisms,
+                valid_genes=self.model.genes,
+                how=self.how,
+                max_len=self.max_len,
+                add_zero_genes=self.add_zero_genes,
+            )
+            dataloader = DataLoader(
+                adataset,
+                collate_fn=col,
+                batch_size=self.batch_size,
+                num_workers=self.num_workers,
+                shuffle=False,
+            )
+            self.model.pred_log_adata = True
+            self.model.pred_embedding = self.pred_embedding
+
+            self.trainer.predict(self.model, dataloader)
+            try:
+                mdir = (
+                    self.model.logger.save_dir
+                    if self.model.logger.save_dir is not None
+                    else "data"
+                )
+            except:
+                mdir = "data"
+            file = mdir + "/step_" + str(self.model.global_step) + "_predict_part_"+str(self.model.counter)+"_"+str(self.model.global_rank) + ".h5ad"
 
         pred_adata = sc.read_h5ad(
-            mdir + "/step_" + str(self.model.global_step) + "_" + ".h5ad"
+            file
         )
-        if self.output_expression == "all":
+        if output_expression == "all":
             adata.obsm["scprint_mu"] = self.model.expr_pred[0]
             adata.obsm["scprint_theta"] = self.model.expr_pred[1]
             adata.obsm["scprint_pi"] = self.model.expr_pred[2]
-        elif self.output_expression == "sample":
+            adata.obsm["scprint_pos"] = self.model.pos.cpu().numpy()
+        elif output_expression == "sample":
             adata.obsm["scprint_expr"] = utils.zinb_sample(
                 self.model.expr_pred[0],
                 self.model.expr_pred[1],
                 self.model.expr_pred[2],
-            )
-        elif self.output_expression == "old":
+            ).cpu().numpy()
+            adata.obsm["scprint_pos"] = self.model.pos.cpu().numpy()
+        elif output_expression == "old":
             expr = np.array(self.model.expr_pred[0])
             expr[
                 np.random.binomial(
@@ -137,7 +154,9 @@ class Embedder:
             expr[expr <= 0.3] = 0
             expr[(expr >= 0.3) & (expr <= 1)] = 1
             adata.obsm["scprint_expr"] = expr.astype(int)
-        adata.obsm["scprint_pos"] = self.model.pos
+            adata.obsm["scprint_pos"] = self.model.pos.cpu().numpy()
+        else:
+            pass
         pred_adata.obs.index = adata.obs.index
         adata.obsm["scprint_umap"] = pred_adata.obsm["X_umap"]
         # adata.obsm["scprint_leiden"] = pred_adata.obsm["leiden"]
@@ -145,36 +164,36 @@ class Embedder:
         pred_adata.obs.index = adata.obs.index
         adata.obs = pd.concat([adata.obs, pred_adata.obs], axis=1)
         metrics = {}
-        for label in self.model.labels:
+        for cl in self.model.classes:
             res = []
-            if label not in adata.obs.columns:
+            if cl not in adata.obs.columns:
                 continue
-            class_topred = self.model.label_decoders[label].values()
+            class_topred = self.model.label_decoders[cl].values()
 
-            if label in self.model.cls_hierarchy:
+            if cl in self.model.labels_hierarchy:
                 # class_groupings = {
                 #    k: [
                 #        i.ontology_id
                 #        for i in bt.CellType.filter(k).first().children.all()
                 #    ]
-                #    for k in set(adata.obs[label].unique()) - set(class_topred)
+                #    for k in set(adata.obs[cl].unique()) - set(class_topred)
                 # }
-                cur_cls_hierarchy = {
-                    self.model.label_decoders[label][k]: [
-                        self.model.label_decoders[label][i] for i in v
+                cur_labels_hierarchy = {
+                    self.model.label_decoders[cl][k]: [
+                        self.model.label_decoders[cl][i] for i in v
                     ]
-                    for k, v in self.model.cls_hierarchy[label].items()
+                    for k, v in self.model.labels_hierarchy[cl].items()
                 }
             else:
-                cur_cls_hierarchy = {}
+                cur_labels_hierarchy = {}
 
-            for pred, true in adata.obs[["pred_" + label, label]].values:
+            for pred, true in adata.obs[["pred_" + cl, cl]].values:
                 if pred == true:
                     res.append(True)
                     continue
-                if len(cur_cls_hierarchy) > 0:
-                    if true in cur_cls_hierarchy:
-                        res.append(pred in cur_cls_hierarchy[true])
+                if len(cur_labels_hierarchy) > 0:
+                    if true in cur_labels_hierarchy:
+                        res.append(pred in cur_labels_hierarchy[true])
                         continue
                     elif true not in class_topred:
                         raise ValueError(f"true label {true} not in available classes")
@@ -184,12 +203,16 @@ class Embedder:
                     raise ValueError(f"true label {true} not in available classes")
                 elif true != "unknown":
                     res.append(False)
+                # else true is unknown
                 # else we pass
+            if len(res) == 0:
+                # true was always unknown
+                res = [1]
             if self.doplot:
-                print("    ", label)
+                print("    ", cl)
                 print("     accuracy:", sum(res) / len(res))
                 print(" ")
-            metrics.update({label + "_accuracy": sum(res) / len(res)})
+            metrics.update({cl + "_accuracy": sum(res) / len(res)})
         m = self.compute_reconstruction(adata, plot_corr_size=self.plot_corr_size)
         metrics.update(m)
         return adata, metrics
@@ -222,6 +245,7 @@ class Embedder:
             num_workers=self.num_workers,
             shuffle=False,
         )
+        self.model.pred_log_adata = False
         self.model.predict_mode = "generate"
 
         # self.trainer.num_predict_batches = 1
@@ -264,15 +288,15 @@ class Embedder:
             compute_mean_regress=add == 2,
             plot_corr_size=plot_corr_size,
         )
-        expr = np.array(res[0])
-        expr[
-            np.random.binomial(
-                1,
-                p=np.array(torch.nn.functional.sigmoid(res[2].to(torch.float32))),
-            ).astype(bool)
-        ] = 0
-        compute_corr(out, expr, doplot=self.doplot, plot_corr_size=plot_corr_size)
-        return adata, metrics
+        expr = res[0].cpu().numpy()
+        #expr[
+        #    np.random.binomial(
+        #        1,
+        #        p=torch.nn.functional.sigmoid(res[2].to(torch.float32)).cpu().numpy(),
+        #    ).astype(bool)
+        #] = 0
+        compute_corr(expr.T, to, doplot=self.doplot, plot_corr_size=plot_corr_size)
+        return metrics
 
 
 def compute_corr(out, to, doplot=True, compute_mean_regress=False, plot_corr_size=64):
@@ -309,3 +333,60 @@ def compute_corr(out, to, doplot=True, compute_mean_regress=False, plot_corr_siz
         plt.title('Correlation Coefficient of expr and i["x"]')
         plt.show()
     return metrics
+
+from scdataloader import Preprocessor
+from scib_metrics.benchmark import Benchmarker
+
+
+def default_benchmark(model, default_dataset="pancreas", do_class=True):
+    if default_dataset == 'pancreas':
+        adata = sc.read(
+            FILE_LOC+"/../../data/pancreas_atlas.h5ad",
+            backup_url="https://figshare.com/ndownloader/files/24539828",
+        )
+    elif default_dataset == 'lung':
+        adata = sc.read(
+            FILE_LOC+"/../../data/lung_atlas.h5ad",
+            backup_url="https://figshare.com/ndownloader/files/24539942",
+        )
+    else:
+        adata = sc.read_h5ad(default_dataset)
+    preprocessor = Preprocessor(
+        use_layer="counts",
+        is_symbol=True,
+        force_preprocess=True,
+        skip_validate=True,
+        do_postp=False,
+    )
+    adata.obs["organism_ontology_term_id"] = "NCBITaxon:9606"
+    adata = preprocessor(adata.copy())
+    embedder = Embedder(
+        model, pred_embedding=["cell_type_ontology_term_id"]
+    )  # ), 'sex_ontology_term_id', "disease_ontology_term_id"])
+    embed_adata, metrics = embedder(adata.copy())
+    #if do_class and default_dataset == "lung":
+
+    bm = Benchmarker(
+        embed_adata,
+        batch_key="tech",
+        label_key="celltype",
+        embedding_obsm_keys=["X_pca", "scprint"],
+        n_jobs=6,
+    )
+    bm.benchmark()
+    metrics.update({"scib": bm.get_results(min_max_scale=False).T.to_dict()["scprint"]})
+    return metrics
+    
+from sklearn.metrics import f1_score
+
+def compute_f1(input_solution, input_prediction):
+    print("Compute F1 score", flush=True)
+    metric_type = [ "macro", "micro", "weighted" ]
+    return {x:  f1_score(
+            input_solution.obs["label"], 
+            input_prediction.obs["label_pred"], 
+            average=x
+        ) for x in metric_type} | {
+            "accuracy": np.mean(input_solution.obs["label"] == input_prediction.obs["label_pred"])
+        }
+    

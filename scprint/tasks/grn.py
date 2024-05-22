@@ -82,8 +82,6 @@ class GRNfer:
         self.model = model
         self.batch_size = batch_size
         self.num_workers = num_workers
-        if how == "random expr" and cell_agg == "consensus":
-            raise ValueError("cannot have random expr with consensus")
         self.how = how
         assert self.how in [
             "most var within",
@@ -108,7 +106,6 @@ class GRNfer:
         self.head_agg = head_agg
         self.max_cells = max_cells
         self.curr_genes = None
-        self.model.doplot = False
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
@@ -117,9 +114,6 @@ class GRNfer:
         subadata = self.predict(layer, cell_type)
         adjacencies = self.aggregate(self.model.attn.get())
         if self.head_agg == "none":
-            adjacencies = adjacencies.reshape(
-                -1, adjacencies.shape[-2], adjacencies.shape[-1]
-            ).T
             return self.save(adjacencies[8:, 8:, :], subadata, locname)
         else:
             return self.save(self.filter(adjacencies)[8:, 8:], subadata, locname)
@@ -172,7 +166,7 @@ class GRNfer:
             subadata, obs_to_output=["organism_ontology_term_id"]
         )
         self.col = Collator(
-            organisms=self.organisms,
+            organisms=[subadata.obs['organism_ontology_term_id'][0]],
             valid_genes=self.model.genes,
             how="some" if self.how != "random expr" else "random expr",
             genelist=self.curr_genes if self.how != "random expr" else [],
@@ -185,6 +179,7 @@ class GRNfer:
             shuffle=False,
         )
         self.model.predict_mode = self.forward_mode
+        self.model.doplot = self.doplot
         self.trainer.predict(self.model, dataloader)
         return subadata
 
@@ -217,43 +212,72 @@ class GRNfer:
             plt.scatter(mm[:, 0], mm[:, 1], c=labels)
             plt.title(f"Ks @H{0}")
             plt.show()
-        attn = attn[:, :, 0, :, :].permute(0, 2, 1, 3) @ attn[:, :, 1, :, :].permute(
-            0, 2, 3, 1
+        # attn = attn[:, :, 0, :, :].permute(0, 2, 1, 3) @ attn[:, :, 1, :, :].permute(
+        #    0, 2, 3, 1
+        # )
+        attns = None
+        Qs = (
+            attn[:, :, 0, :, :]
+            .permute(0, 2, 1, 3)
+            .reshape(-1, attn.shape[1], attn.shape[-1])
         )
-        # return attn
-        scale = attn.shape[-1] ** -0.5
-        attn = attn * scale
-        if self.preprocess == "sinkhorn":
-            if attn.numel() > 100_000_000:
-                raise ValueError("you can't sinkhorn such a large matrix")
-            sink = SinkhornDistance(0.1, max_iter=200)
-            attn = sink(attn)[0]
-            attn = attn * attn.shape[-1]
-        elif self.preprocess == "softmax":
-            attn = torch.nn.functional.softmax(attn, dim=-1)
-        elif self.preprocess == "none":
-            pass
-        else:
-            raise ValueError("preprocess must be one of 'sinkhorn', 'softmax', 'none'")
+        Ks = (
+            attn[:, :, 1, :, :]
+            .permute(0, 2, 1, 3)
+            .reshape(-1, attn.shape[1], attn.shape[-1])
+        )
+        for i in range(Qs.shape[0]):
+            attn = Qs[i] @ Ks[i].T
+            # return attn
+            scale = Qs.shape[-1] ** -0.5
+            attn = attn * scale
+            if self.preprocess == "sinkhorn":
+                if attn.numel() > 100_000_000:
+                    raise ValueError("you can't sinkhorn such a large matrix")
+                sink = SinkhornDistance(0.1, max_iter=200)
+                attn = sink(attn)[0]
+                attn = attn * Qs.shape[-1]
+            elif self.preprocess == "softmax":
+                attn = torch.nn.functional.softmax(attn, dim=-1)
+            elif self.preprocess == "none":
+                pass
+            else:
+                raise ValueError(
+                    "preprocess must be one of 'sinkhorn', 'softmax', 'none'"
+                )
 
-        if self.symmetrize:
-            print(attn.shape)
-            attn = (attn + attn.permute(0, 1, 3, 2)) / 2
-        if self.apc:
-            pass
-            # attn = attn - (
-            #    (attn.sum(-1).unsqueeze(-1) * attn.sum(-2).unsqueeze(-2))
-            #    / attn.sum(-1).sum(-1).unsqueeze(-1).unsqueeze(-1)
-            # )  # .view()
-        if self.head_agg == "mean":
-            attn = attn.mean(0).mean(0).detach().cpu().numpy()
-        elif self.head_agg == "max":
-            attn = attn.max(0)[0].max(0)[0].detach().cpu().numpy()
-        elif self.head_agg == "none":
-            attn = attn.detach().cpu().numpy()
-        else:
-            raise ValueError("head_agg must be one of 'mean', 'max' or 'None'")
-        return attn
+            if self.symmetrize:
+                print(attn.shape)
+                attn = (attn + attn.T) / 2
+            if self.apc:
+                pass
+                # attn = attn - (
+                #    (attn.sum(-1).unsqueeze(-1) * attn.sum(-2).unsqueeze(-2))
+                #    / attn.sum(-1).sum(-1).unsqueeze(-1).unsqueeze(-1)
+                # )  # .view()
+            # if self.head_agg == "mean":
+            #    attns += attn.mean(0).mean(0).detach().cpu().numpy()
+            if self.head_agg == "max":
+                attns = (
+                    np.maximum(attn.detach().cpu().numpy(), attns)
+                    if attns is not None
+                    else attn.detach().cpu().numpy()
+                )
+            elif self.head_agg == "none":
+                if attns is not None:
+                    if len(attns.shape) > 2:
+                        attns = np.concatenate(
+                            [attns, attn.detach().cpu().numpy()[..., np.newaxis]],
+                            axis=-1,
+                        )
+                    else:
+                        attns = np.stack([attns, attn.detach().cpu().numpy()], axis=-1)
+
+                else:
+                    attns = attn.detach().cpu().numpy()
+            else:
+                raise ValueError("head_agg must be one of 'mean', 'max' or 'None'")
+        return attns
 
     def filter(self, adj, gt=None):
         if self.filtration == "thresh":
@@ -334,3 +358,78 @@ def get_GTdb(db="omnipath"):
     if db == "stringdb":
         net = pd.read_parquet(FILEDIR + "/../../data/main/stringdb_bias.parquet")
     return net
+
+from bengrn.base import train_classifier
+from anndata.utils import make_index_unique
+from grnndata import utils as grnutils
+from bengrn import BenGRN, get_sroy_gt
+
+
+def default_benchmark(model, default_dataset="sroy", elem=[
+                                        'kidney collecting duct principal cell', 
+                                        'mesangial cell',
+                                        'blood vessel smooth muscle cell',
+                                        'podocyte',
+                                        'macrophage',
+                                        'leukocyte',
+                                        'kidney interstitial fibroblast',
+                                        'endothelial cell',
+                                        ]
+):
+    if default_dataset == 'sroy':
+        pass
+    else:
+        adata = sc.read_h5ad(default_dataset)
+        adata.var["isTF"]=False
+        adata.var.loc[adata.var.symbol.isin(grnutils.TF), "isTF"]=True
+        metrics = {}
+        for celltype in elem:
+            grn_inferer = GRNfer(model, adata,
+                how="random expr",
+                preprocess="softmax",
+                head_agg='max',
+                filtration="none",
+                forward_mode="none",
+                organisms=adata.obs['organism_ontology_term_id'][0],
+                apc=False,
+                symmetrize=False,
+                num_genes=3000,
+                max_cells=1024,
+                doplot=False,
+                batch_size=32,
+            )
+            #print(celltype)
+            #print("scprint\n")
+            grn = grn_inferer(layer=list(range(model.nlayers))[8:], cell_type=celltype)
+            grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
+            m = BenGRN(grn, doplot=False).scprint_benchmark()
+            metrics[celltype + '_scprint'] = m
+            #print(m)
+            #print("______________________________")
+            #print("now with classifier")
+            grn_inferer = GRNfer(model, adata,
+                how="most var across",
+                preprocess="softmax",
+                head_agg='none',
+                filtration="none",
+                forward_mode="none",
+                organisms=adata.obs['organism_ontology_term_id'][0],
+                apc=False,
+                symmetrize=False,
+                num_genes=6000,
+                max_cells=1024,
+                doplot=False,
+                batch_size=32,
+            )
+            #print("scprint\n")
+            grn = grn_inferer(layer=list(range(model.nlayers))[:], cell_type=celltype)
+            grn, m = train_classifier(grn, C=0.1, train_size=0.3, class_weight={1: 100, 0: 1}, shuffle=False, doplot=False)
+            grn.varp['GRN'] = grn.varp['classified']
+            grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
+            #print(m)
+            m = BenGRN(grn, doplot=False).scprint_benchmark()
+            #print(m)
+            metrics[celltype + '_scprint_class'] = m
+            #print("__________________________________")
+            return metrics
+
