@@ -352,6 +352,7 @@ class scPrint(L.LightningModule):
             self.mat_labels_hierarchy[k] = tens.to(bool)
 
         mencoders = {}
+
         try:
             if self.trainer.datamodule.decoders != checkpoints['hyper_parameters']['label_decoders']:
                 # if we don't have the same decoders, we need to update the one on the datamodule side
