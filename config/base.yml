@@ -8,7 +8,7 @@ log_graph: True
 trainer:
   precision: 16-mixed
   # profiler: simple
-  gradient_clip_val: 500
+  gradient_clip_val: 50
   log_every_n_steps: 100
   limit_train_batches: 5000
   limit_val_batches: 2000
@@ -63,16 +63,11 @@ trainer:
   #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
   #    requeue_signal: signal.SIGHUP
 model:
-  lr: 0.0001
-  optim: "adamW"
-  weight_decay: 0.02
   dropout: 0.1
   transformer: flash
   mvc_decoder: inner product
   residual_in_fp32: True
   num_heads_kv: null
-  lr_reduce_factor: .66
-  lr_reduce_patience: 2
   fused_dropout_add_ln: False
   prenorm: True
   fused_mlp: False

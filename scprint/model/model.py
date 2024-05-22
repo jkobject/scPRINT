@@ -62,12 +62,10 @@ class scPrint(L.LightningModule):
         mvc_decoder: str = "None",
         pred_embedding: list[str] = [],
         cell_emb_style: str = "cls",
-        lr: float = 0.001,
-        optim: str = "adamW",
-        weight_decay: float = 0.01,
         freeze_embeddings: bool = True,
         label_decoders: Optional[Dict[str, Dict[int, str]]] = None,
         zinb: bool=True,
+        lr: float = 0.0001,
         **flash_attention_kwargs,
     ):
         """
@@ -123,11 +121,13 @@ class scPrint(L.LightningModule):
         self.do_generate = False
         self.mask_ratio = [0.3]
         self.warmup_duration = 500
-        self.weight_decay = weight_decay
-        self.optim = optim
+        self.weight_decay = 0.01
+        self.optim = "adamW"
         self.fused_adam = False
         self.lr_reduce_patience = 2
         self.lr_reduce_factor = 0.6
+        self.lr_reduce_monitor = "val_loss"
+        self.lr = lr
         self.lrfinder_steps = 0
         self.doplot = True
         self.get_attention_layer = []
@@ -151,7 +151,6 @@ class scPrint(L.LightningModule):
         self.cell_emb_style = cell_emb_style
         self.label_decoders = label_decoders
         self.pred_embedding = pred_embedding
-        self.lr = lr
         # compute tensor for mat_labels_hierarchy
         self.mat_labels_hierarchy = {}
         self.labels_hierarchy = labels_hierarchy
@@ -322,7 +321,7 @@ class scPrint(L.LightningModule):
             )
         )
         for i, dec in self.cls_decoders.items():
-            nn.init.constant_(dec.out_layer.bias, -0.1)
+            nn.init.constant_(dec.out_layer.bias, -0.13)
         self.save_hyperparameters()
 
     def on_load_checkpoint(self, checkpoints):
@@ -360,8 +359,6 @@ class scPrint(L.LightningModule):
                     mencoders[self.trainer.datamodule.kwargs["collate_fn"].organism_name], 
                     valid_genes=self.genes
                 )
-
-
 
     def _encoder(
         self,
@@ -592,6 +589,7 @@ class scPrint(L.LightningModule):
             factor=self.lr_reduce_factor,
             verbose=True,
         )
+        print(bool(self.trainer.val_dataloaders))
         lr_dict = {
             "scheduler": lr_scheduler,
             # The unit of the scheduler's step size, could also be 'step'.
@@ -603,7 +601,7 @@ class scPrint(L.LightningModule):
             # rate after every epoch/step.
             "frequency": 1,
             # Metric to to monitor for schedulers like `ReduceLROnPlateau`
-            "monitor": "val_loss" if self.trainer.val_dataloaders else "train_loss",
+            "monitor": self.lr_reduce_monitor
         }
         self.lrfinder_steps = 0
         for val in self.trainer.callbacks:

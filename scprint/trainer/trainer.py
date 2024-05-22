@@ -25,9 +25,13 @@ class TrainingMode(Callback):
         adv_class_scale: float = 0.1,
         lr_reduce_patience: int = 2,
         lr_reduce_factor: float = 0.5,
+        lr_reduce_monitor: str = "val_loss",
         do_cls: bool = True,
         do_adv_batch: bool = True,
         run_full_forward: bool = False,
+        lr: float = 0.001,
+        optim: str = "adamW",
+        weight_decay: float = 0.01,
     ):
         """
         TrainingMode a callback to set the training specific info to the model.
@@ -60,6 +64,10 @@ class TrainingMode(Callback):
         self.adv_class_scale = adv_class_scale
         self.lr_reduce_patience = lr_reduce_patience
         self.lr_reduce_factor = lr_reduce_factor
+        self.lr_reduce_monitor = lr_reduce_monitor
+        self.lr = lr
+        self.optim = optim
+        self.weight_decay = weight_decay
         self.do_cls = do_cls
         self.do_adv_batch = do_adv_batch
         self.run_full_forward = run_full_forward
@@ -76,6 +84,9 @@ class TrainingMode(Callback):
             f"ecs_threshold={self.ecs_threshold}, "
             f"ecs_scale={self.ecs_scale}, "
             f"do_mvc={self.do_mvc}, "
+            f"lr={self.lr},"
+            f"optim={self.optim},"
+            f"weight_decay={self.weight_decay},"
             f"do_adv_cls={self.do_adv_cls}, "
             f"adv_class_scale={self.adv_class_scale}, "
             f"do_next_tp={self.do_next_tp}, "
@@ -86,13 +97,14 @@ class TrainingMode(Callback):
             f"fused_adam={self.fused_adam}, "
             f"lr_reduce_patience={self.lr_reduce_patience}, "
             f"lr_reduce_factor={self.lr_reduce_factor}, "
+            f"lr_reduce_monitor={self.lr_reduce_monitor}, "
             f"mvc_scale={self.mvc_scale}, "
             f"do_cls={self.do_cls}, "
             f"do_adv_batch={self.do_adv_batch}, "
             f"run_full_forward={self.run_full_forward})"
         )
 
-    def on_fit_start(self, trainer, model):
+    def setup(self, trainer, model, stage=None):
         # do something with all training_step outputs, for example:
         model.do_denoise = self.do_denoise
         model.noise = self.noise
@@ -115,6 +127,11 @@ class TrainingMode(Callback):
         model.adv_class_scale = self.adv_class_scale
         model.lr_reduce_patience = self.lr_reduce_patience
         model.lr_reduce_factor = self.lr_reduce_factor
+        model.lr_reduce_monitor = self.lr_reduce_monitor
         model.do_cls = self.do_cls
         model.do_adv_batch = self.do_adv_batch
         model.run_full_forward = self.run_full_forward
+        model.lr = self.lr
+        model.optim = self.optim
+        model.weight_decay = self.weight_decay
+        #model.configure_optimizers()
