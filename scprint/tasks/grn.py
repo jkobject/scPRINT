@@ -428,7 +428,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             grn, m, _ = train_classifier(grn, other=preadata, C=0.4, train_size=0.5, class_weight=weight, shuffle=False)
             grn.varp['GRN'] = grn.varp['classified']
             grn.var.index = grn.var['symbol']
-            metrics['class_omni_'+da+"_"+gt] = BenGRN(
+            metrics['class_self_'+da+"_"+gt] = BenGRN(
                 grn, do_auc=True, doplot=False).compare_to(other=preadata)
             ############################
             grn_inferer = GRNfer(model, adata,

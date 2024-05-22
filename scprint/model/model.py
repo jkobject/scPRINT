@@ -9,6 +9,7 @@ from galore_torch import GaLoreAdamW
 from math import factorial
 import lightning as L
 import os
+import numpy as np
 
 import pandas as pd
 from functools import partial
@@ -352,7 +353,6 @@ class scPrint(L.LightningModule):
             self.mat_labels_hierarchy[k] = tens.to(bool)
 
         mencoders = {}
-
         try:
             if self.trainer.datamodule.decoders != checkpoints['hyper_parameters']['label_decoders']:
                 # if we don't have the same decoders, we need to update the one on the datamodule side
@@ -1071,22 +1071,46 @@ class scPrint(L.LightningModule):
     def test(self):
         metrics = {}
         res = embbed_task.default_benchmark(self, default_dataset="lung", do_class=True, coarse=False)
-        metrics['emb_lung'] = res
-
+        metrics.update({
+            'emb_lung/scib': res['scib']['Total'],
+            'emb_lung/ct_class': res['classif']['cell_type_ontology_term_id']['accuracy'],
+        })
         res = embbed_task.default_benchmark(self, default_dataset="pancreas", do_class=True, coarse=False)
-        metrics['emb_panc'] = res
+        metrics.update({
+            'emb_panc/scib': res['scib']['Total'],
+            'emb_panc/ct_class': res['classif']['cell_type_ontology_term_id']['accuracy'],
+        })
 
         res = grn_task.default_benchmark(self, FILEDIR+"/../../data/yBCKp6HmXuHa0cZptMo7.h5ad")
-        metrics['grn_omni'] = res
+        metrics.update({
+            'grn_omni/auprc': np.mean([i['auprc'] for k, i in res.items() if "class" in k]),
+            'grn_omni/epr': np.mean([i['epr'] for k, i in res.items() if "class" in k]),
+            'grn_omni/tf_enr': np.sum([i['TF_enr'] for k, i in res.items() if "class" in k]),
+            'grn_omni/tf_targ_enr': np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" in k]),
+            # 'grn_omni/ct': res['classif']['cell_type_ontology_term_id']['accuracy'],
+        })
 
         res = grn_task.default_benchmark(self, "sroy")
-        metrics['grn_sroy'] = res
+        metrics.update({
+            'grn_sroy/auprc_self': np.mean([i['auprc'] for k, i in res.items() if "class_self" in k]),
+            'grn_sroy/epr_self': np.mean([i['epr'] for k, i in res.items() if "class_self" in k]),
+            'grn_sroy/auprc_omni': np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k]),
+            'grn_sroy/epr_omni': np.mean([i['epr'] for k, i in res.items() if "class_omni" in k]),
+        })
 
         res = grn_task.default_benchmark(self, "gwps")
-        metrics['grn_perturb'] = res
+        metrics.update({
+            'grn_gwps/auprc_self': np.mean([i['auprc'] for k, i in res.items() if "class_self" in k]),
+            'grn_gwps/epr_self': np.mean([i['epr'] for k, i in res.items() if "class_self" in k]),
+            'grn_gwps/auprc_omni': np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k]),
+            'grn_gwps/epr_omni': np.mean([i['epr'] for k, i in res.items() if "class_omni" in k]),
+        })
 
         res = denoise_task.default_benchmark(self, FILEDIR+"/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad")
-        metrics['denoise'] = res
+        metrics.update({
+            'denoise/reco2full_vs_noisy2full': res['reco2full'] - res['noisy2full'],
+        })
+
         return metrics
 
     def on_predict_epoch_start(self):

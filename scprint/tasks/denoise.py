@@ -190,7 +190,7 @@ def default_benchmark(model, default_dataset=FILE_DIR+"/../../data/r4iCehg3Tw5Ib
         predict_depth_mult=10,
         downsample=0.7,
     )
-    return denoise(adata)
+    return denoise(adata)[0]
 
 
 def open_benchmark(model):

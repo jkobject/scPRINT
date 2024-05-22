@@ -393,7 +393,7 @@ def default_benchmark(model, default_dataset="pancreas", do_class=True, coarse=F
         embed_adata,
         batch_key="tech" if default_dataset == 'pancreas' else "batch",
         label_key="celltype" if default_dataset == 'pancreas' else "cell_type",
-        embedding_obsm_keys=["X_pca", "scprint"],
+        embedding_obsm_keys=["scprint"],
         n_jobs=6,
     )
     bm.benchmark()
