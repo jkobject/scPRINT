@@ -10,6 +10,9 @@ from math import factorial
 import lightning as L
 import os
 import numpy as np
+import copy
+import gc
+import json
 
 import pandas as pd
 from functools import partial
@@ -990,7 +993,6 @@ class scPrint(L.LightningModule):
             #    pg["lr"] = 2e-5
             self.log("lr_"+str(i), pg["lr"])
             
-
     def on_before_zero_grad(self, optimizer):
         pass
 
@@ -1064,53 +1066,65 @@ class scPrint(L.LightningModule):
         if self.trainer.state.stage != "sanity_check":
             sch = self.lr_schedulers()
             sch.step(self.trainer.callback_metrics["val_loss"])
-            #run the test function on specific dataset
-        self.log_adata(gtclass=self.info, name="validation_part_"+str(self.counter))
-        self.test()
+            # run the test function on specific dataset
+            self.log_adata(gtclass=self.info, name="validation_part_"+str(self.counter))
+            metrics = self._test()
+            metrics = {k: float(v) for k,v in metrics.items()}
+            self.log_dict(metrics, sync_dist=True)
 
-    def test(self):
+    def _test(self):
         metrics = {}
-        res = embbed_task.default_benchmark(self, default_dataset="lung", do_class=True, coarse=False)
+        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'w')
+        model_copy = copy.deepcopy(self) 
+        res = embbed_task.default_benchmark(model_copy, default_dataset="lung", do_class=True, coarse=False)
+        f.write(json.dumps({"embed_lung":res}, indent=4))
         metrics.update({
             'emb_lung/scib': res['scib']['Total'],
             'emb_lung/ct_class': res['classif']['cell_type_ontology_term_id']['accuracy'],
         })
-        res = embbed_task.default_benchmark(self, default_dataset="pancreas", do_class=True, coarse=False)
+        res = embbed_task.default_benchmark(model_copy, default_dataset="pancreas", do_class=True, coarse=False)
+        f.write(json.dumps({"embed_panc":res}, indent=4))
         metrics.update({
             'emb_panc/scib': res['scib']['Total'],
             'emb_panc/ct_class': res['classif']['cell_type_ontology_term_id']['accuracy'],
         })
-
-        res = grn_task.default_benchmark(self, FILEDIR+"/../../data/yBCKp6HmXuHa0cZptMo7.h5ad")
+        gc.collect()
+        res = denoise_task.default_benchmark(model_copy, FILEDIR+"/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad")
         metrics.update({
-            'grn_omni/auprc': np.mean([i['auprc'] for k, i in res.items() if "class" in k]),
-            'grn_omni/epr': np.mean([i['epr'] for k, i in res.items() if "class" in k]),
-            'grn_omni/tf_enr': np.sum([i['TF_enr'] for k, i in res.items() if "class" in k]),
-            'grn_omni/tf_targ_enr': np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" in k]),
-            # 'grn_omni/ct': res['classif']['cell_type_ontology_term_id']['accuracy'],
+            'denoise/reco2full_vs_noisy2full': res['reco2full'] - res['noisy2full'],
         })
-
-        res = grn_task.default_benchmark(self, "sroy")
+        res = grn_task.default_benchmark(model_copy, "sroy")
+        f.write(json.dumps({"grn_sroy":res}, indent=4))
         metrics.update({
             'grn_sroy/auprc_self': np.mean([i['auprc'] for k, i in res.items() if "class_self" in k]),
             'grn_sroy/epr_self': np.mean([i['epr'] for k, i in res.items() if "class_self" in k]),
             'grn_sroy/auprc_omni': np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k]),
             'grn_sroy/epr_omni': np.mean([i['epr'] for k, i in res.items() if "class_omni" in k]),
         })
-
-        res = grn_task.default_benchmark(self, "gwps")
+        gc.collect()
+        res = grn_task.default_benchmark(model_copy, "gwps")
+        f.write(json.dumps({"grn_gwps":res}, indent=4))
         metrics.update({
             'grn_gwps/auprc_self': np.mean([i['auprc'] for k, i in res.items() if "class_self" in k]),
             'grn_gwps/epr_self': np.mean([i['epr'] for k, i in res.items() if "class_self" in k]),
             'grn_gwps/auprc_omni': np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k]),
             'grn_gwps/epr_omni': np.mean([i['epr'] for k, i in res.items() if "class_omni" in k]),
         })
-
-        res = denoise_task.default_benchmark(self, FILEDIR+"/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad")
+        gc.collect()
+        res = grn_task.default_benchmark(model_copy, FILEDIR+"/../../data/yBCKp6HmXuHa0cZptMo7.h5ad")
+        f.write(json.dumps({"grn_omni":res}, indent=4))
         metrics.update({
-            'denoise/reco2full_vs_noisy2full': res['reco2full'] - res['noisy2full'],
+            'grn_omni/auprc_class': np.mean([i['auprc'] for k, i in res.items() if "class" in k]),
+            'grn_omni/epr_class': np.mean([i['epr'] for k, i in res.items() if "class" in k]),
+            'grn_omni/tf_enr_class': np.sum([i['TF_enr'] for k, i in res.items() if "class" in k]),
+            'grn_omni/tf_targ_enr_class': np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" in k]),
+            'grn_omni/auprc': np.mean([i['auprc'] for k, i in res.items() if "class" not in k]),
+            'grn_omni/epr': np.mean([i['epr'] for k, i in res.items() if "class" not in k]),
+            'grn_omni/tf_enr': np.sum([i['TF_enr'] for k, i in res.items() if "class" not in k]),
+            'grn_omni/tf_targ_enr': np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" not in k]),
+            # 'grn_omni/ct': res['classif']['cell_type_ontology_term_id']['accuracy'],
         })
-
+        f.close()
         return metrics
 
     def on_predict_epoch_start(self):

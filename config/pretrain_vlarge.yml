@@ -6,7 +6,7 @@ trainer:
   log_every_n_steps: 300
   precision: 16-mixed
   gradient_clip_val: 500
-  limit_train_batches: 30000
+  limit_train_batches: 60000
   limit_val_batches: 4000
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 6
@@ -26,7 +26,7 @@ trainer:
         run_full_forward: False
         do_cls: True
         class_scale: 1
-        warmup_duration: 3000
+        warmup_duration: 1000 # prev 3000 (maybe it helped?)
         fused_adam: True
         mask_ratio: []
     #- class_path: lightning.pytorch.callbacks.StochasticWeightAveraging

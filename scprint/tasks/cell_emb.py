@@ -381,8 +381,6 @@ def default_benchmark(model, default_dataset="pancreas", do_class=True, coarse=F
     )
     adata.obs["organism_ontology_term_id"] = "NCBITaxon:9606"
     adata = preprocessor(adata.copy())
-    import pdb
-    pdb.set_trace()
     embedder = Embedder(
         model, pred_embedding=["cell_type_ontology_term_id"], organisms=[adata.obs["organism_ontology_term_id"].values[0]],
         doclass=(default_dataset not in ['pancreas', 'lung'])
