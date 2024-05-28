@@ -166,3 +166,4 @@ notebooks/tests/curr_genes.csv
 notebooks/tests/precision_recall_plot.png
 notebooks/tests/lightning_logs/*
 notebooks/additional/lightning_logs/*
+collator_output.txt

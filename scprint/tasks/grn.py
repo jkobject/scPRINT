@@ -253,9 +253,9 @@ class GRNfer:
                 #    (attn.sum(-1).unsqueeze(-1) * attn.sum(-2).unsqueeze(-2))
                 #    / attn.sum(-1).sum(-1).unsqueeze(-1).unsqueeze(-1)
                 # )  # .view()
-            # if self.head_agg == "mean":
-            #    attns += attn.mean(0).mean(0).detach().cpu().numpy()
-            if self.head_agg == "max":
+            if self.head_agg == "mean":
+                attns = attn.detach().cpu().numpy() + (attns if attns is not None else 0)
+            elif self.head_agg == "max":
                 attns = (
                     np.maximum(attn.detach().cpu().numpy(), attns)
                     if attns is not None
@@ -277,6 +277,8 @@ class GRNfer:
             else:
                 raise ValueError(
                     "head_agg must be one of 'mean', 'max' or 'None'")
+        if self.head_agg == "mean":
+            attns = attns / Qs.shape[0]
         return attns
 
     def filter(self, adj, gt=None):

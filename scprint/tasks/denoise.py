@@ -15,7 +15,7 @@ import pandas as pd
 from lightning.pytorch import Trainer
 import anndata as ad
 
-from typing import List
+from typing import List, Optional
 from anndata import AnnData
 from scprint.tasks import compute_corr
 from scdataloader import Preprocessor
@@ -38,13 +38,14 @@ class Denoiser:
         num_workers: int = 1,
         max_len: int = 20_000,
         precision: str = "16-mixed",
+        how="most var",
         organisms: List[str] = [
             "NCBITaxon:9606",
         ],
         plot_corr_size: int = 64,
         doplot: bool = True,
         predict_depth_mult: int = 4,
-        downsample: float = 0.4,
+        downsample: Optional[float] = None,
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -72,6 +73,7 @@ class Denoiser:
         self.plot_corr_size = plot_corr_size
         self.precision = precision
         self.doplot = doplot
+        self.how=how
         self.downsample = downsample
         self.trainer = Trainer(precision=precision)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
@@ -92,15 +94,16 @@ class Denoiser:
             adataset = SimpleAnnDataset(
                 adata, obs_to_output=["organism_ontology_term_id"]
             )
-        sc.pp.highly_variable_genes(
-            adata, flavor="seurat_v3", n_top_genes=self.max_len)
-        genelist = adata.var.index[adata.var.highly_variable]
-        print(len(genelist))
+        if self.how == "most var":
+            sc.pp.highly_variable_genes(
+                adata, flavor="seurat_v3", n_top_genes=self.max_len, span=0.99)
+            genelist = adata.var.index[adata.var.highly_variable]
+            print(len(genelist))
         col = Collator(
             organisms=self.organisms,
             valid_genes=self.model.genes,
-            how="some",
-            genelist=genelist,
+            how="some" if self.how == "most var" else self.how,
+            genelist=genelist if self.how == "most var" else [],
             downsample=self.downsample,
             save_output=True,
         )
@@ -111,22 +114,26 @@ class Denoiser:
             num_workers=self.num_workers,
             shuffle=False,
         )
-        self.genes = list(set(self.model.genes) & set(genelist))
 
         self.model.doplot = self.doplot
         self.trainer.predict(self.model, dataloader)
+        self.genes = self.model.pos if self.how != "most var" else list(set(self.model.genes) & set(genelist))
         if self.downsample is not None:
             reco = self.model.expr_pred[0]
-            noisy = np.loadtxt("collator_output.txt")
-            true = adata.X[random_indices][
-                :, adata.var.index.isin(self.genes)
-            ] if random_indices is not None else adata.X[
-                :, adata.var.index.isin(self.genes)
-            ]
-
-            true = true.toarray() if issparse(true) else true
-            # noisy[true==0]=0
             reco = reco.cpu().numpy()
+            noisy = np.loadtxt("collator_output.txt")
+            if random_indices is not None:
+                true = adata.X[random_indices]
+            else:
+                true = adata.X
+            true = true.toarray() if issparse(true) else true
+            if self.how=="most var":
+                true = true[
+                    :, adata.var.index.isin(self.genes)
+                ]
+                # noisy[true==0]=0
+            else:
+                true = np.vstack([true[i, adata.var.index.get_indexer(np.array(self.model.genes)[val])].copy() for i, val in enumerate(self.genes.cpu().numpy())])
             # reco[true==0] = 0
             # import pdb
             # pdb.set_trace()
