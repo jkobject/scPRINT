@@ -65,6 +65,7 @@ class GRNfer:
         forward_mode="none",
         genes: list = [],
         loc="./",
+        devices: List[int] = [0],
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -109,10 +110,10 @@ class GRNfer:
         self.head_agg = head_agg
         self.max_cells = max_cells
         self.curr_genes = None
-        self.trainer = Trainer(precision=precision)
+        self.trainer = Trainer(precision=precision, devices=devices)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
-    def __call__(self, layer, cell_type=None, locname=""):
+    def __call__(self, layer, cell_type=None, k=""):
         # Add at least the organism you are working with
         subadata = self.predict(layer, cell_type)
         adjacencies = self.aggregate(self.model.attn.get())
@@ -312,7 +313,7 @@ class GRNfer:
         print(f"avg link count: {res}, sparsity: {res / adj.shape[0] ** 2}")
         return adj
 
-    def save(self, grn, subadata, loc="./"):
+    def save(self, grn, subadata, loc=""):
         grn = GRNAnnData(
             subadata[:, subadata.var.index.isin(self.curr_genes)].copy(),
             grn=grn,
@@ -326,8 +327,11 @@ class GRNfer:
             "preprocess": self.preprocess,
             "head_agg": self.head_agg,
         }
-        grn.write_h5ad(loc + "grn_fromscprint.h5ad")
-        return from_anndata(grn)
+        if loc != "":
+            grn.write_h5ad(loc + "grn_fromscprint.h5ad")
+            return from_anndata(grn)
+        else:
+            return grn
 
 
 def get_GTdb(db="omnipath"):
@@ -400,6 +404,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  max_cells=256,
                                  doplot=False,
                                  batch_size=32,
+                                 devices=1,
                                  )
             grn = grn_inferer(layer=list(range(model.nlayers))[:])
             if clf_omni is not None:
@@ -441,6 +446,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  max_cells=256,
                                  doplot=False,
                                  batch_size=32,
+                                 devices=1,
                                  )
             grn = grn_inferer(layer=list(range(model.nlayers))[:])
             grn.var['ensembl_id'] = grn.var.index
@@ -472,6 +478,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              max_cells=2048,
                              doplot=False,
                              batch_size=32,
+                             devices=1,
                              )
         grn = grn_inferer(layer=list(range(model.nlayers))[
                           max(0, model.nlayers-maxlayers):])
@@ -488,6 +495,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              max_cells=2048,
                              doplot=False,
                              batch_size=32,
+                             devices=1,
                              )
         grn = grn_inferer(layer=list(range(model.nlayers))[:])
         grn.var['ensembl_id'] = grn.var.index
@@ -524,6 +532,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  max_cells=1024,
                                  doplot=False,
                                  batch_size=32,
+                                 devices=1,
                                  )
             grn = grn_inferer(layer=list(range(model.nlayers))[
                               :], cell_type=celltype)
@@ -541,6 +550,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  max_cells=1024,
                                  doplot=False,
                                  batch_size=32,
+                                 devices=1,
                                  )
             grn = grn_inferer(layer=list(range(model.nlayers))[:], cell_type=celltype)
             grn, m, _ = train_classifier(grn, C=0.1, train_size=0.5, class_weight={

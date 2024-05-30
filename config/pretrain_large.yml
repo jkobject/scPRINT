@@ -1,13 +1,11 @@
 trainer:
-  precision: 16-mixed
-  gradient_clip_val: 500
   strategy: ddp_find_unused_parameters_true
   callbacks:
     - class_path: scprint.trainer.TrainingMode
       init_args:
         do_denoise: True
         noise:
-          - 0.3
+          - 0.4
         do_cce: False
         do_ecs: False
         do_mvc: False

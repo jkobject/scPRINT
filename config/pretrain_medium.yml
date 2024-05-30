@@ -13,7 +13,7 @@ data:
   collection_name: all no zhang13M #preprocessed dataset
   max_len: 2200
   weight_scaler: 3000
-  train_oversampling_per_epoch: 0.3
+  train_oversampling_per_epoch: 0.4
   validation_split: 0.02
   test_split: 0.02
   batch_size: 64

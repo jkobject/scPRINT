@@ -50,6 +50,7 @@ class Embedder:
         model_name: str = "scprint",
         plot_corr_size: int = 64,
         doplot: bool = True,
+        devices: List[int] = [0],
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -81,7 +82,7 @@ class Embedder:
         self.doplot = doplot
         self.doclass = doclass
         self.model.doplot = doplot
-        self.trainer = Trainer(precision=precision)
+        self.trainer = Trainer(precision=precision, devices=devices)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, adata: AnnData, cache=False, output_expression: str = "none"):
@@ -383,7 +384,7 @@ def default_benchmark(model, default_dataset="pancreas", do_class=True, coarse=F
     adata = preprocessor(adata.copy())
     embedder = Embedder(
         model, pred_embedding=["cell_type_ontology_term_id"], organisms=[adata.obs["organism_ontology_term_id"].values[0]],
-        doclass=(default_dataset not in ['pancreas', 'lung'])
+        doclass=(default_dataset not in ['pancreas', 'lung']), devices=1,
     )
     embed_adata, metrics = embedder(adata.copy())
 
