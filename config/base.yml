@@ -27,7 +27,7 @@ trainer:
       init_args:
         do_denoise: True
         noise:
-          - 0.3
+          - 0.5
         do_cce: False
         do_ecs: False
         do_mvc: False
@@ -87,7 +87,7 @@ data:
   collection_name: all no zhang13M #preprocessed dataset
   how: random expr
   max_len: 2200
-  weight_scaler: 20
+  weight_scaler: 40
   do_gene_pos: ./data/main/biomart_pos.parquet
   add_zero_genes: 0
   train_oversampling_per_epoch: 0.4

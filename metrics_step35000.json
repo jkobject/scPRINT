@@ -1,26 +1,26 @@
 {
     "embed_lung": {
         "scib": {
-            "Isolated labels": 0.5466254353523254,
-            "KMeans NMI": 0.31626030420576734,
-            "KMeans ARI": 0.15058158872636934,
-            "Silhouette label": 0.41311825811862946,
-            "cLISI": 0.9316383898258209,
-            "Silhouette batch": 0.8920273780822754,
-            "iLISI": 0.1176687240600586,
-            "KBET": 0.3372743882277265,
-            "Graph connectivity": 0.6319147966752406,
+            "Isolated labels": 0.54726642370224,
+            "KMeans NMI": 0.3279379683402296,
+            "KMeans ARI": 0.18927797183023434,
+            "Silhouette label": 0.4351685270667076,
+            "cLISI": 0.9370182454586029,
+            "Silhouette batch": 0.8819507360458374,
+            "iLISI": 0.1093599796295166,
+            "KBET": 0.3104764585971988,
+            "Graph connectivity": 0.6036399853253249,
             "PCR comparison": 0,
-            "Batch correction": 0.3957770574090603,
-            "Bio conservation": 0.4716447952457825,
-            "Total": 0.4412977001110936
+            "Batch correction": 0.38108543191957556,
+            "Bio conservation": 0.4873338272796029,
+            "Total": 0.44483446913559194
         },
         "classif": {
             "cell_type_ontology_term_id": {
-                "accuracy": 0.18619577687513567,
-                "macro": 0.17157512486391469,
-                "micro": 0.18619577687513567,
-                "weighted": 0.1318487423087868
+                "accuracy": 0.10120616414994883,
+                "macro": 0.09905745566906689,
+                "micro": 0.10120616414994883,
+                "weighted": 0.07848743201027361
             },
             "organism_ontology_term_id": {
                 "accuracy": 1.0,
@@ -33,32 +33,32 @@
 }{
     "embed_panc": {
         "scib": {
-            "Isolated labels": 0.5734894871711731,
-            "KMeans NMI": 0.20081742322233415,
-            "KMeans ARI": 0.09589427947971446,
-            "Silhouette label": 0.4734988193958998,
-            "cLISI": 0.9217486748328576,
-            "Silhouette batch": 0.8773528933525085,
-            "iLISI": 0.08524714410305023,
-            "KBET": 0.20701244482382142,
-            "Graph connectivity": 0.46797239505371413,
+            "Isolated labels": 0.633569598197937,
+            "KMeans NMI": 0.20399813385577176,
+            "KMeans ARI": 0.09322837344639999,
+            "Silhouette label": 0.4638623036444187,
+            "cLISI": 0.9322971930870643,
+            "Silhouette batch": 0.8736705183982849,
+            "iLISI": 0.06271983683109283,
+            "KBET": 0.20750698710674678,
+            "Graph connectivity": 0.47262607564009623,
             "PCR comparison": 0,
-            "Batch correction": 0.3275169754666189,
-            "Bio conservation": 0.45308973682039577,
-            "Total": 0.402860632278885
+            "Batch correction": 0.3233046835952441,
+            "Bio conservation": 0.4653911204463183,
+            "Total": 0.4085565457058886
         },
         "classif": {
             "cell_type_ontology_term_id": {
-                "accuracy": 0.11836161640825296,
-                "macro": 0.1412559048761935,
-                "micro": 0.11836161640825296,
-                "weighted": 0.06221004622312013
+                "accuracy": 0.09351727505799047,
+                "macro": 0.1651109940703239,
+                "micro": 0.09351727505799047,
+                "weighted": 0.04236305167504758
             },
             "assay_ontology_term_id": {
-                "accuracy": 0.12269564155780735,
-                "macro": 0.1530686999568958,
-                "micro": 0.12269564155780735,
-                "weighted": 0.11114243651180351
+                "accuracy": 0.14851666463191307,
+                "macro": 0.19344711787900973,
+                "micro": 0.14851666463191307,
+                "weighted": 0.12768007693524516
             },
             "organism_ontology_term_id": {
                 "accuracy": 1.0,
@@ -74,81 +74,141 @@
             "precision": 0.03094632492010696,
             "recall": 1.0,
             "rand_precision": 0.030952717468117723,
-            "auprc": 0.03375259353746379,
-            "epr": 1.3312211006047303
+            "auprc": 0.03475575899994744,
+            "epr": 1.2686204249296738
         },
         "class_self_liu_full": {
             "precision": 0.03094632492010696,
             "recall": 1.0,
             "rand_precision": 0.030952717468117723,
-            "auprc": 0.01547316246005348,
-            "epr": 0.23792046362283656,
+            "auprc": 0.046006918552768006,
+            "epr": 1.4833374783737023,
             "classifier": {
-                "used_heads": "0",
-                "precision": NaN,
+                "used_heads": "11",
+                "precision": 0.02035667681600696,
                 "random_precision": 0.020348268440618274,
-                "recall": 0.0,
-                "predicted_true": 0.0,
+                "recall": 1.0,
+                "predicted_true": 45980.0,
                 "number_of_true": 936.0,
-                "epr": 0.050476707941319456
+                "epr": 1.218195494314208
             }
         },
         "full_liu_full": {
             "precision": 0.03094632492010696,
             "recall": 1.0,
             "rand_precision": 0.030952717468117723,
-            "auprc": 0.03208956798363715,
-            "epr": 0.8429221091558754
+            "auprc": 0.03272614784417412,
+            "epr": 1.0348467836897883
         },
         "class_omni_liu_chip": {
             "precision": 0.2787394155307724,
             "recall": 1.0,
             "rand_precision": 0.27879699442263994,
-            "auprc": 0.2816218212656761,
-            "epr": 1.0390889823010823
+            "auprc": 0.27062024669542645,
+            "epr": 1.0214245965709208
         },
         "class_self_liu_chip": {
             "precision": 0.2787394155307724,
             "recall": 1.0,
             "rand_precision": 0.27879699442263994,
-            "auprc": 0.1393697077653862,
-            "epr": 1.3436670576375191,
+            "auprc": 0.3585241068349098,
+            "epr": 1.2566178862432842,
             "classifier": {
-                "used_heads": "0",
-                "precision": NaN,
+                "used_heads": "15",
+                "precision": 0.2839743755327668,
                 "random_precision": 0.28384448574969023,
-                "recall": 0.0,
-                "predicted_true": 0.0,
+                "recall": 0.9998635743519781,
+                "predicted_true": 77426.0,
                 "number_of_true": 21990.0,
-                "epr": 0.29208784892502027
+                "epr": 1.1610224513963054
             }
         },
         "full_liu_chip": {
             "precision": 0.2787394155307724,
             "recall": 1.0,
             "rand_precision": 0.27879699442263994,
-            "auprc": 0.27433844125779105,
-            "epr": 0.9336579354287853
+            "auprc": 0.2596775739947591,
+            "epr": 0.8376736203486045
+        },
+        "class_omni_liu_ko": {
+            "precision": 0.05674777514926214,
+            "recall": 1.0,
+            "rand_precision": 0.05675949747422584,
+            "auprc": 0.06085644916074384,
+            "epr": 1.1595439911941159
+        },
+        "class_self_liu_ko": {
+            "precision": 0.05674777514926214,
+            "recall": 1.0,
+            "rand_precision": 0.05675949747422584,
+            "auprc": 0.06918372309721356,
+            "epr": 1.4479552845555812,
+            "classifier": {
+                "used_heads": "14",
+                "precision": 0.05883754317992314,
+                "random_precision": 0.058753582917151694,
+                "recall": 0.9996804431188752,
+                "predicted_true": 159507.0,
+                "number_of_true": 9388.0,
+                "epr": 1.3098158405955815
+            }
+        },
+        "full_liu_ko": {
+            "precision": 0.05674777514926214,
+            "recall": 1.0,
+            "rand_precision": 0.05675949747422584,
+            "auprc": 0.060457774800220805,
+            "epr": 1.0204272819580311
+        },
+        "class_omni_chen_full": {
+            "precision": 0.017410924132744195,
+            "recall": 1.0,
+            "rand_precision": 0.01741452589611464,
+            "auprc": 0.01644050932839175,
+            "epr": 0.3638563327032136
+        },
+        "class_self_chen_full": {
+            "precision": 0.017410924132744195,
+            "recall": 1.0,
+            "rand_precision": 0.01741452589611464,
+            "auprc": 0.03517542470859364,
+            "epr": 0.8640927977839336,
+            "classifier": {
+                "used_heads": "8",
+                "precision": 0.002144469525959368,
+                "random_precision": 0.00214342120106795,
+                "recall": 1.0,
+                "predicted_true": 26580.0,
+                "number_of_true": 57.0,
+                "epr": 0.0
+            }
+        },
+        "full_chen_full": {
+            "precision": 0.017410924132744195,
+            "recall": 1.0,
+            "rand_precision": 0.01741452589611464,
+            "auprc": 0.01618125294523526,
+            "epr": 1.3164469949024755
         },
         "class_omni_duren_full": {
             "precision": 0.006052047609441194,
             "recall": 1.0,
             "rand_precision": 0.006053268765133172,
-            "auprc": 0.006881603153008901,
-            "epr": 1.8544375710137608
+            "auprc": 0.006967794687945695,
+            "epr": 2.8132720482619935
         },
         "class_self_duren_full": {
             "precision": 0.006052047609441194,
             "recall": 1.0,
             "rand_precision": 0.006053268765133172,
-            "auprc": 0.003026023804720597,
+            "auprc": 0.009099609464051028,
             "epr": 1.8544375710137608,
             "classifier": {
-                "used_heads": "0",
-                "precision": NaN,
+                "used_heads": "1",
+                "precision": 0.0,
                 "random_precision": 0.004101943379732365,
                 "recall": 0.0,
-                "predicted_true": 0.0,
+                "predicted_true": 11.0,
                 "number_of_true": 61.0,
                 "epr": 0.0
             }
@@ -157,38 +217,38 @@
             "precision": 0.006052047609441194,
             "recall": 1.0,
             "rand_precision": 0.006053268765133172,
-            "auprc": 0.006111147026851343,
-            "epr": 1.8544375710137608
+            "auprc": 0.005769223310665614,
+            "epr": 3.793904958677686
         },
         "class_omni_semrau_full": {
             "precision": 0.011162801851274549,
             "recall": 1.0,
             "rand_precision": 0.01116507765185585,
-            "auprc": 0.011908639249531365,
-            "epr": 1.3575132984258327
+            "auprc": 0.01049191862967459,
+            "epr": 0.7656130968660534
         },
         "class_self_semrau_full": {
             "precision": 0.011162801851274549,
             "recall": 1.0,
             "rand_precision": 0.01116507765185585,
-            "auprc": 0.0055814009256372745,
-            "epr": 2.067895181741336,
+            "auprc": 0.02570471511860657,
+            "epr": 1.8627101608187135,
             "classifier": {
-                "used_heads": "0",
-                "precision": NaN,
+                "used_heads": "11",
+                "precision": 0.0035782901056676275,
                 "random_precision": 0.0035730558020191363,
-                "recall": 0.0,
-                "predicted_true": 0.0,
+                "recall": 1.0,
+                "predicted_true": 41640.0,
                 "number_of_true": 149.0,
-                "epr": 1.8902483564645727
+                "epr": 3.8321995464852607
             }
         },
         "full_semrau_full": {
             "precision": 0.011162801851274549,
             "recall": 1.0,
             "rand_precision": 0.01116507765185585,
-            "auprc": 0.011441010321661962,
-            "epr": 0.9612008851258074
+            "auprc": 0.010925519186957586,
+            "epr": 0.668454020726748
         }
     }
 }{
@@ -197,257 +257,321 @@
             "precision": 0.02072508763433421,
             "recall": 1.0,
             "rand_precision": 0.02072944989230818,
-            "auprc": 0.024939616019137356,
-            "epr": 1.8800038725728383
+            "auprc": 0.02261102944242162,
+            "epr": 1.1320129204872285
         },
         "class_self": {
             "precision": 0.02072508763433421,
             "recall": 1.0,
             "rand_precision": 0.02072944989230818,
-            "auprc": 0.04861473848411424,
-            "epr": 5.104556678739458,
+            "auprc": 0.03731885231209868,
+            "epr": 3.4682088031972618,
             "classifier": {
-                "used_heads": "29",
-                "precision": 0.09334076637460424,
+                "used_heads": "28",
+                "precision": 0.058079277116508905,
                 "random_precision": 0.02150860776716941,
-                "recall": 0.11893449489026638,
-                "predicted_true": "190142",
+                "recall": 0.12775339252806164,
+                "predicted_true": "328241",
                 "number_of_true": "149225",
-                "epr": 5.405567441798146
+                "epr": 3.594445480347296
             }
         },
         "class_omni": {
             "precision": 0.02072508763433421,
             "recall": 1.0,
             "rand_precision": 0.02072944989230818,
-            "auprc": 0.03505953316655795,
-            "epr": 3.288374495317399,
+            "auprc": 0.021102623160262166,
+            "epr": 1.0811983449543565,
             "classifier": {
-                "used_heads": "22",
-                "precision": 0.015873015873015872,
+                "used_heads": "20",
+                "precision": 0.0,
                 "random_precision": 0.001610562441384053,
-                "recall": 0.002326934264107039,
-                "predicted_true": 252.0,
+                "recall": 0.0,
+                "predicted_true": 11.0,
                 "number_of_true": 1719.0,
-                "epr": 6.243582927944038
+                "epr": 1.8107043511530412
             }
         }
     }
 }{
     "grn_omni": {
         "kidney collecting duct principal cell_scprint": {
-            "enriched_terms_Regulators": [
-                "celltype.gmt__Immune cells",
-                "celltype.gmt__Pancreatic progenitor cells"
+            "enriched_terms_Targets": [
+                "0__TFs"
             ],
-            "significant_enriched_TFtargets": 9.821428571428571,
+            "enriched_terms_Regulators": [
+                "celltype.gmt__Plasma B cells",
+                "celltype.gmt__Memory B cells",
+                "celltype.gmt__Proximal tubule cells",
+                "celltype.gmt__Pro-B cells",
+                "celltype.gmt__Pre-B cells"
+            ],
+            "significant_enriched_TFtargets": 10.714285714285714,
             "precision": 0.0008896322223674437,
             "recall": 1.0,
             "rand_precision": 0.0008897036558203398,
-            "auprc": 0.0009478111411102829,
-            "epr": 1.9497875218936758
+            "auprc": 0.0008937439242263478,
+            "epr": 1.508066775151862
         },
         "kidney collecting duct principal cell_scprint_class": {
             "TF_enr": true,
-            "significant_enriched_TFtargets": 17.741935483870968,
+            "significant_enriched_TFtargets": 6.451612903225806,
             "precision": 0.0013111024662794692,
             "recall": 1.0,
             "rand_precision": 0.0013114980916464818,
-            "auprc": 0.0019750400547772634,
-            "epr": 3.5157865681783846,
+            "auprc": 0.0016943247397190856,
+            "epr": 4.000234229931606,
             "classifier": {
                 "used_heads": "17",
-                "precision": 0.0053106744556558685,
+                "precision": 0.009746588693957114,
                 "random_precision": 0.0011931686544621068,
-                "recall": 0.001525320317266626,
-                "predicted_true": 1883.0,
+                "recall": 0.000762660158633313,
+                "predicted_true": 513.0,
                 "number_of_true": 6556.0,
-                "epr": 3.083331989594587
+                "epr": 4.511717666498344
             }
         },
         "blood vessel smooth muscle cell_scprint": {
             "enriched_terms_Targets": [
-                "celltype.gmt__Oocytes"
+                "0__TFs"
             ],
+            "TF_enr": true,
             "enriched_terms_Regulators": [
-                "celltype.gmt__Myofibroblasts",
-                "celltype.gmt__Enteric glia cells",
-                "celltype.gmt__Glial cells",
-                "celltype.gmt__Pancreatic progenitor cells"
+                "celltype.gmt__Plasma B cells",
+                "celltype.gmt__Memory B cells",
+                "celltype.gmt__Naive B cells",
+                "celltype.gmt__Pro-B cells",
+                "celltype.gmt__Pulmonary alveolar type I cells",
+                "celltype.gmt__Foveolar cells"
             ],
-            "significant_enriched_TFtargets": 8.035714285714286,
+            "significant_enriched_TFtargets": 10.714285714285714,
             "precision": 0.0008896322223674437,
             "recall": 1.0,
             "rand_precision": 0.0008897036558203398,
-            "auprc": 0.0009849542789429875,
-            "epr": 1.966160847001878
+            "auprc": 0.0009072766147747637,
+            "epr": 1.6552301206308122
         },
         "blood vessel smooth muscle cell_scprint_class": {
             "TF_enr": false,
             "enriched_terms_Targets": [
+                "celltype.gmt__Hepatic stellate cells",
+                "celltype.gmt__Smooth Muscle cells",
                 "celltype.gmt__Myofibroblasts",
+                "celltype.gmt__Fibroblasts",
                 "celltype.gmt__Perivascular cells",
-                "celltype.gmt__Myoepithelial cells",
-                "celltype.gmt__Smooth muscle cells"
+                "celltype.gmt__Smooth muscle cells",
+                "celltype.gmt__Vascular smooth muscle cells",
+                "celltype.gmt__Cap mesenchyme cells (Mesenchymal cells)",
+                "celltype.gmt__Airway goblet cells",
+                "celltype.gmt__Odontoblasts",
+                "celltype.gmt__Starburst amacrine cells",
+                "celltype.gmt__Glycinergic amacrine cells",
+                "celltype.gmt__Pancreatic progenitor cells",
+                "celltype.gmt__Trophoblast cells",
+                "celltype.gmt__Neuronal cells",
+                "celltype.gmt__Pericytes",
+                "celltype.gmt__Gamma (PP) cells",
+                "celltype.gmt__Lymphatic Endothelial cells",
+                "celltype.gmt__Radial glial cells",
+                "celltype.gmt__Enteric neurons",
+                "celltype.gmt__GABAergic amacrine cells",
+                "celltype.gmt__Cholinergic GABAergic amacrine cells",
+                "celltype.gmt__Tachykinin GABAergic amacrine cells",
+                "celltype.gmt__Renal interstitium (Mesenchymal cells)",
+                "celltype.gmt__Enteroendocrine cells"
             ],
             "enriched_terms_Regulators": [
-                "celltype.gmt__Myofibroblasts",
-                "celltype.gmt__Perivascular cells"
+                "celltype.gmt__Perivascular cells",
+                "celltype.gmt__Myofibroblasts"
             ],
-            "significant_enriched_TFtargets": 42.5531914893617,
+            "significant_enriched_TFtargets": 17.02127659574468,
             "precision": 0.001786850561697227,
             "recall": 1.0,
             "rand_precision": 0.0017874837475801812,
-            "auprc": 0.0026421979362946046,
-            "epr": 2.2095618491192544,
+            "auprc": 0.0019584922815081714,
+            "epr": 1.5351167236160117,
             "classifier": {
-                "used_heads": "19",
+                "used_heads": "17",
                 "precision": 0.0,
                 "random_precision": 0.0017722945341703757,
                 "recall": 0.0,
-                "predicted_true": 303.0,
+                "predicted_true": 40.0,
                 "number_of_true": 7062.0,
-                "epr": 2.0045519966136887
+                "epr": 1.1190447680957945
             }
         },
         "podocyte_scprint": {
-            "significant_enriched_TFtargets": 7.142857142857143,
+            "enriched_terms_Targets": [
+                "0__TFs"
+            ],
+            "enriched_terms_Regulators": [
+                "celltype.gmt__Memory B cells",
+                "celltype.gmt__Plasma B cells",
+                "celltype.gmt__Pro-B cells",
+                "celltype.gmt__Naive B cells",
+                "celltype.gmt__Podocytes",
+                "celltype.gmt__Loop of Henle cells",
+                "celltype.gmt__Pre-B cells",
+                "celltype.gmt__Non-classical monocytes",
+                "celltype.gmt__Spermatocytes",
+                "celltype.gmt__Foveolar cells",
+                "celltype.gmt__Parietal cells",
+                "celltype.gmt__Immune cells"
+            ],
+            "significant_enriched_TFtargets": 14.285714285714286,
             "precision": 0.0008896322223674437,
             "recall": 1.0,
             "rand_precision": 0.0008897036558203398,
-            "auprc": 0.0009724888014013577,
-            "epr": 3.0735607243598224
+            "auprc": 0.0009191303254182938,
+            "epr": 1.7206607294847243
         },
         "podocyte_scprint_class": {
             "TF_enr": true,
-            "enriched_terms_Regulators": [
-                "celltype.gmt__Hepatic stellate cells",
-                "celltype.gmt__Podocytes",
-                "celltype.gmt__Pulmonary alveolar type I cells"
+            "enriched_terms_Targets": [
+                "celltype.gmt__Hepatocytes",
+                "celltype.gmt__Enterocytes"
             ],
-            "significant_enriched_TFtargets": 12.820512820512821,
+            "enriched_terms_Regulators": [
+                "celltype.gmt__Pro-B cells",
+                "celltype.gmt__Pancreatic stellate cells"
+            ],
+            "significant_enriched_TFtargets": 7.6923076923076925,
             "precision": 0.0013777314931025123,
             "recall": 1.0,
             "rand_precision": 0.0013781596259468572,
-            "auprc": 0.0016633024268641365,
-            "epr": 5.610267925600585,
+            "auprc": 0.0016608906127544578,
+            "epr": 2.244041920273404,
             "classifier": {
-                "used_heads": "19",
-                "precision": 0.011124845488257108,
+                "used_heads": "17",
+                "precision": 0.005393743257820928,
                 "random_precision": 0.0013634483508046062,
-                "recall": 0.002548131370328426,
-                "predicted_true": 1618.0,
+                "recall": 0.0007078142695356738,
+                "predicted_true": 927.0,
                 "number_of_true": 7064.0,
-                "epr": 4.613263447536951
+                "epr": 1.873332407312588
             }
         },
         "macrophage_scprint": {
-            "significant_enriched_TFtargets": 4.545454545454546,
-            "precision": 0.0009026294262630154,
+            "enriched_terms_Targets": [
+                "0__TFs"
+            ],
+            "TF_enr": true,
+            "significant_enriched_TFtargets": 15.596330275229358,
+            "precision": 0.0009083791567083706,
             "recall": 1.0,
-            "rand_precision": 0.0009027046015296318,
-            "auprc": 0.0009430840464620513,
-            "epr": 1.2773562763092836
+            "rand_precision": 0.0009084548739007278,
+            "auprc": 0.0009135909523320301,
+            "epr": 1.482876678344197
         },
         "macrophage_scprint_class": {
             "TF_enr": true,
             "enriched_terms_Targets": [
+                "celltype.gmt__Hepatic stellate cells",
+                "celltype.gmt__Cholangiocytes",
                 "celltype.gmt__Acinar cells",
-                "celltype.gmt__Kupffer cells"
+                "celltype.gmt__Proximal tubule cells",
+                "celltype.gmt__Langerhans cells",
+                "celltype.gmt__Enterocytes",
+                "celltype.gmt__Immune cells",
+                "celltype.gmt__Keratinocytes",
+                "celltype.gmt__Kupffer cells",
+                "celltype.gmt__Endometrium",
+                "celltype.gmt__Myofibroblasts",
+                "celltype.gmt__Adipose progenitor cells",
+                "celltype.gmt__Ductal cells",
+                "celltype.gmt__Extracellular matrix cells",
+                "celltype.gmt__Pancreatic stellate cells",
+                "celltype.gmt__Renal interstitium (Mesenchymal cells)",
+                "celltype.gmt__Satellite cells",
+                "celltype.gmt__Myoblasts",
+                "celltype.gmt__Pericytes",
+                "celltype.gmt__Hepatocytes",
+                "celltype.gmt__Neutrophils",
+                "celltype.gmt__Stromal cells",
+                "celltype.gmt__Oligodendrocyte precursor cells"
             ],
-            "significant_enriched_TFtargets": 17.647058823529413,
+            "significant_enriched_TFtargets": 5.882352941176471,
             "precision": 0.001313047970110002,
             "recall": 1.0,
             "rand_precision": 0.0013134731799448822,
-            "auprc": 0.0019426185341006887,
-            "epr": 2.9931051669851247,
+            "auprc": 0.001996803336599408,
+            "epr": 3.5479779594954897,
             "classifier": {
-                "used_heads": "17",
-                "precision": 0.0,
+                "used_heads": "15",
+                "precision": 0.024615384615384615,
                 "random_precision": 0.0012926116981463484,
-                "recall": 0.0,
-                "predicted_true": 217.0,
+                "recall": 0.0012972271769093563,
+                "predicted_true": 325.0,
                 "number_of_true": 6167.0,
-                "epr": 2.89940701590644
+                "epr": 3.5354685996385893
             }
         },
         "leukocyte_scprint": {
-            "significant_enriched_TFtargets": 6.25,
+            "enriched_terms_Targets": [
+                "0__TFs",
+                "celltype.gmt__Enteric neurons"
+            ],
+            "TF_enr": true,
+            "enriched_terms_Regulators": [
+                "celltype.gmt__Pre-B cells",
+                "celltype.gmt__Pro-B cells",
+                "celltype.gmt__Memory B cells",
+                "celltype.gmt__Plasma B cells",
+                "celltype.gmt__Pancreatic progenitor cells",
+                "celltype.gmt__-intercalated cells (Collecting duct system)",
+                "celltype.gmt__Immune cells"
+            ],
+            "significant_enriched_TFtargets": 11.607142857142858,
             "precision": 0.0008896322223674437,
             "recall": 1.0,
             "rand_precision": 0.0008897036558203398,
-            "auprc": 0.0010017212686856255,
-            "epr": 1.360980272864701
+            "auprc": 0.0009055415972185391,
+            "epr": 1.712481072658193
         },
         "leukocyte_scprint_class": {
             "TF_enr": true,
-            "enriched_terms_Regulators": [
+            "enriched_terms_Targets": [
                 "celltype.gmt__Non-classical monocytes",
-                "celltype.gmt__Immune cells",
-                "celltype.gmt__Classical Monocytes",
                 "celltype.gmt__Intermediate monocytes",
-                "celltype.gmt__Immune system cells",
-                "celltype.gmt__Naive B cells",
-                "celltype.gmt__Memory B cells",
-                "celltype.gmt__Plasma B cells",
-                "celltype.gmt__Pro-B cells",
-                "celltype.gmt__Pre-B cells",
-                "celltype.gmt__Neutrophils",
-                "celltype.gmt__Langerhans cells",
-                "celltype.gmt__Acinar cells",
-                "celltype.gmt__Memory CD8+ T cells",
-                "celltype.gmt__Naive CD8+ T cells",
-                "celltype.gmt__-T cells",
-                "celltype.gmt__Kupffer cells",
-                "celltype.gmt__Enteric glia cells",
-                "celltype.gmt__Pulmonary alveolar type II cells",
+                "celltype.gmt__Classical Monocytes",
                 "celltype.gmt__HSC/MPP cells",
-                "celltype.gmt__Effector CD8+ T cells",
-                "celltype.gmt__CD4+ NKT-like cells",
-                "celltype.gmt__Hematopoietic cells",
-                "celltype.gmt__Alveolar macrophages",
-                "celltype.gmt__Granulocytes",
-                "celltype.gmt__CD8+ NKT-like cells",
+                "celltype.gmt__Pulmonary alveolar type II cells",
+                "celltype.gmt__Endothelial",
                 "celltype.gmt__Macrophages",
-                "celltype.gmt__Memory CD4+ T cells",
-                "celltype.gmt__Mast cells",
-                "celltype.gmt__Naive CD4+ T cells",
-                "celltype.gmt__Effector CD4+ T cells",
-                "celltype.gmt__Sebocytes",
-                "celltype.gmt__Microfold cells",
-                "celltype.gmt__Renal interstitium (Mesenchymal cells)",
-                "celltype.gmt__Microglial cells",
-                "celltype.gmt__Natural killer cells",
-                "celltype.gmt__Keratinocytes",
-                "celltype.gmt__Stromal cells"
+                "celltype.gmt__Neutrophils",
+                "celltype.gmt__Immune cells",
+                "celltype.gmt__Granulocytes",
+                "celltype.gmt__Langerhans cells",
+                "celltype.gmt__Pre-B cells",
+                "celltype.gmt__Erythroid-like and erythroid precursor cells"
             ],
-            "significant_enriched_TFtargets": 20.833333333333332,
+            "significant_enriched_TFtargets": 50.0,
             "precision": 0.001586016374297812,
             "recall": 1.0,
             "rand_precision": 0.0015866725664261932,
-            "auprc": 0.0020308912794564067,
-            "epr": 3.424379620131631,
+            "auprc": 0.002499099440083146,
+            "epr": 3.632206805445109,
             "classifier": {
-                "used_heads": "18",
-                "precision": 0.0029940119760479044,
+                "used_heads": "11",
+                "precision": 0.017241379310344827,
                 "random_precision": 0.001322107901792525,
-                "recall": 0.000258732212160414,
-                "predicted_true": 334.0,
+                "recall": 0.0018111254851228978,
+                "predicted_true": 406.0,
                 "number_of_true": 3865.0,
-                "epr": 3.5462024192993113
+                "epr": 3.148902776351839
             }
         },
         "kidney interstitial fibroblast_scprint": {
-            "TF_enr": true,
-            "enriched_terms_Regulators": [
-                "celltype.gmt__Pancreatic progenitor cells"
+            "enriched_terms_Targets": [
+                "0__TFs"
             ],
-            "significant_enriched_TFtargets": 7.142857142857143,
+            "TF_enr": true,
+            "significant_enriched_TFtargets": 11.607142857142858,
             "precision": 0.0008896322223674437,
             "recall": 1.0,
             "rand_precision": 0.0008897036558203398,
-            "auprc": 0.0010001108500843675,
-            "epr": 2.392201078113259
+            "auprc": 0.0009224426671417072,
+            "epr": 1.4835470229907695
         },
         "kidney interstitial fibroblast_scprint_class": {
             "enriched_terms_Central": [
@@ -455,26 +579,22 @@
             ],
             "TF_enr": true,
             "enriched_terms_Targets": [
-                "celltype.gmt__Myofibroblasts",
-                "celltype.gmt__Neutrophils",
-                "celltype.gmt__Acinar cells",
-                "celltype.gmt__Smooth muscle cells",
-                "celltype.gmt__Myoepithelial cells"
+                "celltype.gmt__Perivascular cells"
             ],
             "significant_enriched_TFtargets": 8.333333333333334,
             "precision": 0.0014660317037770098,
             "recall": 1.0,
             "rand_precision": 0.0014665543532257717,
-            "auprc": 0.0017372180249545699,
-            "epr": 1.360094167450328,
+            "auprc": 0.0015188834169212791,
+            "epr": 2.6114384307937226,
             "classifier": {
-                "used_heads": "18",
+                "used_heads": "17",
                 "precision": NaN,
                 "random_precision": 0.001188523320102682,
                 "recall": 0.0,
                 "predicted_true": 0.0,
                 "number_of_true": 4679.0,
-                "epr": 0.7188014984700735
+                "epr": 2.3451309130132914
             }
         }
     }

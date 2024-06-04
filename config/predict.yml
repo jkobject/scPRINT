@@ -2,7 +2,7 @@ trainer:
   max_time:
     hours: 2
   logger: []
-  limit_predict_batches: 5000
+  limit_predict_batches: 10000
   num_sanity_val_steps: 0
   default_root_dir: /pasteur/zeus/projets/p02/ml4ig_hot/Users/jkalfon/predict/
 model:

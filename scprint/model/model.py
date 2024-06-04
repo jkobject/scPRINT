@@ -14,6 +14,7 @@ import copy
 import gc
 import json
 
+from huggingface_hub import PyTorchModelHubMixin
 import pandas as pd
 from functools import partial
 
@@ -47,7 +48,7 @@ from ..tasks import denoise as denoise_task
 
 FILEDIR = os.path.dirname(os.path.realpath(__file__))
 
-class scPrint(L.LightningModule):
+class scPrint(L.LightningModule, PyTorchModelHubMixin):
     def __init__(
         self,
         genes: list,
@@ -305,8 +306,6 @@ class scPrint(L.LightningModule):
 
         # Batch effect correction via adversarial training on batch classes
         if num_batch_labels > 0:
-            # self.batch_encoder = BatchLabelEncoder(num_batch_labels, d_model)
-            # batch norm (dsbn) <- not doing, weird
             self.grad_reverse_discriminator_loss = loss.AdversarialDiscriminatorLoss(
                 d_model,
                 n_cls=num_batch_labels,
@@ -346,7 +345,6 @@ class scPrint(L.LightningModule):
                 n_cls=size,
             )
         classes = checkpoints['hyper_parameters']['classes']
-        #self.classes = list(classes.keys())
         self.label_decoders = checkpoints['hyper_parameters']['label_decoders']
         self.labels_hierarchy = checkpoints['hyper_parameters']['labels_hierarchy']
         for k, v in self.labels_hierarchy.items():
@@ -481,7 +479,6 @@ class scPrint(L.LightningModule):
         gene_pos: Tensor,
         expression: Optional[Tensor] = None,
         mask: Optional[Tensor] = None,
-        # (minibatch,) unormalized total counts
         full_depth: Optional[Tensor] = None,
         timepoint: Optional[Tensor] = None,  # (new_minibatch_of_nxt_cells,)
         get_gene_emb: bool = False,
@@ -713,7 +710,6 @@ class scPrint(L.LightningModule):
         total_count = batch["depth"]
         clss = batch.get("class", None)
         batch_idx = batch.get("dataset", None)
-        timepoint = None
 
         total_loss = 0
         losses = {}
@@ -725,7 +721,7 @@ class scPrint(L.LightningModule):
             ).to(gene_pos.device)
             output = self.forward(
                 gene_pos,
-                #expression=expression,
+                expression=expression,
                 mask=mask,
                 full_depth=total_count,
                 do_mvc=do_mvc,
@@ -741,8 +737,8 @@ class scPrint(L.LightningModule):
                 do_adv_batch & do_cls,
             )
             # we only want to do them once
-            # do_mvc = False if do_mvc else do_mvc
-            # do_cls = False if do_cls else do_cls
+            do_mvc = False if do_mvc else do_mvc
+            do_cls = False if do_cls else do_cls
 
             cell_embs.append(output["cell_emb"].clone())
             total_loss += tot
@@ -808,7 +804,7 @@ class scPrint(L.LightningModule):
                 clss,
                 batch_idx,
                 do_ecs,
-                do_adv_cls,
+                do_adv_cls & do_cls,
                 do_adv_batch & do_cls,
             )
             losses.update({"gen_" + k: v for k, v in l.items()})
@@ -870,8 +866,6 @@ class scPrint(L.LightningModule):
         total_loss = 0
         losses = {}
         # TASK 1. reconstruct masked expression
-        #import pdb
-        #pdb.set_trace()
         if "zero_logits" in output:
             loss_expr = loss.zinb(
                 theta=output["disp"],
@@ -1039,6 +1033,7 @@ class scPrint(L.LightningModule):
         expression = batch["x"]
         gene_pos = batch["genes"]
         depth = batch["depth"]
+        # TODO: make this faster by only calling val loss
         if self.embs is not None:
             if self.embs.shape[0] < 100_000:
                 self.info = torch.cat([self.info, batch["class"]])
@@ -1046,9 +1041,9 @@ class scPrint(L.LightningModule):
         else:
             self.info = batch["class"]
             self._predict(gene_pos, expression, depth, max_size_in_mem=100_000)
-            self.log("val_loss", val_loss, sync_dist=True)
-            self.log_dict(losses, sync_dist=True)
-            return val_loss
+        self.log("val_loss", val_loss, sync_dist=True)
+        self.log_dict(losses, sync_dist=True)
+        return val_loss
 
     def on_validation_epoch_end(self):
         """@see pl.LightningModule"""
@@ -1056,9 +1051,6 @@ class scPrint(L.LightningModule):
         self.info = self.all_gather(self.info).view(-1, self.info.shape[-1])
         self.pred = self.all_gather(self.pred).view(-1, self.pred.shape[-1]) if self.pred is not None else None
         self.pos = self.all_gather(self.pos).view(-1, self.pos.shape[-1])
-        #self.expr_pred = [i.view(-1, self.expr_pred[0].shape[-1]) for i in self.all_gather(self.expr_pred)]
-        # if len(self.get_attention_layer) > 0:
-        #    self.attn = [i.view(-1, *i.shape[2:]) for i in self.all_gather(self.attn)]
         if not self.trainer.is_global_zero:
             # print("you are not on the main node. cancelling logging step")
             return
@@ -1067,42 +1059,43 @@ class scPrint(L.LightningModule):
             sch.step(self.trainer.callback_metrics["val_loss"])
             # run the test function on specific dataset
             self.log_adata(gtclass=self.info, name="validation_part_"+str(self.counter))
-        metrics = self._test()
-        metrics = {k: float(v) for k,v in metrics.items()}
-        self.log_dict(metrics, sync_dist=True)
+            metrics = self._test()
+            metrics = {k: float(v) for k,v in metrics.items()}
+            self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
 
     def _test(self):
         metrics = {}
-       #f = open("metrics_step"+str(self.trainer.global_step)+".json", 'w')
+        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'w')
         model_copy = copy.deepcopy(self) 
-       #res = embbed_task.default_benchmark(model_copy, default_dataset="lung", do_class=True, coarse=False)
-       #f.write(json.dumps({"embed_lung":res}, indent=4))
-       #metrics.update({
-       #    'emb_lung/scib': res['scib']['Total'],
-       #    'emb_lung/ct_class': res['classif']['cell_type_ontology_term_id']['accuracy'],
-       #})
-       #res = embbed_task.default_benchmark(model_copy, default_dataset="pancreas", do_class=True, coarse=False)
-       #f.write(json.dumps({"embed_panc":res}, indent=4))
-       #metrics.update({
-       #    'emb_panc/scib': res['scib']['Total'],
-       #    'emb_panc/ct_class': res['classif']['cell_type_ontology_term_id']['accuracy'],
-       #})
-       #gc.collect()
-       #res = denoise_task.default_benchmark(model_copy, FILEDIR+"/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad")
-       #metrics.update({
-       #    'denoise/reco2full_vs_noisy2full': res['reco2full'] - res['noisy2full'],
-       #})
-       #res = grn_task.default_benchmark(model_copy, "sroy")
-       #f.write(json.dumps({"grn_sroy":res}, default=lambda o: str(o), indent=4))
-       #metrics.update({
-       #    'grn_sroy/auprc_self': np.mean([i['auprc'] for k, i in res.items() if "class_self" in k]),
-       #    'grn_sroy/epr_self': np.mean([i['epr'] for k, i in res.items() if "class_self" in k]),
-       #    'grn_sroy/auprc_omni': np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k]),
-       #    'grn_sroy/epr_omni': np.mean([i['epr'] for k, i in res.items() if "class_omni" in k]),
-       #})
-       #gc.collect()
-        res = grn_task.default_benchmark(model_copy, "gwps")
-        #f.write(json.dumps({"grn_gwps":res}, default=lambda o: str(o), indent=4))
+        res = embbed_task.default_benchmark(model_copy, default_dataset="lung", do_class=True, coarse=False)
+        f.write(json.dumps({"embed_lung":res}, indent=4))
+        metrics.update({
+            'emb_lung/scib': res['scib']['Total'],
+            'emb_lung/ct_class': res['classif']['cell_type_ontology_term_id']['accuracy'],
+        })
+        res = embbed_task.default_benchmark(model_copy, default_dataset="pancreas", do_class=True, coarse=False)
+        f.write(json.dumps({"embed_panc":res}, indent=4))
+        metrics.update({
+            'emb_panc/scib': res['scib']['Total'],
+            'emb_panc/ct_class': res['classif']['cell_type_ontology_term_id']['accuracy'],
+        })
+        gc.collect()
+        res = denoise_task.default_benchmark(model_copy, FILEDIR+"/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad")
+        metrics.update({
+            'denoise/reco2full_vs_noisy2full': res['reco2full'] - res['noisy2full'],
+        })
+        gc.collect()
+        res = grn_task.default_benchmark(model_copy, "sroy", batch_size=32 if self.d_model <= 512 else 8)
+        f.write(json.dumps({"grn_sroy":res}, default=lambda o: str(o), indent=4))
+        metrics.update({
+            'grn_sroy/auprc_self': np.mean([i['auprc'] for k, i in res.items() if "class_self" in k]),
+            'grn_sroy/epr_self': np.mean([i['epr'] for k, i in res.items() if "class_self" in k]),
+            'grn_sroy/auprc_omni': np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k]),
+            'grn_sroy/epr_omni': np.mean([i['epr'] for k, i in res.items() if "class_omni" in k]),
+        })
+        gc.collect()
+        res = grn_task.default_benchmark(model_copy, "gwps", batch_size=32 if self.d_model <= 512 else 8)
+        f.write(json.dumps({"grn_gwps":res}, default=lambda o: str(o), indent=4))
         metrics.update({
             'grn_gwps/auprc_self': np.mean([i['auprc'] for k, i in res.items() if "class_self" in k]),
             'grn_gwps/epr_self': np.mean([i['epr'] for k, i in res.items() if "class_self" in k]),
@@ -1110,21 +1103,21 @@ class scPrint(L.LightningModule):
             'grn_gwps/epr_omni': np.mean([i['epr'] for k, i in res.items() if "class_omni" in k]),
         })
         gc.collect()
-        res = grn_task.default_benchmark(model_copy, FILEDIR+"/../../data/yBCKp6HmXuHa0cZptMo7.h5ad")
-       #f.write(json.dumps({"grn_omni":res}, default=lambda o: str(o), indent=4))
-       #metrics.update({
-       #    'grn_omni/auprc_class': np.mean([i['auprc'] for k, i in res.items() if "class" in k]),
-       #    'grn_omni/epr_class': np.mean([i['epr'] for k, i in res.items() if "class" in k]),
-       #    'grn_omni/tf_enr_class': np.sum([i.get('TF_enr', False) for k, i in res.items() if "class" in k]),
-       #    'grn_omni/tf_targ_enr_class': np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" in k]),
-       #    'grn_omni/auprc': np.mean([i['auprc'] for k, i in res.items() if "class" not in k]),
-       #    'grn_omni/epr': np.mean([i['epr'] for k, i in res.items() if "class" not in k]),
-       #    'grn_omni/tf_enr': np.sum([i.get('TF_enr', False) for k, i in res.items() if "class" not in k]),
-       #    'grn_omni/tf_targ_enr': np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" not in k]),
-       #    # 'grn_omni/ct': res['classif']['cell_type_ontology_term_id']['accuracy'],
-       #})
+        res = grn_task.default_benchmark(model_copy, FILEDIR+"/../../data/yBCKp6HmXuHa0cZptMo7.h5ad", batch_size=32 if self.d_model <= 512 else 8)
+        f.write(json.dumps({"grn_omni":res}, default=lambda o: str(o), indent=4))
+        metrics.update({
+            'grn_omni/auprc_class': np.mean([i['auprc'] for k, i in res.items() if "class" in k]),
+            'grn_omni/epr_class': np.mean([i['epr'] for k, i in res.items() if "class" in k]),
+            'grn_omni/tf_enr_class': np.sum([i.get('TF_enr', False) for k, i in res.items() if "class" in k]),
+            'grn_omni/tf_targ_enr_class': np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" in k]),
+            'grn_omni/auprc': np.mean([i['auprc'] for k, i in res.items() if "class" not in k]),
+            'grn_omni/epr': np.mean([i['epr'] for k, i in res.items() if "class" not in k]),
+            'grn_omni/tf_enr': np.sum([i.get('TF_enr', False) for k, i in res.items() if "class" not in k]),
+            'grn_omni/tf_targ_enr': np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" not in k]),
+            # 'grn_omni/ct': res['classif']['cell_type_ontology_term_id']['accuracy'],
+        })
         print('done test')
-        #f.close()
+        f.close()
         return metrics
 
     def on_predict_epoch_start(self):
@@ -1273,22 +1266,11 @@ class scPrint(L.LightningModule):
 
     def on_predict_epoch_end(self):
         """@see pl.LightningModule will"""
-        #self.embs = self.all_gather(self.embs).view(-1, self.embs.shape[-1])
-        #self.info = self.all_gather(self.info).view(-1, self.info.shape[-1])
-        #self.pred = self.all_gather(self.pred).view(-1, self.pred.shape[-1])
-        #self.pos = self.all_gather(self.pos).view(-1, self.pos.shape[-1])
-        #self.expr_pred = [i.view(-1, self.expr_pred[0].shape[-1]) for i in self.all_gather(self.expr_pred)]
-        ## if len(self.get_attention_layer) > 0:
-        ##    self.attn = [i.view(-1, *i.shape[2:]) for i in self.all_gather(self.attn)]
-        #if not self.trainer.is_global_zero:
-        #    print("you are not on the main node. cancelling logging step")
-        #    return
         if self.pos.shape[0] < 100:
             return
         if self.pred_log_adata:
             print("adding on disk")
             return self.log_adata(name="predict_part_"+str(self.counter))
-        # concat_on_disk(list, "data/step_0_predict.h5ad", uns_merge="same", index_unique="_")
 
     def get_cell_embs(self, layer_output):
         """
