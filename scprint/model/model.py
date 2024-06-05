@@ -119,6 +119,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         self.ecs_scale = 0.05
         self.do_mvc = False
         self.mvc_scale = 0.05
+        self.class_embd_diss_scale = 0.2
         self.do_adv_cls = False
         self.adv_class_scale = 0.1
         self.do_cls = False
@@ -889,6 +890,15 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
 
         # TASK 2. predict classes
         if len(self.classes) > 0:
+            # Calculate pairwise cosine similarity for the embeddings
+            cos_sim_matrix = F.cosine_similarity(output["cell_embs"].unsqueeze(2), output["cell_embs"].unsqueeze(1), dim=3).abs().mean(0)
+            # Since we want to maximize dissimilarity, we minimize the negative of the average cosine similarity
+            # We subtract from 1 to ensure positive values, and take the mean off-diagonal (i != j)
+            loss_class_emb_diss = cos_sim_matrix.fill_diagonal_(0).mean()
+            # Apply the custom dissimilarity loss to the cell embeddings
+            losses.update({"class_emb_sim": loss_class_emb_diss})
+            total_loss += self.class_embd_diss_scale * loss_class_emb_diss
+            # compute class loss
             loss_cls = 0
             loss_adv_cls = 0
             for j, clsname in enumerate(self.classes):
@@ -1059,9 +1069,10 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             sch.step(self.trainer.callback_metrics["val_loss"])
             # run the test function on specific dataset
             self.log_adata(gtclass=self.info, name="validation_part_"+str(self.counter))
-            metrics = self._test()
-            metrics = {k: float(v) for k,v in metrics.items()}
-            self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
+            if self.trainer.current_epoch+1 % 9 == 0:
+                metrics = self._test()
+                metrics = {k: float(v) for k, v in metrics.items()}
+                self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
 
     def _test(self):
         metrics = {}

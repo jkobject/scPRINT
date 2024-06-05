@@ -15,7 +15,7 @@ trainer:
         run_full_forward: False
         do_cls: True
         class_scale: 1.5
-        warmup_duration: 500
+d        warmup_duration: 500
         fused_adam: True
         mask_ratio: [0.4]
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging

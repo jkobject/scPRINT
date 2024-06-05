@@ -5,7 +5,7 @@ trainer:
       init_args:
         do_denoise: True
         noise:
-          - 0.4
+          - 0.6
         do_cce: False
         do_ecs: False
         do_mvc: False
@@ -42,8 +42,8 @@ model:
   freeze_embeddings: False
 data:
   max_len: 2200
-  weight_scaler: 40
-  train_oversampling_per_epoch: 0.4
+  weight_scaler: 100
+  train_oversampling_per_epoch: 0.5
   batch_size: 16
-  collection_name: all no zhang13M
+  collection_name: all
   num_workers: 12
