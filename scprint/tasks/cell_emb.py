@@ -122,7 +122,6 @@ class Embedder:
             )
             self.model.pred_log_adata = True
             self.model.pred_embedding = self.pred_embedding
-
             self.trainer.predict(self.model, dataloader)
             try:
                 mdir = (

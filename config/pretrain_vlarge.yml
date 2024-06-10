@@ -6,7 +6,7 @@ trainer:
   log_every_n_steps: 300
   precision: 16-mixed
   gradient_clip_val: 500
-  limit_train_batches: 60000
+  limit_train_batches: 36000
   limit_val_batches: 4000
   reload_dataloaders_every_n_epochs: 1
   accumulate_grad_batches: 6
@@ -15,8 +15,8 @@ trainer:
       init_args:
         do_denoise: True
         noise:
-          - 0.3
-        do_cce: False
+          - 0.6
+        do_cce: True
         do_ecs: False
         do_mvc: False
         do_generate: True
@@ -40,7 +40,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.EarlyStopping
       init_args:
         monitor: val_loss
-        patience: 2
+        patience: 8
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: epoch

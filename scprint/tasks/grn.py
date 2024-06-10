@@ -378,19 +378,21 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
     'leukocyte',
     'kidney interstitial fibroblast',
     #'endothelial cell',
-], maxlayers=6, maxgenes=5000, batch_size=32,
+], maxlayers=12, maxgenes=5000, batch_size=32,
 
 ):
     metrics = {}
+    layers = list(range(model.nlayers))[ max(0, model.nlayers-maxlayers):]
     if default_dataset == 'sroy':
         preprocessor = Preprocessor(is_symbol=True, force_preprocess=True, skip_validate=True,
                                     do_postp=False, min_valid_genes_id=5000, min_dataset_size=64)
         clf_omni = None
-        for (da, spe, gt) in [("liu", "human", "full"), ("liu", "human", "chip"),
-                              ("liu", "human", "ko"), ("chen", "human", "full"),
+        for (da, spe, gt) in [("liu", "human", "full"), ("chen", "human", "full"),
+                              #("liu", "human", "chip"), ("lui", "human", "ko"),
                               ("duren", "mouse", "full"), ("semrau", "mouse", "full"),
                               #("semrau", "mouse", "chip"), ("semrau", "mouse", "ko")
                               ]:
+            print(da+"_"+gt)
             preadata = get_sroy_gt(get=da, species=spe, gt=gt)
             adata = preprocessor(preadata.copy())
             grn_inferer = GRNfer(model, adata,
@@ -402,11 +404,14 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  organisms=adata.obs['organism_ontology_term_id'][0],
                                  num_genes=maxgenes,
                                  max_cells=256,
+                                 num_workers=1,
                                  doplot=False,
                                  batch_size=batch_size,
                                  devices=1,
                                  )
-            grn = grn_inferer(layer=list(range(model.nlayers))[:])
+            print("running inference")
+            grn = grn_inferer(layer=layers)
+            print("training classifier")
             if clf_omni is not None:
                 grn.varp["classified"] = clf_omni.predict_proba(
                     grn.varp['GRN'].reshape(-1, grn.varp['GRN'].shape[-1])
@@ -420,10 +425,12 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             grn.var['symbol'] = make_index_unique(
                 grn.var['symbol'].astype(str))
             grn.var.index = grn.var['symbol']
+            print("calling bengrn")
             metrics['class_omni_'+da+"_"+gt] = BenGRN(
                 grn, do_auc=True, doplot=False).compare_to(other=preadata)
             ############################
             grn.varp['GRN'] = grn.varp['all']
+            del grn.varp['all']
             grn.var.index = grn.var['ensembl_id']
             ratio = (preadata.varp['GRN'].shape[0] * preadata.varp['GRN'].shape[1]) / preadata.varp['GRN'].sum()
             ratio = ratio if ratio <100 else 100
@@ -434,6 +441,8 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             metrics['class_self_'+da+"_"+gt] = BenGRN(
                 grn, do_auc=True, doplot=False).compare_to(other=preadata)
             metrics['class_self_'+da+"_"+gt].update({'classifier': m})
+            del grn
+            gc.collect()
             ############################
             grn_inferer = GRNfer(model, adata,
                                  how="most var within",
@@ -445,16 +454,19 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  num_genes=maxgenes,
                                  max_cells=256,
                                  doplot=False,
+                                 num_workers=1,
                                  batch_size=batch_size,
                                  devices=1,
                                  )
-            grn = grn_inferer(layer=list(range(model.nlayers))[:])
+            grn = grn_inferer(layer=layers)
             grn.var['ensembl_id'] = grn.var.index
             grn.var['symbol'] = make_index_unique(
                 grn.var['symbol'].astype(str))
             grn.var.index = grn.var['symbol']
             metrics['full_'+da+"_" +
                     gt] = BenGRN(grn, do_auc=True, doplot=False).compare_to(other=preadata)
+            del grn
+            gc.collect()
     elif default_dataset == 'gwps':
         if not os.path.exists(FILEDIR+"/../../data/perturb_gt.h5ad"):
             adata = get_perturb_gt()
@@ -477,13 +489,15 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              num_genes=maxgenes,
                              max_cells=1024,
                              doplot=False,
+                             num_workers=1,
                              batch_size=batch_size,
                              devices=1,
                              )
-        grn = grn_inferer(layer=list(range(model.nlayers))[
-                          max(0, model.nlayers-maxlayers):])
+        grn = grn_inferer(layer=layers)
         metrics['max_all'] = BenGRN(
             grn, do_auc=True, doplot=False).compare_to(other=adata)
+        del grn
+        gc.collect()
         grn_inferer = GRNfer(model, nadata,
                              how="most var within",
                              preprocess="softmax",
@@ -494,10 +508,11 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              num_genes=maxgenes,
                              max_cells=1024,
                              doplot=False,
+                             num_workers=1,
                              batch_size=batch_size,
                              devices=1,
                              )
-        grn = grn_inferer(layer=list(range(model.nlayers))[:])
+        grn = grn_inferer(layer=layers)
         grn.var['ensembl_id'] = grn.var.index
         grn.varp['all'] = grn.varp['GRN']
         grn, m, clf = train_classifier(grn, other=adata, C=0.4, train_size=0.5, class_weight={
@@ -530,14 +545,11 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  num_genes=3000,
                                  max_cells=1024,
                                  doplot=False,
+                                 num_workers=1,
                                  batch_size=batch_size,
                                  devices=1,
                                  )
-            if celltype != cell_types[0]:
-                del grn
-                gc.collect()
-            grn = grn_inferer(layer=list(range(model.nlayers))[
-                              :], cell_type=celltype)
+            grn = grn_inferer(layer=layers, cell_type=celltype)
             grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
             m = BenGRN(grn, doplot=False).scprint_benchmark()
             metrics[celltype + '_scprint'] = m
@@ -551,16 +563,19 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  num_genes=maxgenes,
                                  max_cells=1024,
                                  doplot=False,
+                                 num_workers=1,
                                  batch_size=batch_size,
                                  devices=1,
                                  )
             del grn
             gc.collect()
-            grn = grn_inferer(layer=list(range(model.nlayers))[:], cell_type=celltype)
+            grn = grn_inferer(layer=layers, cell_type=celltype)
             grn, m, _ = train_classifier(grn, C=0.1, train_size=0.5, class_weight={
                                       1: 100, 0: 1}, shuffle=False, doplot=False)
             grn.varp['GRN'] = grn.varp['classified']
             grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
             metrics[celltype + '_scprint_class'] = BenGRN(grn, doplot=False).scprint_benchmark()
             metrics[celltype + '_scprint_class'].update({'classifier': m})
+            del grn
+            gc.collect()
     return metrics

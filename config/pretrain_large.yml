@@ -1,12 +1,11 @@
 trainer:
-  strategy: ddp_find_unused_parameters_true
   callbacks:
     - class_path: scprint.trainer.TrainingMode
       init_args:
         do_denoise: True
         noise:
           - 0.6
-        do_cce: False
+        do_cce: True
         do_ecs: False
         do_mvc: False
         do_generate: True
@@ -45,5 +44,5 @@ data:
   weight_scaler: 100
   train_oversampling_per_epoch: 0.5
   batch_size: 16
-  collection_name: all
+  collection_name: all no zhang13M
   num_workers: 12

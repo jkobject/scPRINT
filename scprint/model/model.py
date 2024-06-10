@@ -218,7 +218,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             assert n_input_bins > 0
             self.expr_encoder = encoders.CategoryValueEncoder(n_input_bins, d_model)
         else:
-            self.expr_encoder = nn.Identity()
+            self.expr_encoder = torch.nn.Identity()
 
         # Positional Encoding
         if self.gene_pos_enc is not None:
@@ -297,7 +297,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             zinb=zinb
         )
         # cls decoder
-        self.cls_decoders = nn.ModuleDict()
+        self.cls_decoders = torch.nn.ModuleDict()
         # should be a very simple classifier for most things
         # (maybe scale with the number of classes) should be 1 layer...
         for clss, n_cls in classes.items():
@@ -330,14 +330,14 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             )
         )
         for i, dec in self.cls_decoders.items():
-            nn.init.constant_(dec.out_layer.bias, -0.13)
+            torch.nn.init.constant_(dec.out_layer.bias, -0.13)
         self.save_hyperparameters()
 
     def on_load_checkpoint(self, checkpoints):
         for name, clss in self.cls_decoders.items():
             size = checkpoints['state_dict']['cls_decoders.'+name+'.out_layer.bias'].shape[0]
             if size > clss.out_layer.bias.shape[0]:
-                self.cls_decoders[name].out_layer = nn.Linear(clss.out_layer.weight.shape[1], size)
+                self.cls_decoders[name].out_layer = torch.nn.Linear(clss.out_layer.weight.shape[1], size)
         size = checkpoints['state_dict']['grad_reverse_discriminator_loss.out_layer.bias'].shape[0]
         # we won't use it but still need to take care of it. for now will still add it to the model
         if size > self.grad_reverse_discriminator_loss.out_layer.bias.shape[0]:
@@ -356,7 +356,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
 
         mencoders = {}
         try:
-            if self.trainer.datamodule.decoders != checkpoints['hyper_parameters']['label_decoders']:
+            if self.trainer.datamodule.decoders != self.label_decoders:
                 # if we don't have the same decoders, we need to update the one on the datamodule side
                 for k, v in checkpoints['hyper_parameters']['label_decoders'].items():
                     mencoders[k] = {va: ke for ke, va in v.items()}
@@ -369,6 +369,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         except RuntimeError as e:
             if "scPrint is not attached to a `Trainer`." in str(e):
                 print("RuntimeError caught: scPrint is not attached to a `Trainer`.")
+        self.save_hyperparameters()
 
     def _encoder(
         self,
@@ -891,7 +892,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         # TASK 2. predict classes
         if len(self.classes) > 0:
             # Calculate pairwise cosine similarity for the embeddings
-            cos_sim_matrix = F.cosine_similarity(output["cell_embs"].unsqueeze(2), output["cell_embs"].unsqueeze(1), dim=3).abs().mean(0)
+            cos_sim_matrix = torch.nn.functional.cosine_similarity(output["cell_embs"].unsqueeze(2), output["cell_embs"].unsqueeze(1), dim=3).abs().mean(0)
             # Since we want to maximize dissimilarity, we minimize the negative of the average cosine similarity
             # We subtract from 1 to ensure positive values, and take the mean off-diagonal (i != j)
             loss_class_emb_diss = cos_sim_matrix.fill_diagonal_(0).mean()
@@ -1069,65 +1070,90 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             sch.step(self.trainer.callback_metrics["val_loss"])
             # run the test function on specific dataset
             self.log_adata(gtclass=self.info, name="validation_part_"+str(self.counter))
-            if self.trainer.current_epoch+1 % 9 == 0:
+            if self.trainer.current_epoch+1 % 5 == 0:
                 metrics = self._test()
-                metrics = {k: float(v) for k, v in metrics.items()}
                 self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
+
+    def test_step(self, *args, **kwargs):
+        pass
+
+    def on_test_epoch_end(self):
+        metrics = self._test()
+        self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
 
     def _test(self):
         metrics = {}
-        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'w')
         model_copy = copy.deepcopy(self) 
         res = embbed_task.default_benchmark(model_copy, default_dataset="lung", do_class=True, coarse=False)
+        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
         f.write(json.dumps({"embed_lung":res}, indent=4))
+        f.close()
         metrics.update({
-            'emb_lung/scib': res['scib']['Total'],
-            'emb_lung/ct_class': res['classif']['cell_type_ontology_term_id']['accuracy'],
+            'emb_lung/scib': float(res['scib']['Total']),
+            'emb_lung/ct_class': float(res['classif']['cell_type_ontology_term_id']['accuracy']),
         })
+        print(metrics)
         res = embbed_task.default_benchmark(model_copy, default_dataset="pancreas", do_class=True, coarse=False)
+        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
         f.write(json.dumps({"embed_panc":res}, indent=4))
+        f.close()
         metrics.update({
-            'emb_panc/scib': res['scib']['Total'],
-            'emb_panc/ct_class': res['classif']['cell_type_ontology_term_id']['accuracy'],
+            'emb_panc/scib': float(res['scib']['Total']),
+            'emb_panc/ct_class': float(res['classif']['cell_type_ontology_term_id']['accuracy']),
         })
+        print(metrics)
         gc.collect()
         res = denoise_task.default_benchmark(model_copy, FILEDIR+"/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad")
         metrics.update({
-            'denoise/reco2full_vs_noisy2full': res['reco2full'] - res['noisy2full'],
+            'denoise/reco2full_vs_noisy2full': float(res['reco2full'] - res['noisy2full']),
         })
         gc.collect()
+        print(metrics)
+        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
+        f.write(json.dumps({"denoise":res}, indent=4))
+        f.close()
         res = grn_task.default_benchmark(model_copy, "sroy", batch_size=32 if self.d_model <= 512 else 8)
+        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
         f.write(json.dumps({"grn_sroy":res}, default=lambda o: str(o), indent=4))
+        f.close()
         metrics.update({
-            'grn_sroy/auprc_self': np.mean([i['auprc'] for k, i in res.items() if "class_self" in k]),
-            'grn_sroy/epr_self': np.mean([i['epr'] for k, i in res.items() if "class_self" in k]),
-            'grn_sroy/auprc_omni': np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k]),
-            'grn_sroy/epr_omni': np.mean([i['epr'] for k, i in res.items() if "class_omni" in k]),
+            'grn_sroy/auprc_self': float(np.mean([i['auprc'] for k, i in res.items() if "class_self" in k])),
+            'grn_sroy/epr_self': float(np.mean([i['epr'] for k, i in res.items() if "class_self" in k])),
+            'grn_sroy/auprc_omni': float(np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k])),
+            'grn_sroy/epr_omni': float(np.mean([i['epr'] for k, i in res.items() if "class_omni" in k])),
         })
+        print(metrics)
         gc.collect()
         res = grn_task.default_benchmark(model_copy, "gwps", batch_size=32 if self.d_model <= 512 else 8)
+        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
         f.write(json.dumps({"grn_gwps":res}, default=lambda o: str(o), indent=4))
+        f.close()
         metrics.update({
-            'grn_gwps/auprc_self': np.mean([i['auprc'] for k, i in res.items() if "class_self" in k]),
-            'grn_gwps/epr_self': np.mean([i['epr'] for k, i in res.items() if "class_self" in k]),
-            'grn_gwps/auprc_omni': np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k]),
-            'grn_gwps/epr_omni': np.mean([i['epr'] for k, i in res.items() if "class_omni" in k]),
+            'grn_gwps/auprc_self': float(np.mean([i['auprc'] for k, i in res.items() if "class_self" in k])),
+            'grn_gwps/epr_self': float(np.mean([i['epr'] for k, i in res.items() if "class_self" in k])),
+            'grn_gwps/auprc_omni': float(np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k])),
+            'grn_gwps/epr_omni': float(np.mean([i['epr'] for k, i in res.items() if "class_omni" in k])),
         })
+        print(metrics)
         gc.collect()
         res = grn_task.default_benchmark(model_copy, FILEDIR+"/../../data/yBCKp6HmXuHa0cZptMo7.h5ad", batch_size=32 if self.d_model <= 512 else 8)
+        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
         f.write(json.dumps({"grn_omni":res}, default=lambda o: str(o), indent=4))
+        f.close()
         metrics.update({
-            'grn_omni/auprc_class': np.mean([i['auprc'] for k, i in res.items() if "class" in k]),
-            'grn_omni/epr_class': np.mean([i['epr'] for k, i in res.items() if "class" in k]),
-            'grn_omni/tf_enr_class': np.sum([i.get('TF_enr', False) for k, i in res.items() if "class" in k]),
-            'grn_omni/tf_targ_enr_class': np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" in k]),
-            'grn_omni/auprc': np.mean([i['auprc'] for k, i in res.items() if "class" not in k]),
-            'grn_omni/epr': np.mean([i['epr'] for k, i in res.items() if "class" not in k]),
-            'grn_omni/tf_enr': np.sum([i.get('TF_enr', False) for k, i in res.items() if "class" not in k]),
-            'grn_omni/tf_targ_enr': np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" not in k]),
+            'grn_omni/auprc_class': float(np.mean([i['auprc'] for k, i in res.items() if "class" in k])),
+            'grn_omni/epr_class': float(np.mean([i['epr'] for k, i in res.items() if "class" in k])),
+            'grn_omni/tf_enr_class': float(np.sum([i.get('TF_enr', False) for k, i in res.items() if "class" in k])),
+            'grn_omni/tf_targ_enr_class': float(np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" in k])),
+            'grn_omni/auprc': float(np.mean([i['auprc'] for k, i in res.items() if "class" not in k])),
+            'grn_omni/epr': float(np.mean([i['epr'] for k, i in res.items() if "class" not in k])),
+            'grn_omni/tf_enr': float(np.sum([i.get('TF_enr', False) for k, i in res.items() if "class" not in k])),
+            'grn_omni/tf_targ_enr': float(np.mean([i['significant_enriched_TFtargets'] for k, i in res.items() if "class" not in k])),
             # 'grn_omni/ct': res['classif']['cell_type_ontology_term_id']['accuracy'],
         })
+        print(metrics)
         print('done test')
+        f
         f.close()
         return metrics
 
