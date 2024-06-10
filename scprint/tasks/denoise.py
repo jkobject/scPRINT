@@ -102,6 +102,7 @@ class Denoiser:
         col = Collator(
             organisms=self.organisms,
             valid_genes=self.model.genes,
+            max_len=self.max_len,
             how="some" if self.how == "most var" else self.how,
             genelist=genelist if self.how == "most var" else [],
             downsample=self.downsample,

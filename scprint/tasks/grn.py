@@ -138,7 +138,7 @@ class GRNfer:
         if self.how == "most var within":
             sc.pp.highly_variable_genes(
                 subadata, flavor="seurat_v3", n_top_genes=self.num_genes)
-            self.curr_genes = subadata.var.index[subadata.var.highly_variable]
+            self.curr_genes = subadata.var.index[subadata.var.highly_variable].tolist()+self.genes
             print(
                 "number of expressed genes in this cell type: "
                 + str((subadata.X.sum(0) > 1).sum())
@@ -149,7 +149,7 @@ class GRNfer:
             )
             self.curr_genes = self.adata.uns["rank_genes_groups"]["names"][cell_type][
                 : self.num_genes
-            ].tolist()
+            ].tolist() + self.genes
             self.curr_genes.sort()
         elif self.how == "random expr":
             self.curr_genes = self.model.genes
@@ -385,9 +385,9 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
         preprocessor = Preprocessor(is_symbol=True, force_preprocess=True, skip_validate=True,
                                     do_postp=False, min_valid_genes_id=5000, min_dataset_size=64)
         clf_omni = None
-        for (da, spe, gt) in [("liu", "human", "full"), ("liu", "human", "chip"),
+        for (da, spe, gt) in [("han", "human", "full"),# ("liu", "human", "chip"),
                               #("liu", "human", "ko"), ("chen", "human", "full"),
-                              ("duren", "mouse", "full"), ("semrau", "mouse", "full"),
+                              ("tran", "mouse", "full"), ("zhao", "mouse", "full"),
                               #("semrau", "mouse", "chip"), ("semrau", "mouse", "ko")
                               ]:
             preadata = get_sroy_gt(get=da, species=spe, gt=gt)
@@ -401,7 +401,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  forward_mode="none",
                                  organisms=adata.obs['organism_ontology_term_id'][0],
                                  num_genes=maxgenes,
-                                 max_cells=256,
+                                 max_cells=2048,
                                  doplot=False,
                                  batch_size=32,
                                  )
@@ -411,7 +411,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                     grn.varp['GRN'].reshape(-1, grn.varp['GRN'].shape[-1])
                 ).reshape(len(grn.var), len(grn.var), 2)[:, :, 1]
             else:
-                grn, m, clf_omni = train_classifier(grn, C=0.3, train_size=0.9, class_weight={
+                grn, m, clf_omni = train_classifier(grn, C=1, train_size=0.9, class_weight={
                     1: 200, 0: 1}, shuffle=True)
             grn.varp['all'] = grn.varp['GRN']
             grn.varp['GRN'] = grn.varp['classified']
@@ -427,7 +427,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             ratio = (preadata.varp['GRN'].shape[0] * preadata.varp['GRN'].shape[1]) / preadata.varp['GRN'].sum()
             ratio = ratio if ratio >0.01 else 100
             weight = {1: 1/ratio, 0: 1}
-            grn, m, _ = train_classifier(grn, other=preadata, C=0.4, train_size=0.5, class_weight=weight, shuffle=False)
+            grn, m, _ = train_classifier(grn, other=preadata, C=0.5, train_size=0.5, class_weight=weight, shuffle=False)
             grn.varp['GRN'] = grn.varp['classified']
             grn.var.index = grn.var['symbol']
             metrics['class_omni_'+da+"_"+gt] = BenGRN(
@@ -441,7 +441,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  forward_mode="none",
                                  organisms=adata.obs['organism_ontology_term_id'][0],
                                  num_genes=maxgenes,
-                                 max_cells=256,
+                                 max_cells=1024,
                                  doplot=False,
                                  batch_size=32,
                                  )
@@ -468,7 +468,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              forward_mode="none",
                              organisms=adata.obs['organism_ontology_term_id'][0],
                              num_genes=maxgenes,
-                             max_cells=2048,
+                             max_cells=1024,
                              doplot=False,
                              batch_size=32,
                              )
@@ -484,7 +484,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              forward_mode="none",
                              organisms=adata.obs['organism_ontology_term_id'][0],
                              num_genes=maxgenes,
-                             max_cells=2048,
+                             max_cells=1024,
                              doplot=False,
                              batch_size=32,
                              )
