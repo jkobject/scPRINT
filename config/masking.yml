@@ -1,0 +1,35 @@
+trainer:
+  callbacks:
+    - class_path: scprint.trainer.TrainingMode
+      init_args:
+        do_denoise: False
+        noise:
+          - 0.5
+        do_cce: False
+        do_ecs: False
+        do_mvc: False
+        do_generate: True
+        do_adv_cls: False
+        do_next_tp: False
+        do_adv_batch: False
+        run_full_forward: False
+        do_cls: True
+        class_scale: 1.5
+d        warmup_duration: 500
+        fused_adam: True
+        mask_ratio: [0.4]
+    - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
+      init_args:
+        swa_lrs: 0.03
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        monitor: val_loss
+        save_top_k: 6
+        save_last: True
+    - class_path: lightning.pytorch.callbacks.EarlyStopping
+      init_args:
+        monitor: val_loss
+        patience: 3
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: epoch

@@ -46,6 +46,7 @@ class Denoiser:
         doplot: bool = True,
         predict_depth_mult: int = 4,
         downsample: Optional[float] = None,
+        devices: List[int] = [0],
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -75,7 +76,7 @@ class Denoiser:
         self.doplot = doplot
         self.how=how
         self.downsample = downsample
-        self.trainer = Trainer(precision=precision)
+        self.trainer = Trainer(precision=precision, devices=devices)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, adata: AnnData):
@@ -197,8 +198,9 @@ def default_benchmark(model, default_dataset=FILE_DIR+"/../../data/r4iCehg3Tw5Ib
         doplot=False,
         predict_depth_mult=10,
         downsample=0.7,
+        devices=1,
     )
-    return denoise(adata)
+    return denoise(adata)[0]
 
 
 def open_benchmark(model):

@@ -58,6 +58,8 @@ wandb = "*"
 wandb-core = "*"
 pykeops = "*"
 louvain = "*"
+hdbscan = "*"
+scib-metrics = "*"
 zarr = "*"
 galore = { git = "https://github.com/jiaweizzhao/GaLore", branch = "main" }
 

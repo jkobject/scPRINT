@@ -6,7 +6,7 @@ from grnndata import utils as grnutils
 from anndata.utils import make_index_unique
 import scanpy as sc
 import torch
-
+import gc 
 from scdataloader.data import SimpleAnnDataset
 from scdataloader import Collator
 from grnndata import utils
@@ -20,7 +20,7 @@ from anndata import AnnData
 from scprint.utils.sinkhorn import SinkhornDistance
 from scprint.utils import load_genes
 
-from grnndata import GRNAnnData, from_anndata
+from grnndata import GRNAnnData, from_anndata, read_h5ad
 
 import umap
 import hdbscan
@@ -34,9 +34,6 @@ import scipy.sparse
 import os.path
 
 import pandas as pd
-
-from omnipath.interactions import AllInteractions
-from omnipath.requests import Annotations
 
 FILEDIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -68,6 +65,7 @@ class GRNfer:
         forward_mode="none",
         genes: list = [],
         loc="./",
+        devices: List[int] = [0],
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -112,7 +110,7 @@ class GRNfer:
         self.head_agg = head_agg
         self.max_cells = max_cells
         self.curr_genes = None
-        self.trainer = Trainer(precision=precision)
+        self.trainer = Trainer(precision=precision, devices=devices)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, layer, cell_type=None, locname=""):
@@ -317,7 +315,7 @@ class GRNfer:
         print(f"avg link count: {res}, sparsity: {res / adj.shape[0] ** 2}")
         return adj
 
-    def save(self, grn, subadata, loc="./"):
+    def save(self, grn, subadata, loc=""):
         grn = GRNAnnData(
             subadata[:, subadata.var.index.isin(self.curr_genes)].copy(),
             grn=grn,
@@ -331,13 +329,18 @@ class GRNfer:
             "preprocess": self.preprocess,
             "head_agg": self.head_agg,
         }
-        grn.write_h5ad(loc + "grn_fromscprint.h5ad")
-        return from_anndata(grn)
+        if loc != "":
+            grn.write_h5ad(loc + "grn_fromscprint.h5ad")
+            return from_anndata(grn)
+        else:
+            return grn
 
 
 def get_GTdb(db="omnipath"):
     if db == "omnipath":
         if not os.path.exists(FILEDIR + "/../../data/main/omnipath.parquet"):
+            from omnipath.interactions import AllInteractions
+            from omnipath.requests import Annotations
             interactions = AllInteractions()
             net = interactions.get(exclude=["small_molecule", "lncrna_mrna"])
             hgnc = Annotations.get(resources="HGNC")
@@ -351,7 +354,7 @@ def get_GTdb(db="omnipath"):
             }
             net = net.replace({"source": rn, "target": rn})
             varnames = list(set(net.iloc[:, :2].values.flatten()))
-            da = np.zeros((len(varnames), len(varnames)), dtype=np.float)
+            da = np.zeros((len(varnames), len(varnames)), dtype=float)
             for i, j in net.iloc[:, :2].values:
                 da[varnames.index(i), varnames.index(j)] = 1
             net = pd.DataFrame(data=da, index=varnames, columns=varnames)
@@ -370,14 +373,14 @@ def get_GTdb(db="omnipath"):
 
 def default_benchmark(model, default_dataset="sroy", cell_types=[
     'kidney collecting duct principal cell',
-    'mesangial cell',
+    #'mesangial cell',
     'blood vessel smooth muscle cell',
     'podocyte',
     'macrophage',
-    #'leukocyte',
-    #'kidney interstitial fibroblast',
+    'leukocyte',
+    'kidney interstitial fibroblast',
     #'endothelial cell',
-], maxlayers=6, maxgenes=5000
+], maxlayers=6, maxgenes=5000, batch_size=32,
 
 ):
     metrics = {}
@@ -388,11 +391,14 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
         for (da, spe, gt) in [("han", "human", "full"),# ("liu", "human", "chip"),
                               #("liu", "human", "ko"), ("chen", "human", "full"),
                               ("tran", "mouse", "full"), ("zhao", "mouse", "full"),
+        ]:
+        #for (da, spe, gt) in [("liu", "human", "full"), ("liu", "human", "chip"),
+        #                      ("liu", "human", "ko"), ("chen", "human", "full"),
+        #                      ("duren", "mouse", "full"), ("semrau", "mouse", "full"),
                               #("semrau", "mouse", "chip"), ("semrau", "mouse", "ko")
-                              ]:
+        #                      ]:
             preadata = get_sroy_gt(get=da, species=spe, gt=gt)
             adata = preprocessor(preadata.copy())
-            print(adata.obs['organism_ontology_term_id'][0])
             grn_inferer = GRNfer(model, adata,
                                  how="most var within",
                                  preprocess="softmax",
@@ -403,7 +409,8 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  num_genes=maxgenes,
                                  max_cells=2048,
                                  doplot=False,
-                                 batch_size=32,
+                                 batch_size=batch_size,
+                                 devices=1,
                                  )
             grn = grn_inferer(layer=list(range(model.nlayers))[:])
             if clf_omni is not None:
@@ -425,13 +432,14 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             grn.varp['GRN'] = grn.varp['all']
             grn.var.index = grn.var['ensembl_id']
             ratio = (preadata.varp['GRN'].shape[0] * preadata.varp['GRN'].shape[1]) / preadata.varp['GRN'].sum()
-            ratio = ratio if ratio >0.01 else 100
-            weight = {1: 1/ratio, 0: 1}
-            grn, m, _ = train_classifier(grn, other=preadata, C=0.5, train_size=0.5, class_weight=weight, shuffle=False)
+            ratio = ratio if ratio <100 else 100
+            weight = {1: ratio, 0: 1}
+            grn, m, _ = train_classifier(grn, other=preadata, C=0.4, train_size=0.5, class_weight=weight, shuffle=False)
             grn.varp['GRN'] = grn.varp['classified']
             grn.var.index = grn.var['symbol']
-            metrics['class_omni_'+da+"_"+gt] = BenGRN(
+            metrics['class_self_'+da+"_"+gt] = BenGRN(
                 grn, do_auc=True, doplot=False).compare_to(other=preadata)
+            metrics['class_self_'+da+"_"+gt].update({'classifier': m})
             ############################
             grn_inferer = GRNfer(model, adata,
                                  how="most var within",
@@ -443,7 +451,8 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  num_genes=maxgenes,
                                  max_cells=1024,
                                  doplot=False,
-                                 batch_size=32,
+                                 batch_size=batch_size,
+                                 devices=1,
                                  )
             grn = grn_inferer(layer=list(range(model.nlayers))[:])
             grn.var['ensembl_id'] = grn.var.index
@@ -453,7 +462,11 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             metrics['full_'+da+"_" +
                     gt] = BenGRN(grn, do_auc=True, doplot=False).compare_to(other=preadata)
     elif default_dataset == 'gwps':
-        adata = get_perturb_gt()
+        if not os.path.exists(FILEDIR+"/../../data/perturb_gt.h5ad"):
+            adata = get_perturb_gt()
+            adata.write_h5ad(FILEDIR+"/../../data/perturb_gt.h5ad")
+        else:
+            adata = read_h5ad(FILEDIR+"/../../data/perturb_gt.h5ad")
         preprocessor = Preprocessor(force_preprocess=True, skip_validate=True,
                                     do_postp=False, min_valid_genes_id=5000, min_dataset_size=64)
         nadata = preprocessor(adata.copy())
@@ -470,7 +483,8 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              num_genes=maxgenes,
                              max_cells=1024,
                              doplot=False,
-                             batch_size=32,
+                             batch_size=batch_size,
+                             devices=1,
                              )
         grn = grn_inferer(layer=list(range(model.nlayers))[
                           max(0, model.nlayers-maxlayers):])
@@ -486,28 +500,32 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              num_genes=maxgenes,
                              max_cells=1024,
                              doplot=False,
-                             batch_size=32,
+                             batch_size=batch_size,
+                             devices=1,
                              )
         grn = grn_inferer(layer=list(range(model.nlayers))[:])
         grn.var['ensembl_id'] = grn.var.index
         grn.varp['all'] = grn.varp['GRN']
         grn, m, clf = train_classifier(grn, other=adata, C=0.4, train_size=0.5, class_weight={
-                                       1: 80, 0: 1}, shuffle=False, use_col="ensembl_id")
+                                       1: 40, 0: 1}, doplot=False, shuffle=False, use_col="ensembl_id")
         grn.varp['GRN'] = grn.varp['classified']
         metrics['class_self'] = BenGRN(
             grn, do_auc=True, doplot=False).compare_to(other=adata)
+        metrics['class_self'].update({'classifier': m})
         grn.varp['GRN'] = grn.varp['all']
         grn, m, clf_omni = train_classifier(grn, C=0.1, train_size=0.9, class_weight={
-                                            1: 200, 0: 1}, shuffle=True, use_col="gene_name")
+                                            1: 100, 0: 1}, doplot=False, shuffle=True, use_col="gene_name")
         grn.varp['GRN'] = grn.varp['classified']
         metrics['class_omni'] = BenGRN(
             grn, do_auc=True, doplot=False).compare_to(other=adata)
+        metrics['class_omni'].update({'classifier': m})
     else:
         adata = sc.read_h5ad(default_dataset)
         adata.var["isTF"] = False
         adata.var.loc[adata.var.symbol.isin(grnutils.TF), "isTF"] = True
         metrics = {}
         for celltype in cell_types:
+            print(celltype)
             grn_inferer = GRNfer(model, adata[adata.X.sum(1) > 500],
                                  how="random expr",
                                  preprocess="softmax",
@@ -518,8 +536,12 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  num_genes=3000,
                                  max_cells=1024,
                                  doplot=False,
-                                 batch_size=32,
+                                 batch_size=batch_size,
+                                 devices=1,
                                  )
+            if celltype != cell_types[0]:
+                del grn
+                gc.collect()
             grn = grn_inferer(layer=list(range(model.nlayers))[
                               :], cell_type=celltype)
             grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
@@ -535,13 +557,16 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  num_genes=maxgenes,
                                  max_cells=1024,
                                  doplot=False,
-                                 batch_size=32,
+                                 batch_size=batch_size,
+                                 devices=1,
                                  )
+            del grn
+            gc.collect()
             grn = grn_inferer(layer=list(range(model.nlayers))[:], cell_type=celltype)
-            grn, m = train_classifier(grn, C=0.1, train_size=0.5, class_weight={
+            grn, m, _ = train_classifier(grn, C=0.1, train_size=0.5, class_weight={
                                       1: 100, 0: 1}, shuffle=False, doplot=False)
             grn.varp['GRN'] = grn.varp['classified']
             grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
-            m = BenGRN(grn, doplot=False).scprint_benchmark()
-            metrics[celltype + '_scprint_class'] = m
+            metrics[celltype + '_scprint_class'] = BenGRN(grn, doplot=False).scprint_benchmark()
+            metrics[celltype + '_scprint_class'].update({'classifier': m})
     return metrics
