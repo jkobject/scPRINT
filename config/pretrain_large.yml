@@ -1,48 +1,9 @@
 trainer:
-  callbacks:
-    - class_path: scprint.trainer.TrainingMode
-      init_args:
-        do_denoise: True
-        noise:
-          - 0.6
-        do_cce: True
-        do_ecs: False
-        do_mvc: False
-        do_generate: True
-        do_adv_cls: False
-        do_next_tp: False
-        do_adv_batch: False
-        run_full_forward: False
-        do_cls: True
-        class_scale: 1
-        warmup_duration: 500
-        fused_adam: True
-        mask_ratio: []
-    - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
-      init_args:
-        swa_lrs: 0.03
-    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
-      init_args:
-        monitor: val_loss
-        save_top_k: 6
-        save_last: True
-    - class_path: lightning.pytorch.callbacks.EarlyStopping
-      init_args:
-        monitor: val_loss
-        patience: 3
-    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
-      init_args:
-        logging_interval: epoch
+  strategy: ddp_find_unused_parameters_true
 model:
   nhead: 8
   nlayers: 16 #used to be 12
   layers_cls: [512]
   d_model: 512
-  freeze_embeddings: False
 data:
-  max_len: 2200
-  weight_scaler: 100
-  train_oversampling_per_epoch: 0.5
   batch_size: 16
-  collection_name: all no zhang13M
-  num_workers: 12

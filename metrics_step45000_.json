@@ -1,0 +1,33 @@
+{
+    "embed_lung": {
+        "scib": {
+            "Isolated labels": 0.5714662075042725,
+            "KMeans NMI": 0.4872611038537848,
+            "KMeans ARI": 0.2812375953996755,
+            "Silhouette label": 0.47575180046260357,
+            "cLISI": 0.9723199680447578,
+            "Silhouette batch": 0.9201125502586365,
+            "iLISI": 0.07394795417785645,
+            "KBET": 0.279891175576251,
+            "Graph connectivity": 0.6894909984094054,
+            "PCR comparison": 0,
+            "Batch correction": 0.39268853568442985,
+            "Bio conservation": 0.5576073350530188,
+            "Total": 0.4916398153055832
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.3352144119562184,
+                "macro": 0.3265461492040278,
+                "micro": 0.3352144119562184,
+                "weighted": 0.2619373872877339
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}

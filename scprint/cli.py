@@ -1,5 +1,9 @@
 from lightning.pytorch.cli import LightningCLI
-
+from lightning.pytorch.callbacks import EarlyStopping
+from lightning.pytorch.callbacks import LearningRateMonitor
+from lightning.pytorch.callbacks import TrainingMode
+from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks import StochasticWeightAveraging
 import torch
 
 
@@ -8,8 +12,14 @@ class MyCLI(LightningCLI):
     MyCLI is a subclass of LightningCLI to add some missing params
     and create bindings between params of the model and the data.
     """
-
+def add_arguments_to_parser(self, parser):
+        
     def add_arguments_to_parser(self, parser):
+        parser.add_lightning_class_args(EarlyStopping, "scprint_early_stopping")
+        parser.set_defaults({"scprint_early_stopping.monitor": "val_loss", "scprint_early_stopping.patience": 3})
+        parser.add_lightning_class_args(LearningRateMonitor, "scprint_learning_rate_monitor")
+        parser.set_defaults({"scprint_learning_rate_monitor.logging_interval": "epoch"})
+        parser.add_lightning_class_args(TrainingMode, "scprint_training")
         parser.link_arguments(
             "data.gene_pos", "model.gene_pos_enc", apply_on="instantiate"
         )

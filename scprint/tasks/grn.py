@@ -110,7 +110,7 @@ class GRNfer:
         self.head_agg = head_agg
         self.max_cells = max_cells
         self.curr_genes = None
-        self.trainer = Trainer(precision=precision, devices=devices)
+        self.trainer = Trainer(precision=precision, devices=devices, use_distributed_sampler=False)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, layer, cell_type=None, locname=""):
@@ -372,13 +372,13 @@ def get_GTdb(db="omnipath"):
 def default_benchmark(model, default_dataset="sroy", cell_types=[
     'kidney collecting duct principal cell',
     #'mesangial cell',
-    'blood vessel smooth muscle cell',
+    'blood vessel smooth muscle cell', #
     'podocyte',
     'macrophage',
     'leukocyte',
     'kidney interstitial fibroblast',
     #'endothelial cell',
-], maxlayers=12, maxgenes=5000, batch_size=32,
+], maxlayers=14, maxgenes=5000, batch_size=32,
 
 ):
     metrics = {}
@@ -515,15 +515,15 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
         grn = grn_inferer(layer=layers)
         grn.var['ensembl_id'] = grn.var.index
         grn.varp['all'] = grn.varp['GRN']
-        grn, m, clf = train_classifier(grn, other=adata, C=0.4, train_size=0.5, class_weight={
-                                       1: 40, 0: 1}, doplot=False, shuffle=False, use_col="ensembl_id")
+        grn, m, clf = train_classifier(grn, other=adata, C=0.5, train_size=0.5, class_weight={
+                                       1: 10, 0: 1}, doplot=False, shuffle=False, use_col="ensembl_id")
         grn.varp['GRN'] = grn.varp['classified']
         metrics['class_self'] = BenGRN(
             grn, do_auc=True, doplot=False).compare_to(other=adata)
         metrics['class_self'].update({'classifier': m})
         grn.varp['GRN'] = grn.varp['all']
-        grn, m, clf_omni = train_classifier(grn, C=0.1, train_size=0.9, class_weight={
-                                            1: 100, 0: 1}, doplot=False, shuffle=True, use_col="gene_name")
+        grn, m, clf_omni = train_classifier(grn, C=0.4, train_size=0.9, class_weight={
+                                            1: 200, 0: 1}, doplot=False, shuffle=True, use_col="gene_name")
         grn.varp['GRN'] = grn.varp['classified']
         metrics['class_omni'] = BenGRN(
             grn, do_auc=True, doplot=False).compare_to(other=adata)

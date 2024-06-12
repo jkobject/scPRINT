@@ -3,19 +3,18 @@ trainer:
     - class_path: scprint.trainer.TrainingMode
       init_args:
         do_denoise: False
-        noise:
-          - 0.5
+        noise: []
         do_cce: False
-        do_ecs: False
-        do_mvc: False
-        do_generate: True
+        do_ecs: True
+        do_mvc: True
+        do_generate: False
         do_adv_cls: False
         do_next_tp: False
         do_adv_batch: False
         run_full_forward: False
         do_cls: True
         class_scale: 1.5
-d        warmup_duration: 500
+        warmup_duration: 500
         fused_adam: True
         mask_ratio: [0.4]
     - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
@@ -33,3 +32,10 @@ d        warmup_duration: 500
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: epoch
+model:
+  nhead: 4
+  nlayers: 8
+  layers_cls: [256]
+  d_model: 256
+data:
+  collection_name: all no zhang13M #preprocessed dataset

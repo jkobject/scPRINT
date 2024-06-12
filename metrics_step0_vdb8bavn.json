@@ -1,0 +1,242 @@
+{
+    "embed_lung": {
+        "scib": {
+            "Isolated labels": 0.5895886421203613,
+            "KMeans NMI": 0.5147225860814498,
+            "KMeans ARI": 0.2894571305471032,
+            "Silhouette label": 0.466048464179039,
+            "cLISI": 0.9905411452054977,
+            "Silhouette batch": 0.900705099105835,
+            "iLISI": 0.04116122722625733,
+            "KBET": 0.28275790104051474,
+            "Graph connectivity": 0.702931235271246,
+            "PCR comparison": 0,
+            "Batch correction": 0.38551109252877064,
+            "Bio conservation": 0.5700715936266902,
+            "Total": 0.4962473931875224
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.5065579361880251,
+                "macro": 0.4443340021605763,
+                "micro": 0.5065579361880251,
+                "weighted": 0.4076094758686522
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "embed_panc": {
+        "scib": {
+            "Isolated labels": 0.605016827583313,
+            "KMeans NMI": 0.2655536915901478,
+            "KMeans ARI": 0.14194208131871072,
+            "Silhouette label": 0.49616941809654236,
+            "cLISI": 0.9822209156476535,
+            "Silhouette batch": 0.865530788898468,
+            "iLISI": 0.029448658227920532,
+            "KBET": 0.15755702324662185,
+            "Graph connectivity": 0.6179546036947462,
+            "PCR comparison": 0,
+            "Batch correction": 0.3340982148135513,
+            "Bio conservation": 0.4981805868472734,
+            "Total": 0.43254763803378454
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.33433036259308996,
+                "macro": 0.39446549855198476,
+                "micro": 0.33433036259308996,
+                "weighted": 0.2203884925916011
+            },
+            "assay_ontology_term_id": {
+                "accuracy": 0.19814430472469785,
+                "macro": 0.2623328215678089,
+                "micro": 0.19814430472469785,
+                "weighted": 0.14086712591683684
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "denoise": {
+        "reco2noisy": 0.8994886861815742,
+        "reco2full": 0.40650018648616787,
+        "noisy2full": 0.346770278788789
+    }
+}{
+    "grn_sroy": {
+        "class_omni_liu_full": {
+            "precision": 0.03094632492010696,
+            "recall": 1.0,
+            "rand_precision": 0.030952717468117723,
+            "auprc": 0.037673587562567196,
+            "epr": 1.742867489711934
+        },
+        "class_self_liu_full": {
+            "precision": 0.03094632492010696,
+            "recall": 1.0,
+            "rand_precision": 0.030952717468117723,
+            "auprc": 0.047213504108569906,
+            "epr": 2.023689707220566,
+            "classifier": {
+                "used_heads": "7",
+                "precision": 0.020347761746207917,
+                "random_precision": 0.020348268440618274,
+                "recall": 0.9989316239316239,
+                "predicted_true": 45951.0,
+                "number_of_true": 936.0,
+                "epr": 1.671375110649858
+            }
+        },
+        "full_liu_full": {
+            "precision": 0.03094632492010696,
+            "recall": 1.0,
+            "rand_precision": 0.030952717468117723,
+            "auprc": 0.03158624661618255,
+            "epr": 1.0957419270954114
+        },
+        "class_omni_chen_full": {
+            "precision": 0.017410924132744195,
+            "recall": 1.0,
+            "rand_precision": 0.01741452589611464,
+            "auprc": 0.02001373017360401,
+            "epr": 1.7829772669778423
+        },
+        "class_self_chen_full": {
+            "precision": 0.017410924132744195,
+            "recall": 1.0,
+            "rand_precision": 0.01741452589611464,
+            "auprc": 0.04422739484448424,
+            "epr": 1.0562544703315215,
+            "classifier": {
+                "used_heads": "4",
+                "precision": 0.002144388849177984,
+                "random_precision": 0.00214342120106795,
+                "recall": 1.0,
+                "predicted_true": 26581.0,
+                "number_of_true": 57.0,
+                "epr": 0.0
+            }
+        },
+        "full_chen_full": {
+            "precision": 0.017410924132744195,
+            "recall": 1.0,
+            "rand_precision": 0.01741452589611464,
+            "auprc": 0.017258605297575173,
+            "epr": 1.12087368278057
+        },
+        "class_omni_duren_full": {
+            "precision": 0.006052047609441194,
+            "recall": 1.0,
+            "rand_precision": 0.006053268765133172,
+            "auprc": 0.0068525441213925205,
+            "epr": 1.8544375710137608
+        },
+        "class_self_duren_full": {
+            "precision": 0.006052047609441194,
+            "recall": 1.0,
+            "rand_precision": 0.006053268765133172,
+            "auprc": 0.005855660457560831,
+            "epr": 1.8544375710137608,
+            "classifier": {
+                "used_heads": "1",
+                "precision": 0.0,
+                "random_precision": 0.004101943379732365,
+                "recall": 0.0,
+                "predicted_true": 10.0,
+                "number_of_true": 61.0,
+                "epr": 0.0
+            }
+        },
+        "full_duren_full": {
+            "precision": 0.006052047609441194,
+            "recall": 1.0,
+            "rand_precision": 0.006053268765133172,
+            "auprc": 0.005647550033567202,
+            "epr": 1.8544375710137608
+        },
+        "class_omni_semrau_full": {
+            "precision": 0.011162801851274549,
+            "recall": 1.0,
+            "rand_precision": 0.01116507765185585,
+            "auprc": 0.009362883960570948,
+            "epr": 0.7656130968660534
+        },
+        "class_self_semrau_full": {
+            "precision": 0.011162801851274549,
+            "recall": 1.0,
+            "rand_precision": 0.01116507765185585,
+            "auprc": 0.019206323534236673,
+            "epr": 2.588778120325997,
+            "classifier": {
+                "used_heads": "4",
+                "precision": 0.003573827113115226,
+                "random_precision": 0.0035730558020191363,
+                "recall": 1.0,
+                "predicted_true": 41692.0,
+                "number_of_true": 149.0,
+                "epr": 1.8902483564645727
+            }
+        },
+        "full_semrau_full": {
+            "precision": 0.011162801851274549,
+            "recall": 1.0,
+            "rand_precision": 0.01116507765185585,
+            "auprc": 0.012128351608566536,
+            "epr": 1.1584953603114518
+        }
+    }
+}{
+    "grn_gwps": {
+        "max_all": {
+            "precision": 0.02072508763433421,
+            "recall": 1.0,
+            "rand_precision": 0.02072944989230818,
+            "auprc": 0.02683119549364165,
+            "epr": 2.3947729523485752
+        },
+        "class_self": {
+            "precision": 0.02072508763433421,
+            "recall": 1.0,
+            "rand_precision": 0.02072944989230818,
+            "auprc": 0.04973447673421651,
+            "epr": 4.741648892993338,
+            "classifier": {
+                "used_heads": "26",
+                "precision": 0.1154115252512403,
+                "random_precision": 0.02150860776716941,
+                "recall": 0.024318981403920255,
+                "predicted_true": "31444",
+                "number_of_true": "149225",
+                "epr": 4.88386076596798
+            }
+        },
+        "class_omni": {
+            "precision": 0.02072508763433421,
+            "recall": 1.0,
+            "rand_precision": 0.02072944989230818,
+            "auprc": 0.028734903620043988,
+            "epr": 2.3391531028553807,
+            "classifier": {
+                "used_heads": "24",
+                "precision": 0.003682272488164124,
+                "random_precision": 0.001610562441384053,
+                "recall": 0.004072134962187318,
+                "predicted_true": 1901.0,
+                "number_of_true": 1719.0,
+                "epr": 2.1753848953556965
+            }
+        }
+    }
+}

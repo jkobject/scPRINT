@@ -987,10 +987,10 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         # making sure that we don't do this during lrfinder
         for i, pg in enumerate(optimizer.param_groups):
             if (
-                self.trainer.global_step < self.warmup_duration + self.lrfinder_steps
-            ) and self.lrfinder_steps < self.trainer.global_step:
+                self.global_step < self.warmup_duration + self.lrfinder_steps
+            ) and self.lrfinder_steps < self.global_step:
                 lr_scale = min(
-                    1.0, float(self.trainer.global_step + 1) / self.warmup_duration
+                    1.0, float(self.global_step + 1) / self.warmup_duration
                 )
                 pg["lr"] = lr_scale * self.hparams.lr
         for i, pg in enumerate(optimizer.param_groups):
@@ -1070,22 +1070,22 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             sch.step(self.trainer.callback_metrics["val_loss"])
             # run the test function on specific dataset
             self.log_adata(gtclass=self.info, name="validation_part_"+str(self.counter))
-            if self.trainer.current_epoch+1 % 5 == 0:
+            if (self.current_epoch + 1)% 3 == 0:
                 metrics = self._test()
-                self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
+                self.log_dict(metrics, sync_dist=True, rank_zero_only=True)                
 
     def test_step(self, *args, **kwargs):
         pass
 
     def on_test_epoch_end(self):
-        metrics = self._test()
+        metrics = self._test(name="")
         self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
 
-    def _test(self):
+    def _test(self, name=""):
         metrics = {}
         model_copy = copy.deepcopy(self) 
         res = embbed_task.default_benchmark(model_copy, default_dataset="lung", do_class=True, coarse=False)
-        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
+        f = open("metrics_step"+str(self.global_step)+"_"+name+".json", 'a')
         f.write(json.dumps({"embed_lung":res}, indent=4))
         f.close()
         metrics.update({
@@ -1094,7 +1094,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         })
         print(metrics)
         res = embbed_task.default_benchmark(model_copy, default_dataset="pancreas", do_class=True, coarse=False)
-        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
+        f = open("metrics_step"+str(self.global_step)+".json", 'a')
         f.write(json.dumps({"embed_panc":res}, indent=4))
         f.close()
         metrics.update({
@@ -1109,11 +1109,11 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         })
         gc.collect()
         print(metrics)
-        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
+        f = open("metrics_step"+str(self.global_step)+".json", 'a')
         f.write(json.dumps({"denoise":res}, indent=4))
         f.close()
         res = grn_task.default_benchmark(model_copy, "sroy", batch_size=32 if self.d_model <= 512 else 8)
-        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
+        f = open("metrics_step"+str(self.global_step)+".json", 'a')
         f.write(json.dumps({"grn_sroy":res}, default=lambda o: str(o), indent=4))
         f.close()
         metrics.update({
@@ -1125,7 +1125,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         print(metrics)
         gc.collect()
         res = grn_task.default_benchmark(model_copy, "gwps", batch_size=32 if self.d_model <= 512 else 8)
-        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
+        f = open("metrics_step"+str(self.global_step)+".json", 'a')
         f.write(json.dumps({"grn_gwps":res}, default=lambda o: str(o), indent=4))
         f.close()
         metrics.update({
@@ -1137,7 +1137,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         print(metrics)
         gc.collect()
         res = grn_task.default_benchmark(model_copy, FILEDIR+"/../../data/yBCKp6HmXuHa0cZptMo7.h5ad", batch_size=32 if self.d_model <= 512 else 8)
-        f = open("metrics_step"+str(self.trainer.global_step)+".json", 'a')
+        f = open("metrics_step"+str(self.global_step)+".json", 'a')
         f.write(json.dumps({"grn_omni":res}, default=lambda o: str(o), indent=4))
         f.close()
         metrics.update({
@@ -1389,7 +1389,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.classes,
             self.pred,
             self.attn.get(),
-            self.trainer.global_step,
+            self.global_step,
             self.label_decoders,
             self.labels_hierarchy,
             gtclass,

@@ -5,21 +5,21 @@ from typing import List
 class TrainingMode(Callback):
     def __init__(
         self,
-        do_denoise: bool = False,
-        noise: List[float] = [0.3],
-        do_cce: bool = True,
+        do_denoise: bool = True,
+        noise: List[float] = [0.6],
+        do_cce: bool = False,
         cce_sim: float = 0.5,  # .6
         cce_scale: float = 0.002,  # .01
         do_ecs: bool = True,
         ecs_threshold: float = 0.3,
         ecs_scale: float = 0.05,  # .1
         do_mvc: bool = False,
-        mvc_scale: float = 0.05,
+        mvc_scale: float = 1,
         do_adv_cls: bool = False,
         do_next_tp: bool = False,
-        do_generate: bool = False,
-        class_scale: float = 0.4,
-        mask_ratio: List[float] = [0.3],
+        do_generate: bool = True,
+        class_scale: float = 1.5,
+        mask_ratio: List[float] = [], #0.3
         warmup_duration: int = 500,
         fused_adam: bool = True,
         adv_class_scale: float = 0.1,
