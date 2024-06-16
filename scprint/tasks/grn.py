@@ -110,7 +110,8 @@ class GRNfer:
         self.head_agg = head_agg
         self.max_cells = max_cells
         self.curr_genes = None
-        self.trainer = Trainer(precision=precision, devices=devices, use_distributed_sampler=False)
+        self.precision = precision
+        ##elf.trainer = Trainer(precision=precision, devices=devices, use_distributed_sampler=False)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, layer, cell_type=None, locname=""):
@@ -124,9 +125,6 @@ class GRNfer:
 
     def predict(self, layer, cell_type=None):
         self.curr_genes = None
-        self.model.pred_log_adata = False
-        self.model.get_attention_layer = layer if type(layer) is list else [
-            layer]
         if cell_type is not None:
             subadata = self.adata[
                 self.adata.obs[self.cell_type_col] == cell_type
@@ -174,9 +172,15 @@ class GRNfer:
             num_workers=self.num_workers,
             shuffle=False,
         )
-        self.model.predict_mode = self.forward_mode
         self.model.doplot = self.doplot
-        self.trainer.predict(self.model, dataloader)
+        self.model.on_predict_epoch_start()
+        self.model.eval()
+        print("Model is running on: ", self.model.device)
+        with torch.autocast(device_type="cuda", dtype=torch.float16):
+            for batch in dataloader:
+                gene_pos, expression, depth = (batch["genes"], batch["x"], batch["depth"])
+                gene_pos, expression, depth = gene_pos.to("cuda"), expression.to("cuda"), depth.to("cuda")
+                self.model._predict(gene_pos, expression, depth, self.forward_mode, layer if type(layer) is list else [layer])
         return subadata
 
     def aggregate(self, attn):
@@ -459,6 +463,8 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  devices=1,
                                  )
             grn = grn_inferer(layer=layers)
+            del grn_inferer
+            gc.collect()
             grn.var['ensembl_id'] = grn.var.index
             grn.var['symbol'] = make_index_unique(
                 grn.var['symbol'].astype(str))
@@ -515,6 +521,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
         grn = grn_inferer(layer=layers)
         grn.var['ensembl_id'] = grn.var.index
         grn.varp['all'] = grn.varp['GRN']
+
         grn, m, clf = train_classifier(grn, other=adata, C=0.5, train_size=0.5, class_weight={
                                        1: 10, 0: 1}, doplot=False, shuffle=False, use_col="ensembl_id")
         grn.varp['GRN'] = grn.varp['classified']

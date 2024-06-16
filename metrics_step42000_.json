@@ -1,0 +1,161 @@
+{
+    "embed_lung": {
+        "scib": {
+            "Isolated labels": 0.548893928527832,
+            "KMeans NMI": 0.3744779214652459,
+            "KMeans ARI": 0.1934614469479409,
+            "Silhouette label": 0.43217431753873825,
+            "cLISI": 0.9538986533880234,
+            "Silhouette batch": 0.8867621421813965,
+            "iLISI": 0.09292001724243164,
+            "KBET": 0.31745798405975106,
+            "Graph connectivity": 0.6834304595790381,
+            "PCR comparison": 0,
+            "Batch correction": 0.3961141206125235,
+            "Bio conservation": 0.5005812535735561,
+            "Total": 0.45879440038914304
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.2294192428141763,
+                "macro": 0.24243592785037155,
+                "micro": 0.2294192428141763,
+                "weighted": 0.17310961745406822
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "embed_lung": {
+        "scib": {
+            "Isolated labels": 0.5813516974449158,
+            "KMeans NMI": 0.43420379564380196,
+            "KMeans ARI": 0.24198979881148985,
+            "Silhouette label": 0.44023388251662254,
+            "cLISI": 0.9651360362768173,
+            "Silhouette batch": 0.9054229259490967,
+            "iLISI": 0.07337729136149089,
+            "KBET": 0.2715204560084442,
+            "Graph connectivity": 0.694471916656749,
+            "PCR comparison": 0,
+            "Batch correction": 0.38895851799515613,
+            "Bio conservation": 0.5325830421387294,
+            "Total": 0.4751332324813001
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.23543456016867695,
+                "macro": 0.22832665281557285,
+                "micro": 0.23543456016867695,
+                "weighted": 0.16927563629209125
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "embed_lung": {
+        "scib": {
+            "Isolated labels": 0.5654129385948181,
+            "KMeans NMI": 0.5297185536954175,
+            "KMeans ARI": 0.30365597623328977,
+            "Silhouette label": 0.4859314700588584,
+            "cLISI": 0.9830622002482414,
+            "Silhouette batch": 0.9272977113723755,
+            "iLISI": 0.0530445655186971,
+            "KBET": 0.24931397513423015,
+            "Graph connectivity": 0.795683748818467,
+            "PCR comparison": 0,
+            "Batch correction": 0.405068000168754,
+            "Bio conservation": 0.573556227766125,
+            "Total": 0.5061609367271767
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.5461846144305603,
+                "macro": 0.4692297528591856,
+                "micro": 0.5461846144305603,
+                "weighted": 0.4589937943530665
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "embed_lung": {
+        "scib": {
+            "Isolated labels": 0.5636024475097656,
+            "KMeans NMI": 0.4892958608715531,
+            "KMeans ARI": 0.2715016581305562,
+            "Silhouette label": 0.46080873161554337,
+            "cLISI": 0.9799850136041641,
+            "Silhouette batch": 0.9065355658531189,
+            "iLISI": 0.05662421385447184,
+            "KBET": 0.25609053129028403,
+            "Graph connectivity": 0.6536749363407032,
+            "PCR comparison": 0,
+            "Batch correction": 0.3745850494677156,
+            "Bio conservation": 0.5530387423463164,
+            "Total": 0.48165726519487606
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.5035192707202878,
+                "macro": 0.44542033572271444,
+                "micro": 0.5035192707202878,
+                "weighted": 0.41533072535705085
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "embed_lung": {
+        "scib": {
+            "Isolated labels": 0.5726816058158875,
+            "KMeans NMI": 0.30872164540691216,
+            "KMeans ARI": 0.12026897195201795,
+            "Silhouette label": 0.4436224400997162,
+            "cLISI": 0.9435387626290321,
+            "Silhouette batch": 0.8865847587585449,
+            "iLISI": 0.0881529172261556,
+            "KBET": 0.30574229939063857,
+            "Graph connectivity": 0.6460307334320303,
+            "PCR comparison": 0,
+            "Batch correction": 0.38530214176147387,
+            "Bio conservation": 0.47776668518071314,
+            "Total": 0.4407808678130174
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.16796378406871104,
+                "macro": 0.1922780356386809,
+                "micro": 0.16796378406871104,
+                "weighted": 0.1151234659015308
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}

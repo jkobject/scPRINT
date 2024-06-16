@@ -394,7 +394,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
 
         if expression is not None:
             enc += self.expr_encoder(
-                expression / expression.sum(1).unsqueeze(1), mask
+                (expression / expression.sum(1).unsqueeze(1)), mask
+                #10_000 * (expression / full_depth.unsqueeze(1)), mask
+                #torch.log2(1 + expression)
             )  # (minibatch, seq_len, embsize)
 
         if self.gene_pos_enc:
@@ -716,6 +718,36 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         total_loss = 0
         losses = {}
         cell_embs = []
+        if run_full_forward:
+            output = self.forward(
+                gene_pos,
+                expression,
+                mask=None,
+                full_depth=total_count,
+                do_mvc=do_mvc,
+                do_class=do_cls,
+            )
+            output.pop('disp') 
+            output.pop('zero_logits')
+            output.pop('mean')
+            l, tot = self._compute_loss(
+                output,
+                expression,
+                clss,
+                batch_idx,
+                do_ecs,
+                do_adv_cls & do_cls,
+                do_adv_batch & do_cls,
+            )
+            cell_embs.append(output["cell_emb"].clone())
+            full_cell_embs = output["cell_embs"].clone()
+            total_loss += tot
+            losses.update(
+                {"full_forward_" + k: v for k, v in l.items()}
+            )
+            do_mvc = False if do_mvc else do_mvc
+            do_cls = False if do_cls else do_cls
+
         for i in mask_ratio:
             mask = simple_masker(
                 shape=gene_pos.shape,
@@ -781,18 +813,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
 
         # TASK 6. expression generation
         if do_generate:
-            if run_full_forward:
-                output = self.forward(
-                    gene_pos,
-                    expression,
-                    mask=None,
-                    full_depth=total_count,
-                    do_mvc=do_mvc,
-                    do_class=False,
-                )
 
             output = self._generate(
-                output["cell_embs"],
+                output["cell_embs"] if not run_full_forward else full_cell_embs,
                 gene_pos,
                 depth_mult=expression.sum(1),
                 full_depth=None,
@@ -881,11 +904,13 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 mu=output["mean"],
                 target=expression,
             )
-        else:
+        elif "mean" in output:
             loss_expr = loss.mse(
                 input=output["mean"],
                 target=expression,
             )
+        else:
+            loss_expr = 0
         total_loss += loss_expr
         losses.update({"expr": loss_expr})
 
@@ -1176,9 +1201,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         Returns:
             Tensor: _description_
         """
-        return self._predict(batch["genes"], batch["x"], batch["depth"], name="predict")
+        return self._predict(batch["genes"], batch["x"], batch["depth"], self.predict_mode, self.get_attention_layer, self.predict_depth_mult, name="predict")
 
-    def _predict(self, gene_pos, expression, depth, keep_output=True, max_size_in_mem=100_000, name=""):
+    def _predict(self, gene_pos, expression, depth, predict_mode="none", get_attention_layer=[], depth_mult=3, keep_output=True, max_size_in_mem=100_000, name=""):
         """
         @see predict_step will save output of predict in multiple self variables
 
@@ -1198,35 +1223,35 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.pred_embedding (list, optional): the classes to predict. Defaults to [].
 
         """
-        if self.predict_mode == "none":
+        if predict_mode == "none":
             output = self.forward(
                 gene_pos,
                 expression,
                 depth_mult=expression.sum(1),
                 full_depth=depth,
-                get_attention_layer=self.get_attention_layer,
+                get_attention_layer=get_attention_layer,
                 do_class=True,
             )
-            if len(self.get_attention_layer) > 0:
+            if len(get_attention_layer) > 0:
                 self.attn.agg([i[:, :, :2, :] for i in output[1]], gene_pos)
                 output = output[0]
             cell_embs = output["cell_embs"]
             
-        elif self.predict_mode == "denoise":
+        elif predict_mode == "denoise":
 
             output = self.forward(
                 gene_pos,
                 expression,
-                depth_mult=expression.sum(1) * self.predict_depth_mult,
-                full_depth=depth * self.predict_depth_mult,
-                get_attention_layer=self.get_attention_layer,
+                depth_mult=expression.sum(1) * depth_mult,
+                full_depth=depth * depth_mult,
+                get_attention_layer=get_attention_layer,
                 do_class=True,
             )
-            if len(self.get_attention_layer) > 0:
+            if len(get_attention_layer) > 0:
                 self.attn.agg([i[:, :, :2, :] for i in output[1]], gene_pos)
                 output = output[0]
             cell_embs = output["cell_embs"]
-        elif self.predict_mode == "generate":
+        elif predict_mode == "generate":
             output = self.forward(
                 gene_pos,
                 expression,

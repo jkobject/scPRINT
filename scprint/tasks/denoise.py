@@ -64,17 +64,16 @@ class Denoiser:
             output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
         """
         self.model = model
-        self.model.predict_mode = "denoise"
-        self.model.predict_depth_mult = predict_depth_mult
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.max_len = max_len
         self.organisms = organisms
         self.plot_corr_size = plot_corr_size
-        self.precision = precision
         self.doplot = doplot
+        self.predict_depth_mult = predict_depth_mult
         self.downsample = downsample
-        self.trainer = Trainer(precision=precision, devices=devices)
+        self.precision = precision
+        #self.trainer = Trainer(precision=precision, devices=devices)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, adata: AnnData):
@@ -115,7 +114,13 @@ class Denoiser:
         self.genes = list(set(self.model.genes) & set(genelist))
 
         self.model.doplot = self.doplot
-        self.trainer.predict(self.model, dataloader)
+        self.model.on_predict_epoch_start()
+        self.model.eval()
+        with torch.autocast(device_type="cuda", dtype=torch.float16):
+            for batch in dataloader:
+                gene_pos, expression, depth = (batch["genes"], batch["x"], batch["depth"])
+                gene_pos, expression, depth = gene_pos.to("cuda"), expression.to("cuda"), depth.to("cuda")
+                self.model._predict(gene_pos, expression, depth, predict_mode="denoise", depth_mult=self.predict_depth_mult)
         if self.downsample is not None:
             reco = self.model.expr_pred[0]
             noisy = np.loadtxt("collator_output.txt")

@@ -27,7 +27,7 @@ class TrainingMode(Callback):
         lr_reduce_factor: float = 0.6,
         lr_reduce_monitor: str = "val_loss",
         do_cls: bool = True,
-        do_adv_batch: bool = True,
+        do_adv_batch: bool = False,
         run_full_forward: bool = False,
         lr: float = 0.001,
         optim: str = "adamW",
