@@ -120,6 +120,14 @@ EPR corresponds to the expected precision recall for a cutoff that leaves as man
 
 
 We focus more on TFs compared to GENIE3
+EPR corresponds to the expected precision recall for a cutoff that leaves as many connections in the ground truth as in the prediction. it is in the form 
+
+$EPR = \frac{2 \cdot precision \cdot recall}{precision + recall}$. 
+
+scPRINT outperforms GENIE3 and scGPT on this benchmark. to compare ourselves to GENIE3-TF we also implement a "GRN" version of our network where we only keep TF-gene connections
+
+We focus more on TFs compared to GENIE3 
+
 We more often find cell type marker enrichment than GENIE3 and much more than scGPT (likely helped by classification task)
 scGPT does really well at TF target enrichment. We confirm that doing masked language modeling in our model also led to great results on this assessment.
 
@@ -190,9 +198,6 @@ labels prediction
 
 one might be interested in some rare cell states. Those have few cells and extracting information can be difficult. they are also often the most interesting. responsible for a breadth of disease and 
 based on the available transcriptomic profile and inferred  
-
-
-
 
 ## Discussion
 

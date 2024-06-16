@@ -50,6 +50,7 @@ class Embedder:
         model_name: str = "scprint",
         plot_corr_size: int = 64,
         doplot: bool = True,
+        keep_all_cls_pred: bool = False,
         devices: List[int] = [0],
     ):
         """
@@ -76,6 +77,7 @@ class Embedder:
         self.add_zero_genes = add_zero_genes
         self.organisms = organisms
         self.pred_embedding = pred_embedding
+        self.keep_all_cls_pred = keep_all_cls_pred
         self.model_name = model_name
         self.plot_corr_size = plot_corr_size
         self.precision = precision
@@ -103,15 +105,21 @@ class Embedder:
             hasfile = False
         if not cache or not hasfile:
             self.model.predict_mode = "none"
+            self.model.keep_all_cls_pred = self.keep_all_cls_pred
             # Add at least the organism you are working with
+            if self.how == "most var":
+                sc.pp.highly_variable_genes(
+                    adata, flavor="seurat_v3", n_top_genes=self.max_len)
+                curr_genes = adata.var.index[adata.var.highly_variable]
             adataset = SimpleAnnDataset(
                 adata, obs_to_output=["organism_ontology_term_id"])
             col = Collator(
                 organisms=self.organisms,
                 valid_genes=self.model.genes,
-                how=self.how,
+                how=self.how if self.how != "most var" else "some",
                 max_len=self.max_len,
                 add_zero_genes=self.add_zero_genes,
+                genelist=[] if self.how != "most var" else curr_genes,
             )
             dataloader = DataLoader(
                 adataset,
@@ -173,8 +181,17 @@ class Embedder:
         adata.obsm[self.model_name] = pred_adata.X
         pred_adata.obs.index = adata.obs.index
         adata.obs = pd.concat([adata.obs, pred_adata.obs], axis=1)
+        if self.keep_all_cls_pred:
+            allclspred = self.model.pred
+            columns = []
+            for cl in self.model.classes:
+                n = self.model.label_counts[cl]
+                columns += [self.model.label_decoders[cl][i] for i in range(n)]
+            allclspred = pd.DataFrame(allclspred, columns=columns, index=adata.obs.index)
+            adata.obs = pd.concat(adata.obs, allclspred)
+
         metrics = {}
-        if self.doclass:
+        if self.doclass and not self.keep_all_cls_pred:
             for cl in self.model.classes:
                 res = []
                 if cl not in adata.obs.columns:

@@ -76,6 +76,8 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         label_decoders: Optional[Dict[str, Dict[int, str]]] = None,
         zinb: bool=True,
         lr: float = 0.0001,
+        optim="adamW", # TODEL
+        weight_decay=0.01, # TODEL
         **flash_attention_kwargs,
     ):
         """
@@ -147,6 +149,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         self.attn = utils.Attention(len(classes) + 2 + len(genes))
         self.predict_depth_mult = 3
         self.predict_mode = "none"
+        self.keep_all_cls_pred = False
         # should be stored somehow
         self.d_model = d_model
         self.edge_dim = edge_dim
@@ -1292,7 +1295,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.embs = torch.mean(cell_embs[:, ind, :], dim=1)
             self.pred = torch.stack(
                 [
-                    torch.argmax(output["cls_output_" + clsname], dim=1)
+                    torch.argmax(output["cls_output_" + clsname], dim=1) if not self.keep_all_cls_pred else output["cls_output_" + clsname]
                     for clsname in self.classes
                 ]
             ).transpose(0, 1) if len(self.classes) > 0 else None
@@ -1305,7 +1308,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                     self.pred,
                     torch.stack(
                         [
-                            torch.argmax(output["cls_output_" + clsname], dim=1)
+                        torch.argmax(output["cls_output_" + clsname], dim=1) if not self.keep_all_cls_pred else output["cls_output_" + clsname]
                             for clsname in self.classes
                         ]
                     ).transpose(0, 1) if len(self.classes) > 0 else None,
@@ -1317,14 +1320,15 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 torch.cat([self.expr_pred[1], output["disp"]]),
                 torch.cat([self.expr_pred[2], output["zero_logits"]]),
             ] if "disp" in output else [torch.cat([self.expr_pred[0], output["mean"]])]
-        if self.embs.shape[0] > max_size_in_mem:
-            print("logging")
-            self.log_adata(name=name+"_part_"+str(self.counter))
-            self.counter+=1
-            self.pos = None
-            self.expr_pred = None
-            self.pred = None
-            self.embs = None
+        if self.embs is not None:
+            if self.embs.shape[0] > max_size_in_mem:
+                print("logging")
+                self.log_adata(name=name+"_part_"+str(self.counter))
+                self.counter+=1
+                self.pos = None
+                self.expr_pred = None
+                self.pred = None
+                self.embs = None
 
     def on_predict_epoch_end(self):
         """@see pl.LightningModule will"""
@@ -1412,7 +1416,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         adata, fig = utils.make_adata(
             self.embs,
             self.classes,
-            self.pred,
+            self.pred if not self.keep_all_cls_pred else None,
             self.attn.get(),
             self.global_step,
             self.label_decoders,
