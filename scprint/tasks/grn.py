@@ -44,7 +44,7 @@ class GRNfer:
         model: torch.nn.Module,
         adata: AnnData,
         batch_size: int = 64,
-        num_workers: int = 8,
+        num_workers: int = 0,
         num_genes: int = 3000,
         precision: str = "16-mixed",
         organisms: List[str] = [
@@ -160,7 +160,7 @@ class GRNfer:
             subadata, obs_to_output=["organism_ontology_term_id"]
         )
         self.col = Collator(
-            organisms=[subadata.obs['organism_ontology_term_id'][0]],
+            organisms=[subadata.obs['organism_ontology_term_id'].iloc[0]],
             valid_genes=self.model.genes,
             how="some" if self.how != "random expr" else "random expr",
             genelist=self.curr_genes if self.how != "random expr" else [],
@@ -175,12 +175,14 @@ class GRNfer:
         self.model.doplot = self.doplot
         self.model.on_predict_epoch_start()
         self.model.eval()
-        print("Model is running on: ", self.model.device)
-        with torch.autocast(device_type="cuda", dtype=torch.float16):
+        device = self.model.device.type
+        #import pdb
+        #pdb.set_trace() 
+        with torch.autocast(device_type=device, dtype=torch.float16):
             for batch in dataloader:
                 gene_pos, expression, depth = (batch["genes"], batch["x"], batch["depth"])
-                gene_pos, expression, depth = gene_pos.to("cuda"), expression.to("cuda"), depth.to("cuda")
-                self.model._predict(gene_pos, expression, depth, self.forward_mode, layer if type(layer) is list else [layer])
+                gene_pos, expression, depth = gene_pos.to(device), expression.to(device), depth.to(device)
+                self.model._predict(gene_pos, expression, depth, predict_mode=self.forward_mode, get_attention_layer=layer if type(layer) is list else [layer])
         return subadata
 
     def aggregate(self, attn):
@@ -384,15 +386,15 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
     'leukocyte',
     'kidney interstitial fibroblast',
     #'endothelial cell',
-], maxlayers=14, maxgenes=5000, batch_size=32,
+], maxlayers=16, maxgenes=5000, batch_size=32,
 
 ):
     metrics = {}
-    layers = list(range(model.nlayers))[ max(0, model.nlayers-maxlayers):]
+    layers = list(range(model.nlayers))[max(0, model.nlayers-maxlayers):]
+    clf_omni = None
     if default_dataset == 'sroy':
         preprocessor = Preprocessor(is_symbol=True, force_preprocess=True, skip_validate=True,
                                     do_postp=False, min_valid_genes_id=5000, min_dataset_size=64)
-        clf_omni = None
         for (da, spe, gt) in [("liu", "human", "full"), ("chen", "human", "full"),
                               #("liu", "human", "chip"), ("lui", "human", "ko"),
                               ("duren", "mouse", "full"), ("semrau", "mouse", "full"),
@@ -411,10 +413,10 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  head_agg='none',
                                  filtration="none",
                                  forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'][0],
+                                 organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                                  num_genes=maxgenes,
-                                 num_workers=1,
-                                 max_cells=2048,
+                                 num_workers=0,
+                                 max_cells=1024,
                                  doplot=False,
                                  batch_size=batch_size,
                                  devices=1,
@@ -427,8 +429,8 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                     grn.varp['GRN'].reshape(-1, grn.varp['GRN'].shape[-1])
                 ).reshape(len(grn.var), len(grn.var), 2)[:, :, 1]
             else:
-                grn, m, clf_omni = train_classifier(grn, C=1, train_size=0.9, class_weight={
-                    1: 200, 0: 1}, shuffle=True)
+                grn, m, clf_omni = train_classifier(grn, C=0.01, train_size=0.9, class_weight={
+                    1: 100, 0: 1}, shuffle=True)
             grn.varp['all'] = grn.varp['GRN']
             grn.varp['GRN'] = grn.varp['classified']
             grn.var['ensembl_id'] = grn.var.index
@@ -445,7 +447,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             ratio = (preadata.varp['GRN'].shape[0] * preadata.varp['GRN'].shape[1]) / preadata.varp['GRN'].sum()
             ratio = ratio if ratio <100 else 100
             weight = {1: ratio, 0: 1}
-            grn, m, _ = train_classifier(grn, other=preadata, C=0.4, train_size=0.5, class_weight=weight, shuffle=False)
+            grn, m, _ = train_classifier(grn, other=preadata, C=0.3, train_size=0.5, class_weight=weight, shuffle=False)
             grn.varp['GRN'] = grn.varp['classified']
             grn.var.index = grn.var['symbol']
             metrics['class_self_'+da+"_"+gt] = BenGRN(
@@ -460,11 +462,11 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  head_agg='max',
                                  filtration="none",
                                  forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'][0],
+                                 organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                                  num_genes=maxgenes,
                                  max_cells=1024,
                                  doplot=False,
-                                 num_workers=1,
+                                 num_workers=0,
                                  batch_size=batch_size,
                                  devices=1,
                                  )
@@ -497,11 +499,11 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              head_agg='max',
                              filtration="none",
                              forward_mode="none",
-                             organisms=adata.obs['organism_ontology_term_id'][0],
+                             organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                              num_genes=maxgenes,
                              max_cells=1024,
                              doplot=False,
-                             num_workers=1,
+                             num_workers=0,
                              batch_size=batch_size,
                              devices=1,
                              )
@@ -516,11 +518,11 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              head_agg='none',
                              filtration="none",
                              forward_mode="none",
-                             organisms=adata.obs['organism_ontology_term_id'][0],
+                             organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                              num_genes=maxgenes,
                              max_cells=1024,
                              doplot=False,
-                             num_workers=1,
+                             num_workers=0,
                              batch_size=batch_size,
                              devices=1,
                              )
@@ -528,14 +530,14 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
         grn.var['ensembl_id'] = grn.var.index
         grn.varp['all'] = grn.varp['GRN']
 
-        grn, m, clf = train_classifier(grn, other=adata, C=0.5, train_size=0.5, class_weight={
-                                       1: 10, 0: 1}, doplot=False, shuffle=False, use_col="ensembl_id")
+        grn, m, clf = train_classifier(grn, other=adata, C=0.3, train_size=0.3, class_weight={
+                                       1: 40, 0: 1}, doplot=False, shuffle=False, use_col="ensembl_id")
         grn.varp['GRN'] = grn.varp['classified']
         metrics['class_self'] = BenGRN(
             grn, do_auc=True, doplot=False).compare_to(other=adata)
         metrics['class_self'].update({'classifier': m})
         grn.varp['GRN'] = grn.varp['all']
-        grn, m, clf_omni = train_classifier(grn, C=0.4, train_size=0.9, class_weight={
+        grn, m, clf_omni = train_classifier(grn, C=0.1, train_size=0.9, class_weight={
                                             1: 200, 0: 1}, doplot=False, shuffle=True, use_col="gene_name")
         grn.varp['GRN'] = grn.varp['classified']
         metrics['class_omni'] = BenGRN(
@@ -554,11 +556,11 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  head_agg='max',
                                  filtration="none",
                                  forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'][0],
-                                 num_genes=3000,
+                                 organisms=adata.obs['organism_ontology_term_id'].iloc[0],
+                                 num_genes=maxgenes,
                                  max_cells=1024,
                                  doplot=False,
-                                 num_workers=1,
+                                 num_workers=0,
                                  batch_size=batch_size,
                                  devices=1,
                                  )
@@ -572,20 +574,25 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  head_agg='none',
                                  filtration="none",
                                  forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'][0],
+                                 organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                                  num_genes=maxgenes,
                                  max_cells=1024,
                                  doplot=False,
-                                 num_workers=1,
+                                 num_workers=0,
                                  batch_size=batch_size,
                                  devices=1,
                                  )
             del grn
             gc.collect()
             grn = grn_inferer(layer=layers, cell_type=celltype)
-            grn, m, _ = train_classifier(grn, C=0.1, train_size=0.5, class_weight={
+            if clf_omni is not None:
+                grn.varp["GRN"] = clf_omni.predict_proba(
+                    grn.varp['GRN'].reshape(-1, grn.varp['GRN'].shape[-1])
+                ).reshape(len(grn.var), len(grn.var), 2)[:, :, 1]
+            else:
+                grn, m, clf_omni = train_classifier(grn, C=0.1, train_size=0.5, class_weight={
                                       1: 100, 0: 1}, shuffle=False, doplot=False)
-            grn.varp['GRN'] = grn.varp['classified']
+                grn.varp['GRN'] = grn.varp['classified']
             grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
             metrics[celltype + '_scprint_class'] = BenGRN(grn, doplot=False).scprint_benchmark()
             metrics[celltype + '_scprint_class'].update({'classifier': m})

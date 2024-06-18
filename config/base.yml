@@ -23,6 +23,16 @@ trainer:
         project: ${project}
         save_dir: /pasteur/zeus/projets/p02/ml4ig_hot/Users/jkalfon/
         offline: True
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
+      init_args:
+        swa_lrs: 0.03
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        monitor: val_loss
+        save_top_k: 20
+        save_last: True
+
     #- class_path: lightning.pytorch.callbacks.LearningRateFinder
     #init_args:
     #  mode: exponential

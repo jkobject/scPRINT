@@ -1672,4 +1672,42 @@
             }
         }
     }
+}{
+    "embed_panc": {
+        "scib": {
+            "Isolated labels": 0.6078484654426575,
+            "KMeans NMI": 0.26928238768002205,
+            "KMeans ARI": 0.1184032671847388,
+            "Silhouette label": 0.5003102803893853,
+            "cLISI": 0.9568228721618652,
+            "Silhouette batch": 0.930271565914154,
+            "iLISI": 0.05399267375469208,
+            "KBET": 0.18978465621679064,
+            "Graph connectivity": 0.6820133297926904,
+            "PCR comparison": 0.045612891544032044,
+            "Batch correction": 0.3803350234444719,
+            "Bio conservation": 0.4905334545717338,
+            "Total": 0.44645408212082904
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.39280918080820415,
+                "macro": 0.43682401989214414,
+                "micro": 0.39280918080820415,
+                "weighted": 0.25709234894523175
+            },
+            "assay_ontology_term_id": {
+                "accuracy": 0.26541325845440117,
+                "macro": 0.31202068619620693,
+                "micro": 0.26541325845440117,
+                "weighted": 0.18505806789996437
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
 }

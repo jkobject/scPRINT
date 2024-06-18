@@ -35,7 +35,7 @@ class Denoiser:
         self,
         model: torch.nn.Module,
         batch_size: int = 10,
-        num_workers: int = 1,
+        num_workers: int = 0,
         max_len: int = 20_000,
         precision: str = "16-mixed",
         how="most var",
@@ -119,10 +119,11 @@ class Denoiser:
         self.model.doplot = self.doplot
         self.model.on_predict_epoch_start()
         self.model.eval()
-        with torch.autocast(device_type="cuda", dtype=torch.float16):
+        device = self.model.device.type
+        with torch.autocast(device_type=device, dtype=torch.float16):
             for batch in dataloader:
                 gene_pos, expression, depth = (batch["genes"], batch["x"], batch["depth"])
-                gene_pos, expression, depth = gene_pos.to("cuda"), expression.to("cuda"), depth.to("cuda")
+                gene_pos, expression, depth = gene_pos.to(device), expression.to(device), depth.to(device)
                 self.model._predict(gene_pos, expression, depth, predict_mode="denoise", depth_mult=self.predict_depth_mult)
         self.genes = self.model.pos if self.how != "most var" else list(set(self.model.genes) & set(genelist))
         if self.downsample is not None:

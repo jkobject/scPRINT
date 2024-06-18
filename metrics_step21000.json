@@ -2331,4 +2331,80 @@
             }
         }
     }
+}{
+    "embed_panc": {
+        "scib": {
+            "Isolated labels": 0.6129021048545837,
+            "KMeans NMI": 0.10510336937927862,
+            "KMeans ARI": 0.027337689203123454,
+            "Silhouette label": 0.44713687151670456,
+            "cLISI": 0.9355705334590032,
+            "Silhouette batch": 0.8149811029434204,
+            "iLISI": 0.04093611240386963,
+            "KBET": 0.09689120894993097,
+            "Graph connectivity": 0.44369779309540125,
+            "PCR comparison": 0,
+            "Batch correction": 0.2793012434785244,
+            "Bio conservation": 0.42561011368253876,
+            "Total": 0.367086565600933
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.033390306433890855,
+                "macro": 0.15619044213838437,
+                "micro": 0.033390306433890855,
+                "weighted": 0.010312610582274529
+            },
+            "assay_ontology_term_id": {
+                "accuracy": 0.20241728726651204,
+                "macro": 0.26221351812432153,
+                "micro": 0.20241728726651204,
+                "weighted": 0.1210263781473341
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "embed_panc": {
+        "scib": {
+            "Isolated labels": 0.5856180787086487,
+            "KMeans NMI": 0.1957888762428884,
+            "KMeans ARI": 0.0756775350296303,
+            "Silhouette label": 0.48198990896344185,
+            "cLISI": 0.9520585170158973,
+            "Silhouette batch": 0.9012774229049683,
+            "iLISI": 0.025069087743759155,
+            "KBET": 0.13174717108467204,
+            "Graph connectivity": 0.5760931114816321,
+            "PCR comparison": 0,
+            "Batch correction": 0.32683735864300634,
+            "Bio conservation": 0.45822658319210136,
+            "Total": 0.40567089337246337
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.11274569649615432,
+                "macro": 0.23614786438594773,
+                "micro": 0.11274569649615432,
+                "weighted": 0.049787177296114184
+            },
+            "assay_ontology_term_id": {
+                "accuracy": 0.27884263215724575,
+                "macro": 0.31677665807360283,
+                "micro": 0.27884263215724575,
+                "weighted": 0.18457147477855848
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
 }

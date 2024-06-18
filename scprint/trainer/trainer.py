@@ -10,7 +10,7 @@ class TrainingMode(Callback):
         do_cce: bool = False,
         cce_sim: float = 0.5,  # .6
         cce_scale: float = 0.002,  # .01
-        do_ecs: bool = True,
+        do_ecs: bool = False,
         ecs_threshold: float = 0.3,
         ecs_scale: float = 0.05,  # .1
         do_mvc: bool = False,

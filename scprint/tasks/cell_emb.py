@@ -31,7 +31,7 @@ class Embedder:
         self,
         model: torch.nn.Module,
         batch_size: int = 64,
-        num_workers: int = 8,
+        num_workers: int = 0,
         how: str = "random expr",
         max_len: int = 2000,
         doclass: bool = True,
@@ -128,9 +128,16 @@ class Embedder:
                 num_workers=self.num_workers,
                 shuffle=False,
             )
-            self.model.pred_log_adata = True
-            self.model.pred_embedding = self.pred_embedding
-            self.trainer.predict(self.model, dataloader)
+            self.model.eval()
+            self.model.on_predict_epoch_start()
+            device = self.model.device.type
+            with torch.autocast(device_type=device, dtype=torch.float16):
+                for batch in dataloader:
+                    gene_pos, expression, depth = (batch["genes"], batch["x"], batch["depth"])
+                    gene_pos, expression, depth = gene_pos.to(device), expression.to(device), depth.to(device)
+                    self.model._predict(gene_pos, expression, depth, predict_mode="none", pred_embedding=self.pred_embedding)
+            
+            self.model.log_adata(name="predict_part_"+str(self.model.counter))
             try:
                 mdir = (
                     self.model.logger.save_dir
