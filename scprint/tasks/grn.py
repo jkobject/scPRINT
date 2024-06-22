@@ -243,7 +243,6 @@ class GRNfer:
                 )
 
             if self.symmetrize:
-                print(attn.shape)
                 attn = (attn + attn.T) / 2
             if self.apc:
                 pass

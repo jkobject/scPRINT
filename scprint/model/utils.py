@@ -469,15 +469,26 @@ class Attention:
     def agg(self, x: list[Tensor], pos: Tensor):
         pos = pos.detach().to("cpu")
         if self.data is None:
+            self.data = torch.zeros([len(x), self.gene_dim] + list(x[0].shape[2:]))
+            self.div = torch.zeros(self.gene_dim)
+        for i in range(x[0].shape[0]):
+
+            loc = torch.cat([torch.Tensor([r for r in range(8)]), pos[i] + 8]).int()
+            for j in range(len(x)):
+                self.data[j, loc, :, :, :] += x[j][i].detach().to("cpu")
+            self.div[loc] += 1
+
+    def add(self, x: list[Tensor], pos: Tensor):
+        pos = pos.detach().to("cpu")
+        if self.data is None:
 
             self.data = torch.zeros([len(x), self.gene_dim] + list(x[0].shape[2:]))
             self.div = torch.zeros(self.gene_dim)
 
         for i in range(x[0].shape[0]):
-            loc = torch.cat([torch.Tensor([r for r in range(8)]), pos[i] + 8]).int()
-            for j in range(len(x)):
-                self.data[j, loc, :, :, :] += x[j][i].detach().to("cpu")
-            self.div[loc] += 1
+            #loc = torch.cat([torch.Tensor([r for r in range(8)]), pos[i] + 8]).int()
+            self.data.append(torch.cat([x[j][i].detach().to("cpu") for j in range(len(x))]))
+            #self.div[loc] += 1
 
     def get(self):
         if self.data is None:
