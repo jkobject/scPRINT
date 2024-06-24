@@ -429,7 +429,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                     grn.varp['GRN'].reshape(-1, grn.varp['GRN'].shape[-1])
                 ).reshape(len(grn.var), len(grn.var), 2)[:, :, 1]
             else:
-                grn, m, clf_omni = train_classifier(grn, C=0.01, train_size=0.9, class_weight={
+                grn, m, clf_omni = train_classifier(grn, C=0.2, train_size=0.9, class_weight={
                     1: 100, 0: 1}, shuffle=True)
             grn.varp['all'] = grn.varp['GRN']
             grn.varp['GRN'] = grn.varp['classified']
@@ -447,7 +447,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             ratio = (preadata.varp['GRN'].shape[0] * preadata.varp['GRN'].shape[1]) / preadata.varp['GRN'].sum()
             ratio = ratio if ratio <100 else 100
             weight = {1: ratio, 0: 1}
-            grn, m, _ = train_classifier(grn, other=preadata, C=0.3, train_size=0.5, class_weight=weight, shuffle=False)
+            grn, m, _ = train_classifier(grn, other=preadata, C=0.5, train_size=0.5, class_weight=weight, shuffle=False)
             grn.varp['GRN'] = grn.varp['classified']
             grn.var.index = grn.var['symbol']
             metrics['class_self_'+da+"_"+gt] = BenGRN(
@@ -457,13 +457,13 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             gc.collect()
             ############################
             grn_inferer = GRNfer(model, adata,
-                                 how="most var within",
+                                 how="random expr",
                                  preprocess="softmax",
                                  head_agg='max',
                                  filtration="none",
                                  forward_mode="none",
                                  organisms=adata.obs['organism_ontology_term_id'].iloc[0],
-                                 num_genes=maxgenes,
+                                 num_genes=3000,
                                  max_cells=1024,
                                  doplot=False,
                                  num_workers=0,
@@ -557,7 +557,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  filtration="none",
                                  forward_mode="none",
                                  organisms=adata.obs['organism_ontology_term_id'].iloc[0],
-                                 num_genes=maxgenes,
+                                 num_genes=3000,
                                  max_cells=1024,
                                  doplot=False,
                                  num_workers=0,
@@ -593,9 +593,9 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                 grn, m, clf_omni = train_classifier(grn, C=0.1, train_size=0.5, class_weight={
                                       1: 100, 0: 1}, shuffle=False, doplot=False)
                 grn.varp['GRN'] = grn.varp['classified']
+                metrics[celltype + '_scprint_class'].update({'classifier': m})
             grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
             metrics[celltype + '_scprint_class'] = BenGRN(grn, doplot=False).scprint_benchmark()
-            metrics[celltype + '_scprint_class'].update({'classifier': m})
             del grn
             gc.collect()
     return metrics
