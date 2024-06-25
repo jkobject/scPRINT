@@ -37,10 +37,6 @@ class Embedder:
         doclass: bool = True,
         add_zero_genes: int = 0,
         precision: str = "16-mixed",
-        organisms: List[str] = [
-            "NCBITaxon:9606",
-            "NCBITaxon:10090",
-        ],
         pred_embedding: List[str] = [
             "cell_type_ontology_term_id",
             "disease_ontology_term_id",
@@ -64,7 +60,6 @@ class Embedder:
             max_len (int, optional): The maximum length of the gene sequence. Defaults to 1000.
             add_zero_genes (int, optional): The number of zero genes to add to the gene sequence. Defaults to 100.
             precision (str, optional): The precision to be used in the Trainer. Defaults to "16-mixed".
-            organisms (List[str], optional): The list of organisms to be considered. Defaults to [ "NCBITaxon:9606", ].
             pred_embedding (List[str], optional): The list of labels to be used for plotting embeddings. Defaults to [ "cell_type_ontology_term_id", "disease_ontology_term_id", "self_reported_ethnicity_ontology_term_id", "sex_ontology_term_id", ].
             model_name (str, optional): The name of the model to be used. Defaults to "scprint".
             output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
@@ -75,7 +70,6 @@ class Embedder:
         self.how = how
         self.max_len = max_len
         self.add_zero_genes = add_zero_genes
-        self.organisms = organisms
         self.pred_embedding = pred_embedding
         self.keep_all_cls_pred = keep_all_cls_pred
         self.model_name = model_name
@@ -114,7 +108,7 @@ class Embedder:
             adataset = SimpleAnnDataset(
                 adata, obs_to_output=["organism_ontology_term_id"])
             col = Collator(
-                organisms=self.organisms,
+                organisms=self.model.organisms,
                 valid_genes=self.model.genes,
                 how=self.how if self.how != "most var" else "some",
                 max_len=self.max_len,
@@ -267,7 +261,7 @@ class Embedder:
             adata[random_indices], obs_to_output=["organism_ontology_term_id"]
         )
         col = Collator(
-            organisms=self.organisms,
+            organisms=self.model.organisms,
             valid_genes=self.model.genes,
             how="some",
             genelist=highly_variable,
@@ -406,7 +400,7 @@ def default_benchmark(model, default_dataset="pancreas", do_class=True, coarse=F
     adata.obs["organism_ontology_term_id"] = "NCBITaxon:9606"
     adata = preprocessor(adata.copy())
     embedder = Embedder(
-        model, pred_embedding=["cell_type_ontology_term_id"], organisms=[adata.obs["organism_ontology_term_id"].values[0]],
+        model, pred_embedding=["cell_type_ontology_term_id"],
         doclass=(default_dataset not in ['pancreas', 'lung']), devices=1,
     )
     embed_adata, metrics = embedder(adata.copy())

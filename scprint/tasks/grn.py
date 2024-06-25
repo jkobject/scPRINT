@@ -47,9 +47,6 @@ class GRNfer:
         num_workers: int = 0,
         num_genes: int = 3000,
         precision: str = "16-mixed",
-        organisms: List[str] = [
-            "NCBITaxon:9606",
-        ],
         cell_type_col="cell_type",
         model_name: str = "scprint",
         how: str = "random expr",  # random expr, most var withing, most var across, given
@@ -78,7 +75,6 @@ class GRNfer:
             max_len (int, optional): The maximum length of the gene sequence. Defaults to 1000.
             add_zero_genes (int, optional): The number of zero genes to add to the gene sequence. Defaults to 100.
             precision (str, optional): The precision to be used in the Trainer. Defaults to "16-mixed".
-            organisms (List[str], optional): The list of organisms to be considered. Defaults to [ "NCBITaxon:9606", ].
             pred_embedding (List[str], optional): The list of labels to be used for plotting embeddings. Defaults to [ "cell_type_ontology_term_id", "disease_ontology_term_id", "self_reported_ethnicity_ontology_term_id", "sex_ontology_term_id", ].
             model_name (str, optional): The name of the model to be used. Defaults to "scprint".
             output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
@@ -94,7 +90,6 @@ class GRNfer:
             "given",
         ], "how must be one of 'most var within', 'most var across', 'random expr', 'given'"
         self.num_genes = num_genes
-        self.organisms = organisms if type(organisms) is list else [organisms]
         self.model_name = model_name
         self.adata = adata
         self.preprocess = preprocess
@@ -160,7 +155,7 @@ class GRNfer:
             subadata, obs_to_output=["organism_ontology_term_id"]
         )
         self.col = Collator(
-            organisms=[subadata.obs['organism_ontology_term_id'].iloc[0]],
+            organisms=self.model.organisms,
             valid_genes=self.model.genes,
             how="some" if self.how != "random expr" else "random expr",
             genelist=self.curr_genes if self.how != "random expr" else [],
@@ -378,15 +373,17 @@ def get_GTdb(db="omnipath"):
 
 
 def default_benchmark(model, default_dataset="sroy", cell_types=[
+    'kidney distal convoluted tubule epithelial cell',
+    'kidney loop of Henle thick ascending limb epithelial cell'
     'kidney collecting duct principal cell',
-    #'mesangial cell',
-    'blood vessel smooth muscle cell', #
+    'mesangial cell',
+    'blood vessel smooth muscle cell',
     'podocyte',
     'macrophage',
     'leukocyte',
     'kidney interstitial fibroblast',
-    #'endothelial cell',
-], maxlayers=16, maxgenes=5000, batch_size=32,
+    'endothelial cell',
+], maxlayers=16, maxgenes=5000, batch_size=32, maxcells=1024,
 
 ):
     metrics = {}
@@ -395,10 +392,10 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
     if default_dataset == 'sroy':
         preprocessor = Preprocessor(is_symbol=True, force_preprocess=True, skip_validate=True,
                                     do_postp=False, min_valid_genes_id=5000, min_dataset_size=64)
-        for (da, spe, gt) in [("liu", "human", "full"), ("chen", "human", "full"),
-                              #("liu", "human", "chip"), ("lui", "human", "ko"),
-                              ("duren", "mouse", "full"), ("semrau", "mouse", "full"),
-                              #("semrau", "mouse", "chip"), ("semrau", "mouse", "ko")
+        for (da, spe, gt) in [("han", "human", "full"), ("mine", "human", "full"),
+                              ("han", "human", "chip"), ("han", "human", "ko"),
+                              ("tran", "mouse", "full"), ("zhao", "mouse", "full"),
+                              ("tran", "mouse", "chip"), ("tran", "mouse", "ko")
                               ]:
             print(da+"_"+gt)
        # for (da, spe, gt) in [("han", "human", "full"),# ("liu", "human", "chip"),
@@ -413,10 +410,9 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  head_agg='none',
                                  filtration="none",
                                  forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                                  num_genes=maxgenes,
                                  num_workers=0,
-                                 max_cells=1024,
+                                 max_cells=maxcells,
                                  doplot=False,
                                  batch_size=batch_size,
                                  devices=1,
@@ -456,15 +452,17 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             del grn
             gc.collect()
             ############################
+            if da == "tran":
+                import pdb
+                pdb.set_trace()
             grn_inferer = GRNfer(model, adata,
                                  how="random expr",
                                  preprocess="softmax",
                                  head_agg='max',
                                  filtration="none",
                                  forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                                  num_genes=3000,
-                                 max_cells=1024,
+                                 max_cells=maxcells,
                                  doplot=False,
                                  num_workers=0,
                                  batch_size=batch_size,
@@ -501,7 +499,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              forward_mode="none",
                              organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                              num_genes=maxgenes,
-                             max_cells=1024,
+                             max_cells=maxcells,
                              doplot=False,
                              num_workers=0,
                              batch_size=batch_size,
@@ -518,9 +516,8 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              head_agg='none',
                              filtration="none",
                              forward_mode="none",
-                             organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                              num_genes=maxgenes,
-                             max_cells=1024,
+                             max_cells=maxcells,
                              doplot=False,
                              num_workers=0,
                              batch_size=batch_size,
@@ -556,9 +553,8 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  head_agg='max',
                                  filtration="none",
                                  forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                                  num_genes=3000,
-                                 max_cells=1024,
+                                 max_cells=maxcells,
                                  doplot=False,
                                  num_workers=0,
                                  batch_size=batch_size,
@@ -574,9 +570,8 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  head_agg='none',
                                  filtration="none",
                                  forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                                  num_genes=maxgenes,
-                                 max_cells=1024,
+                                 max_cells=maxcells,
                                  doplot=False,
                                  num_workers=0,
                                  batch_size=batch_size,

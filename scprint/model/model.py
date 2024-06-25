@@ -52,6 +52,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
     def __init__(
         self,
         genes: list,
+        organisms: list = ["NCBITaxon:9606"],
         precpt_gene_emb: Optional[str] = None,
         gene_pos_enc: Optional[list] = None,
         d_model: int = 512,
@@ -152,6 +153,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         self.keep_all_cls_pred = False
         # should be stored somehow
         self.d_model = d_model
+        self.organisms = organisms
         self.edge_dim = edge_dim
         self.nlayers = nlayers
         self.gene_pos_enc = gene_pos_enc
@@ -1124,7 +1126,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         })
         print(metrics)
         res = embbed_task.default_benchmark(model_copy, default_dataset="pancreas", do_class=True, coarse=False)
-        f = open("metrics_step"+str(self.global_step)+".json", 'a')
+        f = open("metrics_step"+str(self.global_step)+"_"+name+".json", 'a')
         f.write(json.dumps({"embed_panc":res}, indent=4))
         f.close()
         metrics.update({
@@ -1139,11 +1141,12 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         })
         gc.collect()
         print(metrics)
-        f = open("metrics_step"+str(self.global_step)+".json", 'a')
+        f = open("metrics_step"+str(self.global_step)+"_"+name+".json", 'a')
         f.write(json.dumps({"denoise":res}, indent=4))
         f.close()
+        print("sroy")
         res = grn_task.default_benchmark(model_copy, "sroy", batch_size=32 if self.d_model <= 512 else 8)
-        f = open("metrics_step"+str(self.global_step)+".json", 'a')
+        f = open("metrics_step"+str(self.global_step)+"_"+name+".json", 'a')
         f.write(json.dumps({"grn_sroy":res}, default=lambda o: str(o), indent=4))
         f.close()
         metrics.update({
@@ -1157,7 +1160,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         print(metrics)
         gc.collect()
         res = grn_task.default_benchmark(model_copy, "gwps", batch_size=32 if self.d_model <= 512 else 8)
-        f = open("metrics_step"+str(self.global_step)+".json", 'a')
+        f = open("metrics_step"+str(self.global_step)+"_"+name+".json", 'a')
         f.write(json.dumps({"grn_gwps":res}, default=lambda o: str(o), indent=4))
         f.close()
         metrics.update({
@@ -1171,7 +1174,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         print(metrics)
         gc.collect()
         res = grn_task.default_benchmark(model_copy, FILEDIR+"/../../data/yBCKp6HmXuHa0cZptMo7.h5ad", batch_size=32 if self.d_model <= 512 else 8)
-        f = open("metrics_step"+str(self.global_step)+".json", 'a')
+        f = open("metrics_step"+str(self.global_step)+"_"+name+".json", 'a')
         f.write(json.dumps({"grn_omni":res}, default=lambda o: str(o), indent=4))
         f.close()
         metrics.update({
@@ -1245,7 +1248,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             cell_embs = output["cell_embs"]
             
         elif predict_mode == "denoise":
-
             output = self.forward(
                 gene_pos,
                 expression,

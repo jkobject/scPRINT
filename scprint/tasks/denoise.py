@@ -39,9 +39,6 @@ class Denoiser:
         max_len: int = 20_000,
         precision: str = "16-mixed",
         how="most var",
-        organisms: List[str] = [
-            "NCBITaxon:9606",
-        ],
         plot_corr_size: int = 64,
         doplot: bool = True,
         predict_depth_mult: int = 4,
@@ -59,7 +56,6 @@ class Denoiser:
             max_len (int, optional): The maximum length of the gene sequence. Defaults to 1000.
             add_zero_genes (int, optional): The number of zero genes to add to the gene sequence. Defaults to 100.
             precision (str, optional): The precision to be used in the Trainer. Defaults to "16-mixed".
-            organisms (List[str], optional): The list of organisms to be considered. Defaults to [ "NCBITaxon:9606", ].
             pred_embedding (List[str], optional): The list of labels to be used for plotting embeddings. Defaults to [ "cell_type_ontology_term_id", "disease_ontology_term_id", "self_reported_ethnicity_ontology_term_id", "sex_ontology_term_id", ].
             model_name (str, optional): The name of the model to be used. Defaults to "scprint".
             output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
@@ -68,7 +64,6 @@ class Denoiser:
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.max_len = max_len
-        self.organisms = organisms
         self.plot_corr_size = plot_corr_size
         self.doplot = doplot
         self.predict_depth_mult = predict_depth_mult
@@ -100,7 +95,7 @@ class Denoiser:
             genelist = adata.var.index[adata.var.highly_variable]
             print(len(genelist))
         col = Collator(
-            organisms=self.organisms,
+            organisms=self.model.organisms,
             valid_genes=self.model.genes,
             max_len=self.max_len,
             how="some" if self.how == "most var" else self.how,
