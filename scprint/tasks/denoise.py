@@ -195,7 +195,7 @@ def default_benchmark(model, default_dataset=FILE_DIR+"/../../data/r4iCehg3Tw5Ib
         model,
         batch_size=40,
         max_len=4000,
-        plot_corr_size=480,
+        plot_corr_size=1000,
         doplot=False,
         predict_depth_mult=10,
         downsample=0.7,

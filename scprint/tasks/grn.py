@@ -171,8 +171,7 @@ class GRNfer:
         self.model.on_predict_epoch_start()
         self.model.eval()
         device = self.model.device.type
-        #import pdb
-        #pdb.set_trace() 
+
         with torch.autocast(device_type=device, dtype=torch.float16):
             for batch in dataloader:
                 gene_pos, expression, depth = (batch["genes"], batch["x"], batch["depth"])
@@ -452,9 +451,6 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             del grn
             gc.collect()
             ############################
-            if da == "tran":
-                import pdb
-                pdb.set_trace()
             grn_inferer = GRNfer(model, adata,
                                  how="random expr",
                                  preprocess="softmax",
@@ -494,10 +490,9 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
         grn_inferer = GRNfer(model, nadata,
                              how="most var within",
                              preprocess="softmax",
-                             head_agg='max',
+                             head_agg='mean',
                              filtration="none",
                              forward_mode="none",
-                             organisms=adata.obs['organism_ontology_term_id'].iloc[0],
                              num_genes=maxgenes,
                              max_cells=maxcells,
                              doplot=False,
@@ -525,6 +520,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                              )
         grn = grn_inferer(layer=layers)
         grn.var['ensembl_id'] = grn.var.index
+        grn.varp['GRN'] = np.transpose(grn.varp['GRN'], (1,0,2))
         grn.varp['all'] = grn.varp['GRN']
 
         grn, m, clf = train_classifier(grn, other=adata, C=0.3, train_size=0.3, class_weight={
@@ -550,7 +546,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             grn_inferer = GRNfer(model, adata[adata.X.sum(1) > 500],
                                  how="random expr",
                                  preprocess="softmax",
-                                 head_agg='max',
+                                 head_agg='mean',
                                  filtration="none",
                                  forward_mode="none",
                                  num_genes=3000,
@@ -588,7 +584,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                 grn, m, clf_omni = train_classifier(grn, C=0.1, train_size=0.5, class_weight={
                                       1: 100, 0: 1}, shuffle=False, doplot=False)
                 grn.varp['GRN'] = grn.varp['classified']
-                metrics[celltype + '_scprint_class'].update({'classifier': m})
+                metrics['scprint_class'] = m
             grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
             metrics[celltype + '_scprint_class'] = BenGRN(grn, doplot=False).scprint_benchmark()
             del grn
