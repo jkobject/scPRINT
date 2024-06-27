@@ -438,7 +438,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             grn.varp['GRN'] = grn.varp['all']
             del grn.varp['all']
             grn.var.index = grn.var['ensembl_id']
-            ratio = (preadata.varp['GRN'].shape[0] * preadata.varp['GRN'].shape[1]) / preadata.varp['GRN'].sum()
+            ratio = / preadata.varp['GRN'].sum()
             ratio = ratio if ratio <100 else 100
             weight = {1: ratio, 0: 1}
             grn, m, _ = train_classifier(grn, other=preadata, C=0.5, train_size=0.5, class_weight=weight, shuffle=False)
@@ -548,7 +548,7 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                                  head_agg='mean',
                                  filtration="none",
                                  forward_mode="none",
-                                 num_genes=3000,
+                                 num_genes=2200,
                                  max_cells=maxcells,
                                  doplot=False,
                                  num_workers=0,
@@ -580,8 +580,8 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
                     grn.varp['GRN'].reshape(-1, grn.varp['GRN'].shape[-1])
                 ).reshape(len(grn.var), len(grn.var), 2)[:, :, 1]
             else:
-                grn, m, clf_omni = train_classifier(grn, C=0.1, train_size=0.5, class_weight={
-                                      1: 100, 0: 1}, shuffle=False, doplot=False)
+                grn, m, clf_omni = train_classifier(grn, C=0.3, train_size=0.5, class_weight={
+                                      1: 200, 0: 1}, shuffle=False, doplot=False)
                 grn.varp['GRN'] = grn.varp['classified']
                 metrics['scprint_class'] = m
             grn.var.index = make_index_unique(grn.var['symbol'].astype(str))

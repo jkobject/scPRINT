@@ -399,9 +399,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
 
         if expression is not None:
             enc += self.expr_encoder(
-                (expression / expression.sum(1).unsqueeze(1)), mask
+                #(expression / expression.sum(1).unsqueeze(1)), mask
                 #10_000 * (expression / full_depth.unsqueeze(1)), mask
-                #torch.log2(1 + expression)
+                torch.log2(1 + expression)
             )  # (minibatch, seq_len, embsize)
 
         if self.gene_pos_enc:
@@ -922,13 +922,13 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         # TASK 2. predict classes
         if len(self.classes) > 0:
             ## Calculate pairwise cosine similarity for the embeddings
-            #cos_sim_matrix = torch.nn.functional.cosine_similarity(output["cell_embs"].unsqueeze(2), output["cell_embs"].unsqueeze(1), dim=3).abs().mean(0)
+            cos_sim_matrix = torch.nn.functional.cosine_similarity(output["cell_embs"].unsqueeze(2), output["cell_embs"].unsqueeze(1), dim=3).abs().mean(0)
             ## Since we want to maximize dissimilarity, we minimize the negative of the average cosine similarity
             ## We subtract from 1 to ensure positive values, and take the mean off-diagonal (i != j)
-            #loss_class_emb_diss = cos_sim_matrix.fill_diagonal_(0).mean()
+            loss_class_emb_diss = cos_sim_matrix.fill_diagonal_(0).mean()
             ## Apply the custom dissimilarity loss to the cell embeddings
-            #losses.update({"class_emb_sim": loss_class_emb_diss})
-            #total_loss += self.class_embd_diss_scale * loss_class_emb_diss
+            losses.update({"class_emb_sim": loss_class_emb_diss})
+            total_loss += self.class_embd_diss_scale * loss_class_emb_diss
             ## compute class loss
             loss_cls = 0
             loss_adv_cls = 0
@@ -1135,7 +1135,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         })
         print(metrics)
         gc.collect()
-        res = denoise_task.default_benchmark(model_copy, FILEDIR+"/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad")
+        res = denoise_task.default_benchmark(model_copy, FILEDIR+"/../../data/gNNpgpo6gATjuxTE7CCp.h5ad")
         metrics.update({
             'denoise/reco2full_vs_noisy2full': float(res['reco2full'] - res['noisy2full']),
         })
@@ -1144,21 +1144,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         f = open("metrics_step"+str(self.global_step)+"_"+name+".json", 'a')
         f.write(json.dumps({"denoise":res}, indent=4))
         f.close()
-        print("sroy")
-        res = grn_task.default_benchmark(model_copy, "sroy", batch_size=32 if self.d_model <= 512 else 8)
-        f = open("metrics_step"+str(self.global_step)+"_"+name+".json", 'a')
-        f.write(json.dumps({"grn_sroy":res}, default=lambda o: str(o), indent=4))
-        f.close()
-        metrics.update({
-            'grn_sroy/auprc_self': float(np.mean([i['auprc'] for k, i in res.items() if "class_self" in k])),
-            'grn_sroy/epr_self': float(np.mean([i['epr'] for k, i in res.items() if "class_self" in k])),
-            'grn_sroy/auprc_omni': float(np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k])),
-            'grn_sroy/epr_omni': float(np.mean([i['epr'] for k, i in res.items() if "class_omni" in k])),
-            'grn_sroy/epr': float(np.mean([i['epr'] for k, i in res.items() if "full_" in k])),
-            'grn_sroy/auprc': float(np.mean([i['auprc'] for k, i in res.items() if "full_" in k])),
-        })
-        print(metrics)
-        gc.collect()
         res = grn_task.default_benchmark(model_copy, "gwps", batch_size=32 if self.d_model <= 512 else 8)
         f = open("metrics_step"+str(self.global_step)+"_"+name+".json", 'a')
         f.write(json.dumps({"grn_gwps":res}, default=lambda o: str(o), indent=4))
@@ -1173,7 +1158,21 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         })
         print(metrics)
         gc.collect()
-        res = grn_task.default_benchmark(model_copy, FILEDIR+"/../../data/yBCKp6HmXuHa0cZptMo7.h5ad", batch_size=32 if self.d_model <= 512 else 8)
+        res = grn_task.default_benchmark(model_copy, "sroy", batch_size=32 if self.d_model <= 512 else 8)
+        f = open("metrics_step"+str(self.global_step)+"_"+name+".json", 'a')
+        f.write(json.dumps({"grn_sroy":res}, default=lambda o: str(o), indent=4))
+        f.close()
+        metrics.update({
+            'grn_sroy/auprc_self': float(np.mean([i['auprc'] for k, i in res.items() if "class_self" in k])),
+            'grn_sroy/epr_self': float(np.mean([i['epr'] for k, i in res.items() if "class_self" in k])),
+            'grn_sroy/auprc_omni': float(np.mean([i['auprc'] for k, i in res.items() if "class_omni" in k])),
+            'grn_sroy/epr_omni': float(np.mean([i['epr'] for k, i in res.items() if "class_omni" in k])),
+            'grn_sroy/epr': float(np.mean([i['epr'] for k, i in res.items() if "full_" in k])),
+            'grn_sroy/auprc': float(np.mean([i['auprc'] for k, i in res.items() if "full_" in k])),
+        })
+        print(metrics)
+        gc.collect()
+        res = grn_task.default_benchmark(model_copy, FILEDIR+"/../../data/gNNpgpo6gATjuxTE7CCp.h5ad", batch_size=32 if self.d_model <= 512 else 8)
         f = open("metrics_step"+str(self.global_step)+"_"+name+".json", 'a')
         f.write(json.dumps({"grn_omni":res}, default=lambda o: str(o), indent=4))
         f.close()

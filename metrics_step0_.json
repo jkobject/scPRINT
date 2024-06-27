@@ -778,4 +778,587 @@
         "reco2full": 0.27035762133413016,
         "noisy2full": 0.3651696828278916
     }
+}{
+    "embed_lung": {
+        "scib": {
+            "Isolated labels": 0.5936828851699829,
+            "KMeans NMI": 0.5817366766253055,
+            "KMeans ARI": 0.3528961434172497,
+            "Silhouette label": 0.49407396325841546,
+            "cLISI": 0.9938552901148796,
+            "Silhouette batch": 0.9161858558654785,
+            "iLISI": 0.03631014823913574,
+            "KBET": 0.2825960085624222,
+            "Graph connectivity": 0.8224615542547231,
+            "PCR comparison": 0,
+            "Batch correction": 0.41151071338435197,
+            "Bio conservation": 0.6032489917171666,
+            "Total": 0.5265536803840407
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.6437319773030293,
+                "macro": 0.588189586556355,
+                "micro": 0.6437319773030293,
+                "weighted": 0.56737004845097
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "embed_panc": {
+        "scib": {
+            "Isolated labels": 0.6512759923934937,
+            "KMeans NMI": 0.31386573136550655,
+            "KMeans ARI": 0.14017159069743618,
+            "Silhouette label": 0.48869158513844013,
+            "cLISI": 0.9857151141533484,
+            "Silhouette batch": 0.8744715452194214,
+            "iLISI": 0.02049955725669861,
+            "KBET": 0.14179260667542576,
+            "Graph connectivity": 0.6684845354142527,
+            "PCR comparison": 0,
+            "Batch correction": 0.3410496489131597,
+            "Bio conservation": 0.5159440027496449,
+            "Total": 0.4459862612150508
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.23422048589915762,
+                "macro": 0.34257266718645807,
+                "micro": 0.23422048589915762,
+                "weighted": 0.13759022262243845
+            },
+            "assay_ontology_term_id": {
+                "accuracy": 0.2703577096813576,
+                "macro": 0.3133374154336627,
+                "micro": 0.2703577096813576,
+                "weighted": 0.1821625853668431
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "denoise": {
+        "reco2noisy": 0.41288456463588846,
+        "reco2full": 0.5475014965374223,
+        "noisy2full": 0.3651696828278916
+    }
+}{
+    "grn_sroy": {
+        "class_omni_han_full": {
+            "precision": 0.027385657820440428,
+            "recall": 1.0,
+            "rand_precision": 0.027391145928220076,
+            "auprc": 0.023699311853565636,
+            "epr": 0.2326474649830103
+        },
+        "class_self_han_full": {
+            "precision": 0.027385657820440428,
+            "recall": 1.0,
+            "rand_precision": 0.027391145928220076,
+            "auprc": 0.03192462185417781,
+            "epr": 0.9953143107604646,
+            "classifier": {
+                "used_heads": "21",
+                "precision": 0.023661361675569505,
+                "random_precision": 0.023569698184003934,
+                "recall": 0.9961360123647605,
+                "predicted_true": 54477.0,
+                "number_of_true": 1294.0,
+                "epr": 0.8463700006965936
+            }
+        },
+        "full_han_full": {
+            "precision": 0.036613191204682094,
+            "recall": 1.0,
+            "rand_precision": 0.03661822048918823,
+            "auprc": 0.037140721214475717,
+            "epr": 1.0945778972106779
+        },
+        "class_omni_mine_full": {
+            "precision": 0.024687047382578108,
+            "recall": 1.0,
+            "rand_precision": 0.024692795239943086,
+            "auprc": 0.02631616626277368,
+            "epr": 0.7763341574439331
+        },
+        "class_self_mine_full": {
+            "precision": 0.024687047382578108,
+            "recall": 1.0,
+            "rand_precision": 0.024692795239943086,
+            "auprc": 0.02210678912982,
+            "epr": 0.6247194206377822,
+            "classifier": {
+                "used_heads": "14",
+                "precision": 0.0322739272219059,
+                "random_precision": 0.03230395199668943,
+                "recall": 0.9983987189751802,
+                "predicted_true": 38638.0,
+                "number_of_true": 1249.0,
+                "epr": 1.1240873445105461
+            }
+        },
+        "full_mine_full": {
+            "precision": 0.018485279453353605,
+            "recall": 1.0,
+            "rand_precision": 0.018486337145145866,
+            "auprc": 0.016035187375113585,
+            "epr": 0.5216449286064891
+        },
+        "class_omni_han_chip": {
+            "precision": 0.25347576857856335,
+            "recall": 1.0,
+            "rand_precision": 0.2535265653257735,
+            "auprc": 0.22305421766764696,
+            "epr": 0.6402146839898051
+        },
+        "class_self_han_chip": {
+            "precision": 0.25347576857856335,
+            "recall": 1.0,
+            "rand_precision": 0.2535265653257735,
+            "auprc": 0.26996366809178357,
+            "epr": 1.144080233673135,
+            "classifier": {
+                "used_heads": "27",
+                "precision": 0.2610344423159623,
+                "random_precision": 0.2610344423159623,
+                "recall": 1.0,
+                "predicted_true": 102316.0,
+                "number_of_true": 26708.0,
+                "epr": 1.1476760920937417
+            }
+        },
+        "full_han_chip": {
+            "precision": 0.3243373163027057,
+            "recall": 1.0,
+            "rand_precision": 0.32438186813186815,
+            "auprc": 0.33324865749070826,
+            "epr": 1.0844140413579535
+        },
+        "class_omni_han_ko": {
+            "precision": 0.0759561901688526,
+            "recall": 1.0,
+            "rand_precision": 0.07597141185024917,
+            "auprc": 0.0848192729354971,
+            "epr": 1.313794925591367
+        },
+        "class_self_han_ko": {
+            "precision": 0.0759561901688526,
+            "recall": 1.0,
+            "rand_precision": 0.07597141185024917,
+            "auprc": 0.08008398824291915,
+            "epr": 1.2136588151332381,
+            "classifier": {
+                "used_heads": "27",
+                "precision": 0.062372260701714546,
+                "random_precision": 0.06237410990382706,
+                "recall": 0.9993746091307066,
+                "predicted_true": 281824.0,
+                "number_of_true": 17589.0,
+                "epr": 1.144326070866693
+            }
+        },
+        "full_han_ko": {
+            "precision": 0.07328002354788068,
+            "recall": 1.0,
+            "rand_precision": 0.07329009086805488,
+            "auprc": 0.06888271677999211,
+            "epr": 0.8410434438729161
+        },
+        "class_omni_tran_full": {
+            "precision": 0.040534915985817786,
+            "recall": 1.0,
+            "rand_precision": 0.0405430408437023,
+            "auprc": 0.05140719011764532,
+            "epr": 1.9496912840641607
+        },
+        "class_self_tran_full": {
+            "precision": 0.040534915985817786,
+            "recall": 1.0,
+            "rand_precision": 0.0405430408437023,
+            "auprc": 0.04446405334446443,
+            "epr": 1.5070725436179981,
+            "classifier": {
+                "used_heads": "13",
+                "precision": 0.041619571107842375,
+                "random_precision": 0.041698782179744105,
+                "recall": 0.9937153419593345,
+                "predicted_true": 64585.0,
+                "number_of_true": 2705.0,
+                "epr": 1.3492884715770233
+            }
+        },
+        "full_tran_full": {
+            "precision": 0.03505721421787134,
+            "recall": 1.0,
+            "rand_precision": 0.0350626765447984,
+            "auprc": 0.03634817552878167,
+            "epr": 1.206586755532234
+        },
+        "class_omni_zhao_full": {
+            "precision": 0.051739843323009654,
+            "recall": 1.0,
+            "rand_precision": 0.05175021410739992,
+            "auprc": 0.05326630643350235,
+            "epr": 1.2126402304384645
+        },
+        "class_self_zhao_full": {
+            "precision": 0.051739843323009654,
+            "recall": 1.0,
+            "rand_precision": 0.05175021410739992,
+            "auprc": 0.05571280446590107,
+            "epr": 1.3282009550355793,
+            "classifier": {
+                "used_heads": "16",
+                "precision": 0.051156859172891235,
+                "random_precision": 0.051156859172891235,
+                "recall": 1.0,
+                "predicted_true": 54890.0,
+                "number_of_true": 2808.0,
+                "epr": 1.2320400102257956
+            }
+        },
+        "full_zhao_full": {
+            "precision": 0.031514908314403844,
+            "recall": 1.0,
+            "rand_precision": 0.0315187478500172,
+            "auprc": 0.03206662185593279,
+            "epr": 1.041487543790197
+        },
+        "class_omni_tran_chip": {
+            "precision": 0.19812750501002005,
+            "recall": 1.0,
+            "rand_precision": 0.19816721787933453,
+            "auprc": 0.1991715682898619,
+            "epr": 0.9799306525608357
+        },
+        "class_self_tran_chip": {
+            "precision": 0.19812750501002005,
+            "recall": 1.0,
+            "rand_precision": 0.19816721787933453,
+            "auprc": 0.20427633686871927,
+            "epr": 1.0810599416289428,
+            "classifier": {
+                "used_heads": "19",
+                "precision": 0.1546458902222111,
+                "random_precision": 0.15465931863727456,
+                "recall": 0.9998380304502753,
+                "predicted_true": 79834.0,
+                "number_of_true": 12348.0,
+                "epr": 1.0060671655716924
+            }
+        },
+        "full_tran_chip": {
+            "precision": 0.1970200032792261,
+            "recall": 1.0,
+            "rand_precision": 0.19705069653413795,
+            "auprc": 0.1988278817646561,
+            "epr": 1.0132807709251836
+        },
+        "class_omni_tran_ko": {
+            "precision": 0.08198762876267944,
+            "recall": 1.0,
+            "rand_precision": 0.08200362225467457,
+            "auprc": 0.08970491726682699,
+            "epr": 1.3197558858422846
+        },
+        "class_self_tran_ko": {
+            "precision": 0.08198718866304036,
+            "recall": 1.0,
+            "rand_precision": 0.08200362225467457,
+            "auprc": 0.07981949940075557,
+            "epr": 1.066829242801347,
+            "classifier": {
+                "used_heads": "28",
+                "precision": 0.07194468601367819,
+                "random_precision": 0.07194746636129401,
+                "recall": 0.9999005222581447,
+                "predicted_true": 279423.0,
+                "number_of_true": 20105.0,
+                "epr": 1.1244292395306692
+            }
+        },
+        "full_tran_ko": {
+            "precision": 0.06926701978501325,
+            "recall": 1.0,
+            "rand_precision": 0.06927781240261764,
+            "auprc": 0.0690064457396457,
+            "epr": 1.0150380354176218
+        }
+    }
+}{
+    "grn_gwps": {
+        "max_all": {
+            "precision": 0.02072508763433421,
+            "recall": 1.0,
+            "rand_precision": 0.02072944989230818,
+            "auprc": 0.02803865860892446,
+            "epr": 2.791404036766848
+        },
+        "class_self": {
+            "precision": 0.02072508763433421,
+            "recall": 1.0,
+            "rand_precision": 0.02072944989230818,
+            "auprc": 0.03994697752706909,
+            "epr": 4.2564040763673,
+            "classifier": {
+                "used_heads": "13",
+                "precision": 0.02313723446942605,
+                "random_precision": 0.021050977814676446,
+                "recall": 0.8361422213527657,
+                "predicted_true": "7389215",
+                "number_of_true": "204470",
+                "epr": 4.456108000962259
+            }
+        },
+        "class_omni": {
+            "precision": 0.020725090621553813,
+            "recall": 1.0,
+            "rand_precision": 0.02072944989230818,
+            "auprc": 0.01631829613005595,
+            "epr": 0.5385952410065677,
+            "classifier": {
+                "used_heads": "13",
+                "precision": 0.0,
+                "random_precision": 0.001610562441384053,
+                "recall": 0.0,
+                "predicted_true": 7.0,
+                "number_of_true": 1719.0,
+                "epr": 0.0
+            }
+        }
+    }
+}{
+    "embed_lung": {
+        "scib": {
+            "Isolated labels": 0.5801835060119629,
+            "KMeans NMI": 0.6658352348647615,
+            "KMeans ARI": 0.5071033700612775,
+            "Silhouette label": 0.5171556696295738,
+            "cLISI": 0.9963942989706993,
+            "Silhouette batch": 0.9216623306274414,
+            "iLISI": 0.035950549443562824,
+            "KBET": 0.26557912646951704,
+            "Graph connectivity": 0.8107090601360502,
+            "PCR comparison": 0,
+            "Batch correction": 0.40678021333531433,
+            "Bio conservation": 0.653334415907655,
+            "Total": 0.5547127348787186
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.6803509968683141,
+                "macro": 0.6657790184286164,
+                "micro": 0.6803509968683141,
+                "weighted": 0.6118727331889547
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "embed_panc": {
+        "scib": {
+            "Isolated labels": 0.6238522529602051,
+            "KMeans NMI": 0.43989093798498297,
+            "KMeans ARI": 0.3135597073708978,
+            "Silhouette label": 0.506880478002131,
+            "cLISI": 0.9901428772852972,
+            "Silhouette batch": 0.8892701268196106,
+            "iLISI": 0.01662302017211914,
+            "KBET": 0.1839949808408726,
+            "Graph connectivity": 0.6664334004343475,
+            "PCR comparison": 0,
+            "Batch correction": 0.35126430565338995,
+            "Bio conservation": 0.5748652507207028,
+            "Total": 0.48542487269377765
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.5123916493712611,
+                "macro": 0.5297466656778714,
+                "micro": 0.5123916493712611,
+                "weighted": 0.39740170353439325
+            },
+            "assay_ontology_term_id": {
+                "accuracy": 0.4471371016969845,
+                "macro": 0.40366943287311896,
+                "micro": 0.4471371016969845,
+                "weighted": 0.3448424153409286
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "denoise": {
+        "reco2noisy": 0.05300089055827597,
+        "reco2full": 0.5218690840049226,
+        "noisy2full": 0.36613344804409786
+    }
+}{
+    "embed_lung": {
+        "scib": {
+            "Isolated labels": 0.585395872592926,
+            "KMeans NMI": 0.6700868115843444,
+            "KMeans ARI": 0.4969324638812764,
+            "Silhouette label": 0.5154940215870738,
+            "cLISI": 0.9966033548116684,
+            "Silhouette batch": 0.918390154838562,
+            "iLISI": 0.03438622156778971,
+            "KBET": 0.26587827753641563,
+            "Graph connectivity": 0.7945285593247873,
+            "PCR comparison": 0,
+            "Batch correction": 0.4026366426535109,
+            "Bio conservation": 0.6529025048914578,
+            "Total": 0.5527961599962791
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.6843198660506651,
+                "macro": 0.6710088555573972,
+                "micro": 0.6843198660506651,
+                "weighted": 0.6168876968063384
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "embed_panc": {
+        "scib": {
+            "Isolated labels": 0.6256083846092224,
+            "KMeans NMI": 0.4187869348045656,
+            "KMeans ARI": 0.30406291010870634,
+            "Silhouette label": 0.5086630424484611,
+            "cLISI": 0.9910065577580378,
+            "Silhouette batch": 0.8864325284957886,
+            "iLISI": 0.014829277992248535,
+            "KBET": 0.16750480867285006,
+            "Graph connectivity": 0.6812563752501299,
+            "PCR comparison": 0,
+            "Batch correction": 0.3500045980822034,
+            "Bio conservation": 0.5696255659457986,
+            "Total": 0.48177717880036053
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.5142839702112074,
+                "macro": 0.5299458905996322,
+                "micro": 0.5142839702112074,
+                "weighted": 0.3916399896684171
+            },
+            "assay_ontology_term_id": {
+                "accuracy": 0.48266389940178245,
+                "macro": 0.4141299235005585,
+                "micro": 0.48266389940178245,
+                "weighted": 0.3785796503866393
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "embed_lung": {
+        "scib": {
+            "Isolated labels": 0.585395872592926,
+            "KMeans NMI": 0.6700868115843444,
+            "KMeans ARI": 0.4969324638812764,
+            "Silhouette label": 0.5154940215870738,
+            "cLISI": 0.9966033548116684,
+            "Silhouette batch": 0.918390154838562,
+            "iLISI": 0.03438622156778971,
+            "KBET": 0.26587827753641563,
+            "Graph connectivity": 0.7945285593247873,
+            "PCR comparison": 0,
+            "Batch correction": 0.4026366426535109,
+            "Bio conservation": 0.6529025048914578,
+            "Total": 0.5527961599962791
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.6843198660506651,
+                "macro": 0.6710088555573972,
+                "micro": 0.6843198660506651,
+                "weighted": 0.6168876968063384
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "embed_panc": {
+        "scib": {
+            "Isolated labels": 0.6256083846092224,
+            "KMeans NMI": 0.4187869348045656,
+            "KMeans ARI": 0.30406291010870634,
+            "Silhouette label": 0.5086630424484611,
+            "cLISI": 0.9910065577580378,
+            "Silhouette batch": 0.8864325284957886,
+            "iLISI": 0.014829277992248535,
+            "KBET": 0.16750480867285006,
+            "Graph connectivity": 0.6812563752501299,
+            "PCR comparison": 0,
+            "Batch correction": 0.3500045980822034,
+            "Bio conservation": 0.5696255659457986,
+            "Total": 0.48177717880036053
+        },
+        "classif": {
+            "cell_type_ontology_term_id": {
+                "accuracy": 0.5142839702112074,
+                "macro": 0.5299458905996322,
+                "micro": 0.5142839702112074,
+                "weighted": 0.3916399896684171
+            },
+            "assay_ontology_term_id": {
+                "accuracy": 0.48266389940178245,
+                "macro": 0.4141299235005585,
+                "micro": 0.48266389940178245,
+                "weighted": 0.3785796503866393
+            },
+            "organism_ontology_term_id": {
+                "accuracy": 1.0,
+                "macro": 1.0,
+                "micro": 1.0,
+                "weighted": 1.0
+            }
+        }
+    }
+}{
+    "denoise": {
+        "reco2noisy": 0.11324311162667919,
+        "reco2full": 0.5315290670889298,
+        "noisy2full": 0.3751341249560792
+    }
 }
