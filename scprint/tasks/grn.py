@@ -6,7 +6,7 @@ from grnndata import utils as grnutils
 from anndata.utils import make_index_unique
 import scanpy as sc
 import torch
-import gc 
+import gc
 from scdataloader.data import SimpleAnnDataset
 from scdataloader import Collator
 from grnndata import utils
@@ -125,8 +125,7 @@ class GRNfer:
     def predict(self, layer, cell_type=None):
         self.curr_genes = None
         self.model.pred_log_adata = False
-        self.model.get_attention_layer = layer if type(layer) is list else [
-            layer]
+        self.model.get_attention_layer = layer if type(layer) is list else [layer]
         if cell_type is not None:
             subadata = self.adata[
                 self.adata.obs[self.cell_type_col] == cell_type
@@ -135,19 +134,27 @@ class GRNfer:
             subadata = self.adata.copy()
         if self.how == "most var within":
             sc.pp.highly_variable_genes(
-                subadata, flavor="seurat_v3", n_top_genes=self.num_genes)
-            self.curr_genes = subadata.var.index[subadata.var.highly_variable].tolist()+self.genes
+                subadata, flavor="seurat_v3", n_top_genes=self.num_genes
+            )
+            self.curr_genes = (
+                subadata.var.index[subadata.var.highly_variable].tolist() + self.genes
+            )
             print(
                 "number of expressed genes in this cell type: "
                 + str((subadata.X.sum(0) > 1).sum())
             )
         elif self.how == "most var across" and cell_type is not None:
             sc.tl.rank_genes_groups(
-                self.adata, groupby=self.cell_type_col, groups=[cell_type]
+                self.adata,
+                mask_var=self.adata.var.index.isin(self.model.genes),
+                groupby=self.cell_type_col,
+                groups=[cell_type],
             )
-            self.curr_genes = self.adata.uns["rank_genes_groups"]["names"][cell_type][
-                : self.num_genes
-            ].tolist() + self.genes
+            diff_expr_genes = self.adata.uns["rank_genes_groups"]["names"][cell_type]
+            diff_expr_genes = [
+                gene for gene in diff_expr_genes if gene in self.model.genes
+            ]
+            self.curr_genes = diff_expr_genes[:5000] + self.genes
             self.curr_genes.sort()
         elif self.how == "random expr":
             self.curr_genes = self.model.genes
@@ -162,7 +169,7 @@ class GRNfer:
             subadata, obs_to_output=["organism_ontology_term_id"]
         )
         self.col = Collator(
-            organisms=[subadata.obs['organism_ontology_term_id'][0]],
+            organisms=[subadata.obs["organism_ontology_term_id"][0]],
             valid_genes=self.model.genes,
             how="some" if self.how != "random expr" else "random expr",
             genelist=self.curr_genes if self.how != "random expr" else [],
@@ -251,7 +258,9 @@ class GRNfer:
                 #    / attn.sum(-1).sum(-1).unsqueeze(-1).unsqueeze(-1)
                 # )  # .view()
             if self.head_agg == "mean":
-                attns = attn.detach().cpu().numpy() + (attns if attns is not None else 0)
+                attns = attn.detach().cpu().numpy() + (
+                    attns if attns is not None else 0
+                )
             elif self.head_agg == "max":
                 attns = (
                     np.maximum(attn.detach().cpu().numpy(), attns)
@@ -266,14 +275,12 @@ class GRNfer:
                             axis=-1,
                         )
                     else:
-                        attns = np.stack(
-                            [attns, attn.detach().cpu().numpy()], axis=-1)
+                        attns = np.stack([attns, attn.detach().cpu().numpy()], axis=-1)
 
                 else:
                     attns = attn.detach().cpu().numpy()
             else:
-                raise ValueError(
-                    "head_agg must be one of 'mean', 'max' or 'None'")
+                raise ValueError("head_agg must be one of 'mean', 'max' or 'None'")
         if self.head_agg == "mean":
             attns = attns / Qs.shape[0]
         return attns
@@ -307,10 +314,8 @@ class GRNfer:
         elif self.filtration == "mst":
             pass
         else:
-            raise ValueError(
-                "filtration must be one of 'thresh', 'none' or 'top-k'")
-        res = (adj != 0).sum(
-        ) if self.filtration != "none" else adj.shape[0] ** 2
+            raise ValueError("filtration must be one of 'thresh', 'none' or 'top-k'")
+        res = (adj != 0).sum() if self.filtration != "none" else adj.shape[0] ** 2
         print(f"avg link count: {res}, sparsity: {res / adj.shape[0] ** 2}")
         return adj
 
@@ -320,8 +325,7 @@ class GRNfer:
             grn=grn,
         )
         # grn = grn[:, (grn.X != 0).sum(0) > (self.max_cells / 32)]
-        grn.var["TFs"] = [
-            True if i in utils.TF else False for i in grn.var["symbol"]]
+        grn.var["TFs"] = [True if i in utils.TF else False for i in grn.var["symbol"]]
         grn.uns["grn_scprint_params"] = {
             "filtration": self.filtration,
             "how": self.how,
@@ -340,6 +344,7 @@ def get_GTdb(db="omnipath"):
         if not os.path.exists(FILEDIR + "/../../data/main/omnipath.parquet"):
             from omnipath.interactions import AllInteractions
             from omnipath.requests import Annotations
+
             interactions = AllInteractions()
             net = interactions.get(exclude=["small_molecule", "lncrna_mrna"])
             hgnc = Annotations.get(resources="HGNC")
@@ -359,165 +364,218 @@ def get_GTdb(db="omnipath"):
             net = pd.DataFrame(data=da, index=varnames, columns=varnames)
             net.to_parquet(FILEDIR + "/../../data/main/omnipath.parquet")
         else:
-            net = pd.read_parquet(
-                FILEDIR + "/../../data/main/omnipath.parquet")
+            net = pd.read_parquet(FILEDIR + "/../../data/main/omnipath.parquet")
     if db == "scenic+":
-        net = pd.read_parquet(
-            FILEDIR + "/../../data/main/main_scenic+.parquet")
+        net = pd.read_parquet(FILEDIR + "/../../data/main/main_scenic+.parquet")
     if db == "stringdb":
-        net = pd.read_parquet(
-            FILEDIR + "/../../data/main/stringdb_bias.parquet")
+        net = pd.read_parquet(FILEDIR + "/../../data/main/stringdb_bias.parquet")
     return net
 
 
-def default_benchmark(model, default_dataset="sroy", cell_types=[
-    'kidney collecting duct principal cell',
-    #'mesangial cell',
-    'blood vessel smooth muscle cell',
-    'podocyte',
-    'macrophage',
-    'leukocyte',
-    'kidney interstitial fibroblast',
-    #'endothelial cell',
-], maxlayers=6, maxgenes=5000, batch_size=32,
-
+def default_benchmark(
+    model,
+    default_dataset="sroy",
+    cell_types=[
+        "kidney collecting duct principal cell",
+        #'mesangial cell',
+        "blood vessel smooth muscle cell",
+        "podocyte",
+        "macrophage",
+        "leukocyte",
+        "kidney interstitial fibroblast",
+        #'endothelial cell',
+    ],
+    maxlayers=6,
+    maxgenes=5000,
+    batch_size=32,
 ):
     metrics = {}
-    if default_dataset == 'sroy':
-        preprocessor = Preprocessor(is_symbol=True, force_preprocess=True, skip_validate=True,
-                                    do_postp=False, min_valid_genes_id=5000, min_dataset_size=64)
+    if default_dataset == "sroy":
+        preprocessor = Preprocessor(
+            is_symbol=True,
+            force_preprocess=True,
+            skip_validate=True,
+            do_postp=False,
+            min_valid_genes_id=5000,
+            min_dataset_size=64,
+        )
         clf_omni = None
-        for (da, spe, gt) in [("han", "human", "full"),# ("liu", "human", "chip"),
-                              #("liu", "human", "ko"), ("chen", "human", "full"),
-                              ("tran", "mouse", "full"), ("zhao", "mouse", "full"),
+        for da, spe, gt in [
+            ("han", "human", "full"),  # ("liu", "human", "chip"),
+            # ("liu", "human", "ko"), ("chen", "human", "full"),
+            ("tran", "mouse", "full"),
+            ("zhao", "mouse", "full"),
         ]:
-        #for (da, spe, gt) in [("liu", "human", "full"), ("liu", "human", "chip"),
-        #                      ("liu", "human", "ko"), ("chen", "human", "full"),
-        #                      ("duren", "mouse", "full"), ("semrau", "mouse", "full"),
-                              #("semrau", "mouse", "chip"), ("semrau", "mouse", "ko")
-        #                      ]:
+            # for (da, spe, gt) in [("liu", "human", "full"), ("liu", "human", "chip"),
+            #                      ("liu", "human", "ko"), ("chen", "human", "full"),
+            #                      ("duren", "mouse", "full"), ("semrau", "mouse", "full"),
+            # ("semrau", "mouse", "chip"), ("semrau", "mouse", "ko")
+            #                      ]:
             preadata = get_sroy_gt(get=da, species=spe, gt=gt)
             adata = preprocessor(preadata.copy())
-            grn_inferer = GRNfer(model, adata,
-                                 how="most var within",
-                                 preprocess="softmax",
-                                 head_agg='none',
-                                 filtration="none",
-                                 forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'][0],
-                                 num_genes=maxgenes,
-                                 max_cells=2048,
-                                 doplot=False,
-                                 batch_size=batch_size,
-                                 devices=1,
-                                 )
+            grn_inferer = GRNfer(
+                model,
+                adata,
+                how="most var within",
+                preprocess="softmax",
+                head_agg="none",
+                filtration="none",
+                forward_mode="none",
+                organisms=adata.obs["organism_ontology_term_id"][0],
+                num_genes=maxgenes,
+                max_cells=2048,
+                doplot=False,
+                batch_size=batch_size,
+                devices=1,
+            )
             grn = grn_inferer(layer=list(range(model.nlayers))[:])
             if clf_omni is not None:
                 grn.varp["classified"] = clf_omni.predict_proba(
-                    grn.varp['GRN'].reshape(-1, grn.varp['GRN'].shape[-1])
+                    grn.varp["GRN"].reshape(-1, grn.varp["GRN"].shape[-1])
                 ).reshape(len(grn.var), len(grn.var), 2)[:, :, 1]
             else:
-                grn, m, clf_omni = train_classifier(grn, C=1, train_size=0.9, class_weight={
-                    1: 200, 0: 1}, shuffle=True)
-            grn.varp['all'] = grn.varp['GRN']
-            grn.varp['GRN'] = grn.varp['classified']
-            grn.var['ensembl_id'] = grn.var.index
-            grn.var['symbol'] = make_index_unique(
-                grn.var['symbol'].astype(str))
-            grn.var.index = grn.var['symbol']
-            metrics['class_omni_'+da+"_"+gt] = BenGRN(
-                grn, do_auc=True, doplot=False).compare_to(other=preadata)
+                grn, m, clf_omni = train_classifier(
+                    grn, C=1, train_size=0.9, class_weight={1: 200, 0: 1}, shuffle=True
+                )
+            grn.varp["all"] = grn.varp["GRN"]
+            grn.varp["GRN"] = grn.varp["classified"]
+            grn.var["ensembl_id"] = grn.var.index
+            grn.var["symbol"] = make_index_unique(grn.var["symbol"].astype(str))
+            grn.var.index = grn.var["symbol"]
+            metrics["class_omni_" + da + "_" + gt] = BenGRN(
+                grn, do_auc=True, doplot=False
+            ).compare_to(other=preadata)
             ############################
-            grn.varp['GRN'] = grn.varp['all']
-            grn.var.index = grn.var['ensembl_id']
-            ratio = (preadata.varp['GRN'].shape[0] * preadata.varp['GRN'].shape[1]) / preadata.varp['GRN'].sum()
-            ratio = ratio if ratio <100 else 100
+            grn.varp["GRN"] = grn.varp["all"]
+            grn.var.index = grn.var["ensembl_id"]
+            ratio = (
+                preadata.varp["GRN"].shape[0] * preadata.varp["GRN"].shape[1]
+            ) / preadata.varp["GRN"].sum()
+            ratio = ratio if ratio < 100 else 100
             weight = {1: ratio, 0: 1}
-            grn, m, _ = train_classifier(grn, other=preadata, C=0.4, train_size=0.5, class_weight=weight, shuffle=False)
-            grn.varp['GRN'] = grn.varp['classified']
-            grn.var.index = grn.var['symbol']
-            metrics['class_self_'+da+"_"+gt] = BenGRN(
-                grn, do_auc=True, doplot=False).compare_to(other=preadata)
-            metrics['class_self_'+da+"_"+gt].update({'classifier': m})
+            grn, m, _ = train_classifier(
+                grn,
+                other=preadata,
+                C=0.4,
+                train_size=0.5,
+                class_weight=weight,
+                shuffle=False,
+            )
+            grn.varp["GRN"] = grn.varp["classified"]
+            grn.var.index = grn.var["symbol"]
+            metrics["class_self_" + da + "_" + gt] = BenGRN(
+                grn, do_auc=True, doplot=False
+            ).compare_to(other=preadata)
+            metrics["class_self_" + da + "_" + gt].update({"classifier": m})
             ############################
-            grn_inferer = GRNfer(model, adata,
-                                 how="most var within",
-                                 preprocess="softmax",
-                                 head_agg='max',
-                                 filtration="none",
-                                 forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'][0],
-                                 num_genes=maxgenes,
-                                 max_cells=1024,
-                                 doplot=False,
-                                 batch_size=batch_size,
-                                 devices=1,
-                                 )
+            grn_inferer = GRNfer(
+                model,
+                adata,
+                how="most var within",
+                preprocess="softmax",
+                head_agg="max",
+                filtration="none",
+                forward_mode="none",
+                organisms=adata.obs["organism_ontology_term_id"][0],
+                num_genes=maxgenes,
+                max_cells=1024,
+                doplot=False,
+                batch_size=batch_size,
+                devices=1,
+            )
             grn = grn_inferer(layer=list(range(model.nlayers))[:])
-            grn.var['ensembl_id'] = grn.var.index
-            grn.var['symbol'] = make_index_unique(
-                grn.var['symbol'].astype(str))
-            grn.var.index = grn.var['symbol']
-            metrics['full_'+da+"_" +
-                    gt] = BenGRN(grn, do_auc=True, doplot=False).compare_to(other=preadata)
-    elif default_dataset == 'gwps':
-        if not os.path.exists(FILEDIR+"/../../data/perturb_gt.h5ad"):
+            grn.var["ensembl_id"] = grn.var.index
+            grn.var["symbol"] = make_index_unique(grn.var["symbol"].astype(str))
+            grn.var.index = grn.var["symbol"]
+            metrics["full_" + da + "_" + gt] = BenGRN(
+                grn, do_auc=True, doplot=False
+            ).compare_to(other=preadata)
+    elif default_dataset == "gwps":
+        if not os.path.exists(FILEDIR + "/../../data/perturb_gt.h5ad"):
             adata = get_perturb_gt()
-            adata.write_h5ad(FILEDIR+"/../../data/perturb_gt.h5ad")
+            adata.write_h5ad(FILEDIR + "/../../data/perturb_gt.h5ad")
         else:
-            adata = read_h5ad(FILEDIR+"/../../data/perturb_gt.h5ad")
-        preprocessor = Preprocessor(force_preprocess=True, skip_validate=True,
-                                    do_postp=False, min_valid_genes_id=5000, min_dataset_size=64)
+            adata = read_h5ad(FILEDIR + "/../../data/perturb_gt.h5ad")
+        preprocessor = Preprocessor(
+            force_preprocess=True,
+            skip_validate=True,
+            do_postp=False,
+            min_valid_genes_id=5000,
+            min_dataset_size=64,
+        )
         nadata = preprocessor(adata.copy())
         adata.var["isTF"] = False
         adata.var.loc[adata.var.gene_name.isin(grnutils.TF), "isTF"] = True
         adata.var["isTF"].sum()
-        grn_inferer = GRNfer(model, nadata,
-                             how="most var within",
-                             preprocess="softmax",
-                             head_agg='max',
-                             filtration="none",
-                             forward_mode="none",
-                             organisms=adata.obs['organism_ontology_term_id'][0],
-                             num_genes=maxgenes,
-                             max_cells=1024,
-                             doplot=False,
-                             batch_size=batch_size,
-                             devices=1,
-                             )
-        grn = grn_inferer(layer=list(range(model.nlayers))[
-                          max(0, model.nlayers-maxlayers):])
-        metrics['max_all'] = BenGRN(
-            grn, do_auc=True, doplot=False).compare_to(other=adata)
-        grn_inferer = GRNfer(model, nadata,
-                             how="most var within",
-                             preprocess="softmax",
-                             head_agg='none',
-                             filtration="none",
-                             forward_mode="none",
-                             organisms=adata.obs['organism_ontology_term_id'][0],
-                             num_genes=maxgenes,
-                             max_cells=1024,
-                             doplot=False,
-                             batch_size=batch_size,
-                             devices=1,
-                             )
+        grn_inferer = GRNfer(
+            model,
+            nadata,
+            how="most var within",
+            preprocess="softmax",
+            head_agg="max",
+            filtration="none",
+            forward_mode="none",
+            organisms=adata.obs["organism_ontology_term_id"][0],
+            num_genes=maxgenes,
+            max_cells=1024,
+            doplot=False,
+            batch_size=batch_size,
+            devices=1,
+        )
+        grn = grn_inferer(
+            layer=list(range(model.nlayers))[max(0, model.nlayers - maxlayers) :]
+        )
+        metrics["max_all"] = BenGRN(grn, do_auc=True, doplot=False).compare_to(
+            other=adata
+        )
+        grn_inferer = GRNfer(
+            model,
+            nadata,
+            how="most var within",
+            preprocess="softmax",
+            head_agg="none",
+            filtration="none",
+            forward_mode="none",
+            organisms=adata.obs["organism_ontology_term_id"][0],
+            num_genes=maxgenes,
+            max_cells=1024,
+            doplot=False,
+            batch_size=batch_size,
+            devices=1,
+        )
         grn = grn_inferer(layer=list(range(model.nlayers))[:])
-        grn.var['ensembl_id'] = grn.var.index
-        grn.varp['all'] = grn.varp['GRN']
-        grn, m, clf = train_classifier(grn, other=adata, C=0.4, train_size=0.5, class_weight={
-                                       1: 40, 0: 1}, doplot=False, shuffle=False, use_col="ensembl_id")
-        grn.varp['GRN'] = grn.varp['classified']
-        metrics['class_self'] = BenGRN(
-            grn, do_auc=True, doplot=False).compare_to(other=adata)
-        metrics['class_self'].update({'classifier': m})
-        grn.varp['GRN'] = grn.varp['all']
-        grn, m, clf_omni = train_classifier(grn, C=0.1, train_size=0.9, class_weight={
-                                            1: 100, 0: 1}, doplot=False, shuffle=True, use_col="gene_name")
-        grn.varp['GRN'] = grn.varp['classified']
-        metrics['class_omni'] = BenGRN(
-            grn, do_auc=True, doplot=False).compare_to(other=adata)
-        metrics['class_omni'].update({'classifier': m})
+        grn.var["ensembl_id"] = grn.var.index
+        grn.varp["all"] = grn.varp["GRN"]
+        grn, m, clf = train_classifier(
+            grn,
+            other=adata,
+            C=0.4,
+            train_size=0.5,
+            class_weight={1: 40, 0: 1},
+            doplot=False,
+            shuffle=False,
+            use_col="ensembl_id",
+        )
+        grn.varp["GRN"] = grn.varp["classified"]
+        metrics["class_self"] = BenGRN(grn, do_auc=True, doplot=False).compare_to(
+            other=adata
+        )
+        metrics["class_self"].update({"classifier": m})
+        grn.varp["GRN"] = grn.varp["all"]
+        grn, m, clf_omni = train_classifier(
+            grn,
+            C=0.1,
+            train_size=0.9,
+            class_weight={1: 100, 0: 1},
+            doplot=False,
+            shuffle=True,
+            use_col="gene_name",
+        )
+        grn.varp["GRN"] = grn.varp["classified"]
+        metrics["class_omni"] = BenGRN(grn, do_auc=True, doplot=False).compare_to(
+            other=adata
+        )
+        metrics["class_omni"].update({"classifier": m})
     else:
         adata = sc.read_h5ad(default_dataset)
         adata.var["isTF"] = False
@@ -525,47 +583,58 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
         metrics = {}
         for celltype in cell_types:
             print(celltype)
-            grn_inferer = GRNfer(model, adata[adata.X.sum(1) > 500],
-                                 how="random expr",
-                                 preprocess="softmax",
-                                 head_agg='max',
-                                 filtration="none",
-                                 forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'][0],
-                                 num_genes=3000,
-                                 max_cells=1024,
-                                 doplot=False,
-                                 batch_size=batch_size,
-                                 devices=1,
-                                 )
+            grn_inferer = GRNfer(
+                model,
+                adata[adata.X.sum(1) > 500],
+                how="random expr",
+                preprocess="softmax",
+                head_agg="max",
+                filtration="none",
+                forward_mode="none",
+                organisms=adata.obs["organism_ontology_term_id"][0],
+                num_genes=3000,
+                max_cells=1024,
+                doplot=False,
+                batch_size=batch_size,
+                devices=1,
+            )
             if celltype != cell_types[0]:
                 del grn
                 gc.collect()
-            grn = grn_inferer(layer=list(range(model.nlayers))[
-                              :], cell_type=celltype)
-            grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
+            grn = grn_inferer(layer=list(range(model.nlayers))[:], cell_type=celltype)
+            grn.var.index = make_index_unique(grn.var["symbol"].astype(str))
             m = BenGRN(grn, doplot=False).scprint_benchmark()
-            metrics[celltype + '_scprint'] = m
-            grn_inferer = GRNfer(model, adata[adata.X.sum(1) > 500],
-                                 how="most var across",
-                                 preprocess="softmax",
-                                 head_agg='none',
-                                 filtration="none",
-                                 forward_mode="none",
-                                 organisms=adata.obs['organism_ontology_term_id'][0],
-                                 num_genes=maxgenes,
-                                 max_cells=1024,
-                                 doplot=False,
-                                 batch_size=batch_size,
-                                 devices=1,
-                                 )
+            metrics[celltype + "_scprint"] = m
+            grn_inferer = GRNfer(
+                model,
+                adata[adata.X.sum(1) > 500],
+                how="most var across",
+                preprocess="softmax",
+                head_agg="none",
+                filtration="none",
+                forward_mode="none",
+                organisms=adata.obs["organism_ontology_term_id"][0],
+                num_genes=maxgenes,
+                max_cells=1024,
+                doplot=False,
+                batch_size=batch_size,
+                devices=1,
+            )
             del grn
             gc.collect()
             grn = grn_inferer(layer=list(range(model.nlayers))[:], cell_type=celltype)
-            grn, m, _ = train_classifier(grn, C=0.1, train_size=0.5, class_weight={
-                                      1: 100, 0: 1}, shuffle=False, doplot=False)
-            grn.varp['GRN'] = grn.varp['classified']
-            grn.var.index = make_index_unique(grn.var['symbol'].astype(str))
-            metrics[celltype + '_scprint_class'] = BenGRN(grn, doplot=False).scprint_benchmark()
-            metrics[celltype + '_scprint_class'].update({'classifier': m})
+            grn, m, _ = train_classifier(
+                grn,
+                C=0.1,
+                train_size=0.5,
+                class_weight={1: 100, 0: 1},
+                shuffle=False,
+                doplot=False,
+            )
+            grn.varp["GRN"] = grn.varp["classified"]
+            grn.var.index = make_index_unique(grn.var["symbol"].astype(str))
+            metrics[celltype + "_scprint_class"] = BenGRN(
+                grn, doplot=False
+            ).scprint_benchmark()
+            metrics[celltype + "_scprint_class"].update({"classifier": m})
     return metrics
