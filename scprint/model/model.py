@@ -56,6 +56,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         precpt_gene_emb: Optional[str] = None,
         gene_pos_enc: Optional[list] = None,
         d_model: int = 512,
+        organisms=[],
         nhead: int = 8,
         d_hid: int = 512,
         edge_dim: int = 12,
@@ -1304,6 +1305,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         """@see pl.LightningModule"""
         self.embs = None
         self.attn.data = None
+        self.attn.attn = None
         self.counter = 0
         if type(self.transformer) is FlashTransformerEncoder:
             for encoder_layers in self.transformer.blocks:
@@ -1431,7 +1433,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 else [output["mean"]],
             }
         if self.embs is None:
-            self.embs = torch.mean(cell_embs[:, ind, :], dim=1)
+            self.embs = output[
+                "cls_output_" + "cell_type_ontology_term_id"
+            ]  # torch.mean(cell_embs[:, ind, :], dim=1)
             self.pred = (
                 torch.stack(
                     [
@@ -1451,7 +1455,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 else [output["mean"]]
             )
         else:
-            self.embs = torch.cat([self.embs, torch.mean(cell_embs[:, ind, :], dim=1)])
+            self.embs = torch.cat(
+                [self.embs, output["cls_output_" + "cell_type_ontology_term_id"]]
+            )
             self.pred = torch.cat(
                 [
                     self.pred,

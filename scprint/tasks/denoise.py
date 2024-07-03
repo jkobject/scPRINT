@@ -121,6 +121,8 @@ class Denoiser:
         self.trainer.predict(self.model, dataloader)
         self.genes = self.model.pos if self.how != "most var" else list(set(self.model.genes) & set(genelist))
         if self.downsample is not None:
+            import pdb
+            pdb.set_trace()
             reco = self.model.expr_pred[0]
             reco = reco.cpu().numpy()
             noisy = np.loadtxt("collator_output.txt")

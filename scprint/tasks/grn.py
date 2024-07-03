@@ -181,12 +181,15 @@ class GRNfer:
             num_workers=self.num_workers,
             shuffle=False,
         )
+        self.model.attn.comp_attn = self.head_agg == "mean_full"
         self.model.predict_mode = self.forward_mode
         self.model.doplot = self.doplot
         self.trainer.predict(self.model, dataloader)
         return subadata
 
     def aggregate(self, attn):
+        if self.head_agg == "mean_full":
+            return attn
         badloc = torch.isnan(attn.sum((0, 2, 3, 4)))
         attn = attn[:, ~badloc, :, :, :]
         self.curr_genes = (
@@ -449,7 +452,7 @@ def default_benchmark(
             grn.varp["GRN"] = grn.varp["all"]
             grn.var.index = grn.var["ensembl_id"]
             ratio = (
-                preadata.varp["GRN"].shape[0] * preadata.varp["GRN"].shape[1]
+                (preadata.varp["GRN"] > 0).sum(0) * (preadata.varp["GRN"] > 0).sum(1)
             ) / preadata.varp["GRN"].sum()
             ratio = ratio if ratio < 100 else 100
             weight = {1: ratio, 0: 1}
