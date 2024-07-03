@@ -438,8 +438,9 @@ def default_benchmark(model, default_dataset="sroy", cell_types=[
             grn.varp['GRN'] = grn.varp['all']
             del grn.varp['all']
             grn.var.index = grn.var['ensembl_id']
-            ratio = / preadata.varp['GRN'].sum()
-            ratio = ratio if ratio <100 else 100
+            ratio = (
+                (preadata.varp["GRN"] > 0).sum(0) * (preadata.varp["GRN"] > 0).sum(1)
+            ) / preadata.varp["GRN"].sum()
             weight = {1: ratio, 0: 1}
             grn, m, _ = train_classifier(grn, other=preadata, C=0.5, train_size=0.5, class_weight=weight, shuffle=False)
             grn.varp['GRN'] = grn.varp['classified']
