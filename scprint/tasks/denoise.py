@@ -138,11 +138,14 @@ class Denoiser:
         if self.downsample is not None:
             reco = self.model.expr_pred[0]
             reco = reco.cpu().numpy()
-            noisy = np.loadtxt("collator_output.txt")
+            tokeep = np.isnan(reco).sum(1) == 0
+            reco = reco[tokeep]
+            noisy = np.loadtxt("collator_output.txt")[tokeep]
+
             if random_indices is not None:
-                true = adata.X[random_indices]
+                true = adata.X[random_indices][tokeep]
             else:
-                true = adata.X
+                true = adata.X[tokeep]
             true = true.toarray() if issparse(true) else true
             if self.how == "most var":
                 true = true[:, adata.var.index.isin(self.genes)]
@@ -199,7 +202,12 @@ class Denoiser:
             #        ].diagonal()
             #    ),
             # }
-            return metrics, random_indices, self.genes, self.model.expr_pred[0]
+            return (
+                metrics,
+                random_indices[tokeep] if random_indices is not None else None,
+                self.genes,
+                self.model.expr_pred[0][tokeep],
+            )
         else:
             return random_indices, self.genes, self.model.expr_pred[0]
 

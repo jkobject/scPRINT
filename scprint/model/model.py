@@ -388,7 +388,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         except RuntimeError as e:
             if "scPrint is not attached to a `Trainer`." in str(e):
                 print("RuntimeError caught: scPrint is not attached to a `Trainer`.")
-        # self.save_hyperparameters()
+        self.save_hyperparameters()
 
     def _encoder(
         self,
