@@ -24,7 +24,7 @@ from scipy.sparse import issparse
 
 from scipy.stats import spearmanr
 import os
-
+from tqdm import tqdm
 from . import knn_smooth
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -35,7 +35,7 @@ class Denoiser:
         self,
         model: torch.nn.Module,
         batch_size: int = 10,
-        num_workers: int = 0,
+        num_workers: int = 1,
         max_len: int = 20_000,
         precision: str = "16-mixed",
         how="most var",
@@ -67,10 +67,10 @@ class Denoiser:
         self.plot_corr_size = plot_corr_size
         self.doplot = doplot
         self.predict_depth_mult = predict_depth_mult
-        self.how=how
+        self.how = how
         self.downsample = downsample
         self.precision = precision
-        #self.trainer = Trainer(precision=precision, devices=devices)
+        # self.trainer = Trainer(precision=precision, devices=devices)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, adata: AnnData):
@@ -82,8 +82,7 @@ class Denoiser:
                 low=0, high=adata.shape[0], size=self.plot_corr_size
             )
             adataset = SimpleAnnDataset(
-                adata[random_indices], obs_to_output=[
-                    "organism_ontology_term_id"]
+                adata[random_indices], obs_to_output=["organism_ontology_term_id"]
             )
         else:
             adataset = SimpleAnnDataset(
@@ -91,7 +90,8 @@ class Denoiser:
             )
         if self.how == "most var":
             sc.pp.highly_variable_genes(
-                adata, flavor="seurat_v3", n_top_genes=self.max_len, span=0.99)
+                adata, flavor="seurat_v3", n_top_genes=self.max_len, span=0.99
+            )
             genelist = adata.var.index[adata.var.highly_variable]
             print(len(genelist))
         col = Collator(
@@ -115,12 +115,26 @@ class Denoiser:
         self.model.on_predict_epoch_start()
         self.model.eval()
         device = self.model.device.type
-        with torch.autocast(device_type=device, dtype=torch.float16):
-            for batch in dataloader:
-                gene_pos, expression, depth = (batch["genes"], batch["x"], batch["depth"])
-                gene_pos, expression, depth = gene_pos.to(device), expression.to(device), depth.to(device)
-                self.model._predict(gene_pos, expression, depth, predict_mode="denoise", depth_mult=self.predict_depth_mult)
-        self.genes = self.model.pos if self.how != "most var" else list(set(self.model.genes) & set(genelist))
+        with torch.no_grad(), torch.autocast(device_type=device, dtype=torch.float16):
+            for batch in tqdm(dataloader):
+                gene_pos, expression, depth = (
+                    batch["genes"].to(device),
+                    batch["x"].to(device),
+                    batch["depth"].to(device),
+                )
+                self.model._predict(
+                    gene_pos,
+                    expression,
+                    depth,
+                    predict_mode="denoise",
+                    depth_mult=self.predict_depth_mult,
+                )
+        torch.cuda.empty_cache()
+        self.genes = (
+            self.model.pos
+            if self.how != "most var"
+            else list(set(self.model.genes) & set(genelist))
+        )
         if self.downsample is not None:
             reco = self.model.expr_pred[0]
             reco = reco.cpu().numpy()
@@ -130,13 +144,21 @@ class Denoiser:
             else:
                 true = adata.X
             true = true.toarray() if issparse(true) else true
-            if self.how=="most var":
-                true = true[
-                    :, adata.var.index.isin(self.genes)
-                ]
+            if self.how == "most var":
+                true = true[:, adata.var.index.isin(self.genes)]
                 # noisy[true==0]=0
             else:
-                true = np.vstack([true[i, adata.var.index.get_indexer(np.array(self.model.genes)[val])].copy() for i, val in enumerate(self.genes.cpu().numpy())])
+                true = np.vstack(
+                    [
+                        true[
+                            i,
+                            adata.var.index.get_indexer(
+                                np.array(self.model.genes)[val]
+                            ),
+                        ].copy()
+                        for i, val in enumerate(self.genes.cpu().numpy())
+                    ]
+                )
             # reco[true==0] = 0
             # import pdb
             # pdb.set_trace()
@@ -145,8 +167,7 @@ class Denoiser:
             #    np.vstack([reco[true!=0], noisy[true!=0], true[true!=0]])
             # )
             corr_coef, p_value = spearmanr(
-                np.vstack(
-                    [reco[true != 0], noisy[true != 0], true[true != 0]]).T
+                np.vstack([reco[true != 0], noisy[true != 0], true[true != 0]]).T
             )
             metrics = {
                 "reco2noisy": corr_coef[0, 1],
@@ -182,6 +203,7 @@ class Denoiser:
         else:
             return random_indices, self.genes, self.model.expr_pred[0]
 
+
 # testdatasets=['/R4ZHoQegxXdSFNFY5LGe.h5ad', '/SHV11AEetZOms4Wh7Ehb.h5ad',
 # '/V6DPJx8rP3wWRQ43LMHb.h5ad', '/Gz5G2ETTEuuRDgwm7brA.h5ad', '/YyBdEsN89p2aF4xJY1CW.h5ad',
 # '/SO5yBTUDBgkAmz0QbG8K.h5ad', '/r4iCehg3Tw5IbCLiCIbl.h5ad', '/SqvXr3i3PGXM8toXzUf9.h5ad',
@@ -189,7 +211,9 @@ class Denoiser:
 # '/fvU5BAMJrm7vrgDmZM0z.h5ad', '/gNNpgpo6gATjuxTE7CCp.h5ad'],
 
 
-def default_benchmark(model, default_dataset=FILE_DIR+"/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad"):
+def default_benchmark(
+    model, default_dataset=FILE_DIR + "/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad"
+):
     adata = sc.read_h5ad(default_dataset)
     denoise = Denoiser(
         model,
@@ -197,6 +221,7 @@ def default_benchmark(model, default_dataset=FILE_DIR+"/../../data/r4iCehg3Tw5Ib
         max_len=4000,
         plot_corr_size=1000,
         doplot=False,
+        num_workers=0,
         predict_depth_mult=10,
         downsample=0.7,
         devices=1,
@@ -206,23 +231,28 @@ def default_benchmark(model, default_dataset=FILE_DIR+"/../../data/r4iCehg3Tw5Ib
 
 def open_benchmark(model):
     adata = sc.read(
-        FILE_DIR+"/../../data/pancreas_atlas.h5ad",
+        FILE_DIR + "/../../data/pancreas_atlas.h5ad",
         backup_url="https://figshare.com/ndownloader/files/24539828",
     )
     adata = adata[adata.obs.tech == "inDrop1"]
 
-    train, test = split_molecules(
-        adata.layers['counts'].round().astype(int), 0.9)
+    train, test = split_molecules(adata.layers["counts"].round().astype(int), 0.9)
     is_missing = np.array(train.sum(axis=0) == 0)
     true = adata.copy()
     true.X = test
-    adata.layers['counts'] = train
+    adata.layers["counts"] = train
     test = test[:, ~is_missing.flatten()]
     adata = adata[:, ~is_missing.flatten()]
 
-    adata.obs['organism_ontology_term_id'] = "NCBITaxon:9606"
-    preprocessor = Preprocessor(subset_hvg=3000, use_layer='counts', is_symbol=True,
-                                force_preprocess=True, skip_validate=True, do_postp=False)
+    adata.obs["organism_ontology_term_id"] = "NCBITaxon:9606"
+    preprocessor = Preprocessor(
+        subset_hvg=3000,
+        use_layer="counts",
+        is_symbol=True,
+        force_preprocess=True,
+        skip_validate=True,
+        do_postp=False,
+    )
     nadata = preprocessor(adata.copy())
 
     denoise = Denoiser(
@@ -235,16 +265,23 @@ def open_benchmark(model):
         downsample=None,
     )
     expr = denoise(nadata)
-    denoised = ad.AnnData(expr.cpu().numpy(), var=nadata.var.loc[np.array(
-        denoise.model.genes)[denoise.model.pos[0].cpu().numpy().astype(int)]])
+    denoised = ad.AnnData(
+        expr.cpu().numpy(),
+        var=nadata.var.loc[
+            np.array(denoise.model.genes)[
+                denoise.model.pos[0].cpu().numpy().astype(int)
+            ]
+        ],
+    )
     denoised = denoised[:, denoised.var.symbol.isin(true.var.index)]
     loc = true.var.index.isin(denoised.var.symbol)
     true = true[:, loc]
     train = train[:, loc]
 
     # Ensure expr and adata are aligned by reordering expr to match adata's .var order
-    denoised = denoised[:, denoised.var.set_index(
-        'symbol').index.get_indexer(true.var.index)]
+    denoised = denoised[
+        :, denoised.var.set_index("symbol").index.get_indexer(true.var.index)
+    ]
     denoised.X = np.maximum(denoised.X - train.astype(float), 0)
     # scaling and transformation
     target_sum = 1e4
@@ -255,9 +292,7 @@ def open_benchmark(model):
     sc.pp.normalize_total(denoised, target_sum)
     sc.pp.log1p(denoised)
 
-    error_mse = sklearn.metrics.mean_squared_error(
-        true.X, denoised.X
-    )
+    error_mse = sklearn.metrics.mean_squared_error(true.X, denoised.X)
     # scaling
     initial_sum = train.sum()
     target_sum = true.X.sum()
@@ -274,14 +309,13 @@ def mse(test_data, denoised_data, target_sum=1e4):
     sc.pp.log1p(denoised_data)
 
     print("Compute mse value", flush=True)
-    return sklearn.metrics.mean_squared_error(
-        test_data.X.todense(), denoised_data.X
-    )
+    return sklearn.metrics.mean_squared_error(test_data.X.todense(), denoised_data.X)
 
 
 def withknn(adata, k=10, **kwargs):
-    adata.layers['denoised'] = knn_smooth.knn_smoothing(
-        adata.X.transpose(), k=k, **kwargs).transpose()
+    adata.layers["denoised"] = knn_smooth.knn_smoothing(
+        adata.X.transpose(), k=k, **kwargs
+    ).transpose()
     return adata
 
 
@@ -310,8 +344,7 @@ def split_molecules(
 
     umis_X_disjoint = random_state.binomial(umis, data_split - overlap_factor)
     umis_Y_disjoint = random_state.binomial(
-        umis - umis_X_disjoint, (1 - data_split) /
-        (1 - data_split + overlap_factor)
+        umis - umis_X_disjoint, (1 - data_split) / (1 - data_split + overlap_factor)
     )
     overlap_factor = umis - umis_X_disjoint - umis_Y_disjoint
     umis_X = umis_X_disjoint + overlap_factor

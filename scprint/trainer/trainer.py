@@ -19,7 +19,7 @@ class TrainingMode(Callback):
         do_next_tp: bool = False,
         do_generate: bool = True,
         class_scale: float = 1.5,
-        mask_ratio: List[float] = [], #0.3
+        mask_ratio: List[float] = [],  # 0.3
         warmup_duration: int = 500,
         fused_adam: bool = True,
         adv_class_scale: float = 0.1,
@@ -134,4 +134,4 @@ class TrainingMode(Callback):
         model.lr = self.lr
         model.optim = self.optim
         model.weight_decay = self.weight_decay
-        #model.configure_optimizers()
+        # model.configure_optimizers()
