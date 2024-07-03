@@ -1,68 +1,17 @@
 trainer:
   strategy: ddp_find_unused_parameters_true
-  num_nodes: 1
-  max_time:
-    hours: 72
   log_every_n_steps: 300
-  precision: 16-mixed
   gradient_clip_val: 500
-  limit_train_batches: 60000
-  limit_val_batches: 4000
+  limit_train_batches: 14000
+  limit_val_batches: 2000
   reload_dataloaders_every_n_epochs: 1
-  accumulate_grad_batches: 6
-  callbacks:
-    - class_path: scprint.trainer.TrainingMode
-      init_args:
-        do_denoise: True
-        noise:
-          - 0.3
-        do_cce: False
-        do_ecs: False
-        do_mvc: False
-        do_generate: True
-        do_adv_cls: False
-        do_next_tp: False
-        do_adv_batch: False
-        run_full_forward: False
-        do_cls: True
-        class_scale: 1
-        warmup_duration: 1000 # prev 3000 (maybe it helped?)
-        fused_adam: True
-        mask_ratio: []
-    #- class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
-    #  init_args:
-    #    swa_lrs: 0.0
-    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
-      init_args:
-        monitor: val_loss
-        save_top_k: 6
-        save_last: True
-    - class_path: lightning.pytorch.callbacks.EarlyStopping
-      init_args:
-        monitor: val_loss
-        patience: 2
-    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
-      init_args:
-        logging_interval: epoch
-    #- class_path: lightning.pytorch.callbacks.LearningRateFinder
-    #init_args:
-    #  mode: exponential
-
-  #plugins:
-  #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
-  #    requeue_signal: signal.SIGHUP
+  accumulate_grad_batches: 2
 model:
   nhead: 20
   lr: 0.00001
   nlayers: 32
   layers_cls: [512]
   d_model: 1280
-  freeze_embeddings: True
 data:
-  collection_name: all no zhang13M #preprocessed dataset #all no zhang13M
-  how: random expr
-  max_len: 2200
-  weight_scaler: 2000
-  train_oversampling_per_epoch: 1
   batch_size: 3
   num_workers: 9

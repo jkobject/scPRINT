@@ -1,5 +1,9 @@
 from lightning.pytorch.cli import LightningCLI
-
+from lightning.pytorch.callbacks import EarlyStopping
+from lightning.pytorch.callbacks import LearningRateMonitor
+from .trainer import TrainingMode
+from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks import StochasticWeightAveraging
 import torch
 
 
@@ -10,6 +14,18 @@ class MyCLI(LightningCLI):
     """
 
     def add_arguments_to_parser(self, parser):
+        parser.add_lightning_class_args(EarlyStopping, "scprint_early_stopping")
+        parser.set_defaults(
+            {
+                "scprint_early_stopping.monitor": "val_loss",
+                "scprint_early_stopping.patience": 3,
+            }
+        )
+        parser.add_lightning_class_args(
+            LearningRateMonitor, "scprint_learning_rate_monitor"
+        )
+        parser.set_defaults({"scprint_learning_rate_monitor.logging_interval": "epoch"})
+        parser.add_lightning_class_args(TrainingMode, "scprint_training")
         parser.link_arguments(
             "data.gene_pos", "model.gene_pos_enc", apply_on="instantiate"
         )
@@ -24,6 +40,7 @@ class MyCLI(LightningCLI):
         parser.link_arguments(
             "data.gene_embeddings", "model.precpt_gene_emb", apply_on="parse"
         )
+        parser.link_arguments("data.organisms", "model.organisms", apply_on="parse")
         parser.link_arguments(
             "data.num_datasets", "model.num_batch_labels", apply_on="instantiate"
         )

@@ -24,6 +24,7 @@ from grnndata import GRNAnnData, from_anndata, read_h5ad
 
 import umap
 import hdbscan
+from tqdm import tqdm
 
 from matplotlib import pyplot as plt
 import seaborn as sns
@@ -47,9 +48,6 @@ class GRNfer:
         num_workers: int = 8,
         num_genes: int = 3000,
         precision: str = "16-mixed",
-        organisms: List[str] = [
-            "NCBITaxon:9606",
-        ],
         cell_type_col="cell_type",
         model_name: str = "scprint",
         how: str = "random expr",  # random expr, most var withing, most var across, given
@@ -78,7 +76,6 @@ class GRNfer:
             max_len (int, optional): The maximum length of the gene sequence. Defaults to 1000.
             add_zero_genes (int, optional): The number of zero genes to add to the gene sequence. Defaults to 100.
             precision (str, optional): The precision to be used in the Trainer. Defaults to "16-mixed".
-            organisms (List[str], optional): The list of organisms to be considered. Defaults to [ "NCBITaxon:9606", ].
             pred_embedding (List[str], optional): The list of labels to be used for plotting embeddings. Defaults to [ "cell_type_ontology_term_id", "disease_ontology_term_id", "self_reported_ethnicity_ontology_term_id", "sex_ontology_term_id", ].
             model_name (str, optional): The name of the model to be used. Defaults to "scprint".
             output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
@@ -94,7 +91,6 @@ class GRNfer:
             "given",
         ], "how must be one of 'most var within', 'most var across', 'random expr', 'given'"
         self.num_genes = num_genes
-        self.organisms = organisms if type(organisms) is list else [organisms]
         self.model_name = model_name
         self.adata = adata
         self.preprocess = preprocess
@@ -110,7 +106,8 @@ class GRNfer:
         self.head_agg = head_agg
         self.max_cells = max_cells
         self.curr_genes = None
-        self.trainer = Trainer(precision=precision, devices=devices)
+        self.precision = precision
+        ##elf.trainer = Trainer(precision=precision, devices=devices, use_distributed_sampler=False)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, layer, cell_type=None, locname=""):
@@ -125,7 +122,6 @@ class GRNfer:
     def predict(self, layer, cell_type=None):
         self.curr_genes = None
         self.model.pred_log_adata = False
-        self.model.get_attention_layer = layer if type(layer) is list else [layer]
         if cell_type is not None:
             subadata = self.adata[
                 self.adata.obs[self.cell_type_col] == cell_type
@@ -169,7 +165,7 @@ class GRNfer:
             subadata, obs_to_output=["organism_ontology_term_id"]
         )
         self.col = Collator(
-            organisms=[subadata.obs["organism_ontology_term_id"][0]],
+            organisms=self.model.organisms,
             valid_genes=self.model.genes,
             how="some" if self.how != "random expr" else "random expr",
             genelist=self.curr_genes if self.how != "random expr" else [],
@@ -182,9 +178,26 @@ class GRNfer:
             shuffle=False,
         )
         self.model.attn.comp_attn = self.head_agg == "mean_full"
-        self.model.predict_mode = self.forward_mode
         self.model.doplot = self.doplot
-        self.trainer.predict(self.model, dataloader)
+        self.model.on_predict_epoch_start()
+        self.model.eval()
+        device = self.model.device.type
+
+        with torch.no_grad(), torch.autocast(device_type=device, dtype=torch.float16):
+            for batch in tqdm(dataloader):
+                gene_pos, expression, depth = (
+                    batch["genes"].to(device),
+                    batch["x"].to(device),
+                    batch["depth"].to(device),
+                )
+                self.model._predict(
+                    gene_pos,
+                    expression,
+                    depth,
+                    predict_mode=self.forward_mode,
+                    get_attention_layer=layer if type(layer) is list else [layer],
+                )
+                torch.cuda.empty_cache()
         return subadata
 
     def aggregate(self, attn):
@@ -379,20 +392,25 @@ def default_benchmark(
     model,
     default_dataset="sroy",
     cell_types=[
+        "kidney distal convoluted tubule epithelial cell",
+        "kidney loop of Henle thick ascending limb epithelial cell"
         "kidney collecting duct principal cell",
-        #'mesangial cell',
+        # 'mesangial cell',
         "blood vessel smooth muscle cell",
         "podocyte",
         "macrophage",
         "leukocyte",
         "kidney interstitial fibroblast",
-        #'endothelial cell',
+        # 'endothelial cell',
     ],
-    maxlayers=6,
+    maxlayers=16,
     maxgenes=5000,
     batch_size=32,
+    maxcells=1024,
 ):
     metrics = {}
+    layers = list(range(model.nlayers))[max(0, model.nlayers - maxlayers) :]
+    clf_omni = None
     if default_dataset == "sroy":
         preprocessor = Preprocessor(
             is_symbol=True,
@@ -402,18 +420,21 @@ def default_benchmark(
             min_valid_genes_id=5000,
             min_dataset_size=64,
         )
-        clf_omni = None
         for da, spe, gt in [
-            ("han", "human", "full"),  # ("liu", "human", "chip"),
-            # ("liu", "human", "ko"), ("chen", "human", "full"),
+            ("han", "human", "full"),
+            ("mine", "human", "full"),
+            ("han", "human", "chip"),
+            ("han", "human", "ko"),
             ("tran", "mouse", "full"),
             ("zhao", "mouse", "full"),
+            ("tran", "mouse", "chip"),
+            ("tran", "mouse", "ko"),
         ]:
-            # for (da, spe, gt) in [("liu", "human", "full"), ("liu", "human", "chip"),
-            #                      ("liu", "human", "ko"), ("chen", "human", "full"),
-            #                      ("duren", "mouse", "full"), ("semrau", "mouse", "full"),
-            # ("semrau", "mouse", "chip"), ("semrau", "mouse", "ko")
-            #                      ]:
+            print(da + "_" + gt)
+            # for (da, spe, gt) in [("han", "human", "full"),# ("liu", "human", "chip"),
+            #                       #("liu", "human", "ko"), ("chen", "human", "full"),
+            #                       ("tran", "mouse", "full"), ("zhao", "mouse", "full"),
+            # ]:
             preadata = get_sroy_gt(get=da, species=spe, gt=gt)
             adata = preprocessor(preadata.copy())
             grn_inferer = GRNfer(
@@ -424,42 +445,48 @@ def default_benchmark(
                 head_agg="none",
                 filtration="none",
                 forward_mode="none",
-                organisms=adata.obs["organism_ontology_term_id"][0],
                 num_genes=maxgenes,
-                max_cells=2048,
+                num_workers=0,
+                max_cells=maxcells,
                 doplot=False,
                 batch_size=batch_size,
                 devices=1,
             )
-            grn = grn_inferer(layer=list(range(model.nlayers))[:])
+            print("running inference")
+            grn = grn_inferer(layer=layers)
+            print("training classifier")
             if clf_omni is not None:
                 grn.varp["classified"] = clf_omni.predict_proba(
                     grn.varp["GRN"].reshape(-1, grn.varp["GRN"].shape[-1])
                 ).reshape(len(grn.var), len(grn.var), 2)[:, :, 1]
             else:
                 grn, m, clf_omni = train_classifier(
-                    grn, C=1, train_size=0.9, class_weight={1: 200, 0: 1}, shuffle=True
+                    grn,
+                    C=0.01,
+                    train_size=0.9,
+                    class_weight={1: 200, 0: 1},
+                    shuffle=False,
                 )
             grn.varp["all"] = grn.varp["GRN"]
             grn.varp["GRN"] = grn.varp["classified"]
             grn.var["ensembl_id"] = grn.var.index
             grn.var["symbol"] = make_index_unique(grn.var["symbol"].astype(str))
             grn.var.index = grn.var["symbol"]
+            print("calling bengrn")
             metrics["class_omni_" + da + "_" + gt] = BenGRN(
                 grn, do_auc=True, doplot=False
             ).compare_to(other=preadata)
             ############################
             grn.varp["GRN"] = grn.varp["all"]
+            del grn.varp["all"]
             grn.var.index = grn.var["ensembl_id"]
-            ratio = (
-                (preadata.varp["GRN"] > 0).sum(0) * (preadata.varp["GRN"] > 0).sum(1)
-            ) / preadata.varp["GRN"].sum()
+            ratio = 20  # / preadata.varp['GRN'].sum()
             ratio = ratio if ratio < 100 else 100
             weight = {1: ratio, 0: 1}
             grn, m, _ = train_classifier(
                 grn,
                 other=preadata,
-                C=0.4,
+                C=0.5,
                 train_size=0.5,
                 class_weight=weight,
                 shuffle=False,
@@ -470,29 +497,35 @@ def default_benchmark(
                 grn, do_auc=True, doplot=False
             ).compare_to(other=preadata)
             metrics["class_self_" + da + "_" + gt].update({"classifier": m})
+            del grn
+            gc.collect()
             ############################
             grn_inferer = GRNfer(
                 model,
                 adata,
-                how="most var within",
+                how="random expr",
                 preprocess="softmax",
                 head_agg="max",
                 filtration="none",
                 forward_mode="none",
-                organisms=adata.obs["organism_ontology_term_id"][0],
-                num_genes=maxgenes,
-                max_cells=1024,
+                num_genes=3000,
+                max_cells=maxcells,
                 doplot=False,
+                num_workers=0,
                 batch_size=batch_size,
                 devices=1,
             )
-            grn = grn_inferer(layer=list(range(model.nlayers))[:])
+            grn = grn_inferer(layer=layers)
+            del grn_inferer
+            gc.collect()
             grn.var["ensembl_id"] = grn.var.index
             grn.var["symbol"] = make_index_unique(grn.var["symbol"].astype(str))
             grn.var.index = grn.var["symbol"]
             metrics["full_" + da + "_" + gt] = BenGRN(
                 grn, do_auc=True, doplot=False
             ).compare_to(other=preadata)
+            del grn
+            gc.collect()
     elif default_dataset == "gwps":
         if not os.path.exists(FILEDIR + "/../../data/perturb_gt.h5ad"):
             adata = get_perturb_gt()
@@ -515,22 +548,22 @@ def default_benchmark(
             nadata,
             how="most var within",
             preprocess="softmax",
-            head_agg="max",
+            head_agg="mean",
             filtration="none",
             forward_mode="none",
-            organisms=adata.obs["organism_ontology_term_id"][0],
             num_genes=maxgenes,
-            max_cells=1024,
+            max_cells=maxcells,
             doplot=False,
+            num_workers=0,
             batch_size=batch_size,
             devices=1,
         )
-        grn = grn_inferer(
-            layer=list(range(model.nlayers))[max(0, model.nlayers - maxlayers) :]
-        )
+        grn = grn_inferer(layer=layers)
         metrics["max_all"] = BenGRN(grn, do_auc=True, doplot=False).compare_to(
             other=adata
         )
+        del grn
+        gc.collect()
         grn_inferer = GRNfer(
             model,
             nadata,
@@ -539,21 +572,23 @@ def default_benchmark(
             head_agg="none",
             filtration="none",
             forward_mode="none",
-            organisms=adata.obs["organism_ontology_term_id"][0],
             num_genes=maxgenes,
-            max_cells=1024,
+            max_cells=maxcells,
             doplot=False,
+            num_workers=0,
             batch_size=batch_size,
             devices=1,
         )
-        grn = grn_inferer(layer=list(range(model.nlayers))[:])
+        grn = grn_inferer(layer=layers)
         grn.var["ensembl_id"] = grn.var.index
+        grn.varp["GRN"] = np.transpose(grn.varp["GRN"], (1, 0, 2))
         grn.varp["all"] = grn.varp["GRN"]
+
         grn, m, clf = train_classifier(
             grn,
             other=adata,
-            C=0.4,
-            train_size=0.5,
+            C=0.3,
+            train_size=0.3,
             class_weight={1: 40, 0: 1},
             doplot=False,
             shuffle=False,
@@ -569,7 +604,7 @@ def default_benchmark(
             grn,
             C=0.1,
             train_size=0.9,
-            class_weight={1: 100, 0: 1},
+            class_weight={1: 200, 0: 1},
             doplot=False,
             shuffle=True,
             use_col="gene_name",
@@ -594,16 +629,13 @@ def default_benchmark(
                 head_agg="max",
                 filtration="none",
                 forward_mode="none",
-                organisms=adata.obs["organism_ontology_term_id"][0],
-                num_genes=3000,
-                max_cells=1024,
+                num_workers=0,
+                num_genes=2200,
+                max_cells=maxcells,
                 doplot=False,
                 batch_size=batch_size,
                 devices=1,
             )
-            if celltype != cell_types[0]:
-                del grn
-                gc.collect()
             grn = grn_inferer(layer=list(range(model.nlayers))[:], cell_type=celltype)
             grn.var.index = make_index_unique(grn.var["symbol"].astype(str))
             m = BenGRN(grn, doplot=False).scprint_benchmark()
@@ -616,9 +648,9 @@ def default_benchmark(
                 head_agg="none",
                 filtration="none",
                 forward_mode="none",
-                organisms=adata.obs["organism_ontology_term_id"][0],
+                num_workers=0,
                 num_genes=maxgenes,
-                max_cells=1024,
+                max_cells=maxcells,
                 doplot=False,
                 batch_size=batch_size,
                 devices=1,
@@ -630,7 +662,7 @@ def default_benchmark(
                 grn,
                 C=0.1,
                 train_size=0.5,
-                class_weight={1: 100, 0: 1},
+                class_weight={1: 200, 0: 1},
                 shuffle=False,
                 doplot=False,
             )
@@ -640,4 +672,6 @@ def default_benchmark(
                 grn, doplot=False
             ).scprint_benchmark()
             metrics[celltype + "_scprint_class"].update({"classifier": m})
+            del grn
+            gc.collect()
     return metrics

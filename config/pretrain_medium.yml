@@ -1,20 +1,7 @@
-trainer:
-  limit_train_batches: 5000
-  limit_val_batches: 1000
-  max_time:
-    hours: 72
 model:
-  nhead: 4
+  nhead: 2
   nlayers: 8
-  freeze_embeddings: True
   layers_cls: [256]
   d_model: 256
 data:
   collection_name: all no zhang13M #preprocessed dataset
-  max_len: 2200
-  weight_scaler: 40
-  train_oversampling_per_epoch: 0.4
-  validation_split: 0.02
-  test_split: 0.02
-  batch_size: 64
-  num_workers: 12

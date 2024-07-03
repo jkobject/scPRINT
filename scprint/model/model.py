@@ -53,10 +53,11 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
     def __init__(
         self,
         genes: list,
+        organisms: list = ["NCBITaxon:9606"],
         precpt_gene_emb: Optional[str] = None,
         gene_pos_enc: Optional[list] = None,
+        normalization: str = "sum",
         d_model: int = 512,
-        organisms=[],
         nhead: int = 8,
         d_hid: int = 512,
         edge_dim: int = 12,
@@ -154,6 +155,8 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         self.keep_all_cls_pred = False
         # should be stored somehow
         self.d_model = d_model
+        self.normalization = normalization
+        self.organisms = organisms
         self.edge_dim = edge_dim
         self.nlayers = nlayers
         self.gene_pos_enc = gene_pos_enc
@@ -223,7 +226,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             assert n_input_bins > 0
             self.expr_encoder = encoders.CategoryValueEncoder(n_input_bins, d_model)
         else:
-            self.expr_encoder = nn.Identity()
+            self.expr_encoder = torch.nn.Identity()
 
         # Positional Encoding
         if self.gene_pos_enc is not None:
@@ -302,7 +305,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             zinb=zinb,
         )
         # cls decoder
-        self.cls_decoders = nn.ModuleDict()
+        self.cls_decoders = torch.nn.ModuleDict()
         # should be a very simple classifier for most things
         # (maybe scale with the number of classes) should be 1 layer...
         for clss, n_cls in classes.items():
@@ -335,7 +338,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             )
         )
         for i, dec in self.cls_decoders.items():
-            nn.init.constant_(dec.out_layer.bias, -0.13)
+            torch.nn.init.constant_(dec.out_layer.bias, -0.13)
         self.save_hyperparameters()
 
     def on_load_checkpoint(self, checkpoints):
@@ -367,10 +370,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
 
         mencoders = {}
         try:
-            if (
-                self.trainer.datamodule.decoders
-                != checkpoints["hyper_parameters"]["label_decoders"]
-            ):
+            if self.trainer.datamodule.decoders != self.label_decoders:
                 # if we don't have the same decoders, we need to update the one on the datamodule side
                 for k, v in checkpoints["hyper_parameters"]["label_decoders"].items():
                     mencoders[k] = {va: ke for ke, va in v.items()}
@@ -388,6 +388,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         except RuntimeError as e:
             if "scPrint is not attached to a `Trainer`." in str(e):
                 print("RuntimeError caught: scPrint is not attached to a `Trainer`.")
+        # self.save_hyperparameters()
 
     def _encoder(
         self,
@@ -411,12 +412,16 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         self.cur_gene_token_embs = enc.clone()
 
         if expression is not None:
-            enc += self.expr_encoder(
-                (expression / expression.sum(1).unsqueeze(1)),
-                mask
-                # 10_000 * (expression / full_depth.unsqueeze(1)), mask
-                # torch.log2(1 + expression)
-            )  # (minibatch, seq_len, embsize)
+            if self.normalization == "sum":
+                enc += self.expr_encoder(
+                    (expression / expression.sum(1).unsqueeze(1)), mask
+                )  # (minibatch, seq_len, embsize)
+            elif self.normalization == "log":
+                enc += self.expr_encoder(
+                    torch.log2(1 + expression), mask
+                )  # (minibatch, seq_len, embsize)
+            else:
+                raise ValueError(f"Unknown normalization: {self.normalization}")
 
         if self.gene_pos_enc:
             enc += self.pos_encoder(gene_pos)
@@ -831,7 +836,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         # TASK 6. expression generation
         if do_generate:
             output = self._generate(
-                output["cell_embs"],
+                output["cell_embs"] if not run_full_forward else full_cell_embs,
                 gene_pos,
                 depth_mult=expression.sum(1),
                 full_depth=None,
@@ -920,24 +925,34 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 mu=output["mean"],
                 target=expression,
             )
-        else:
+        elif "mean" in output:
             loss_expr = loss.mse(
                 input=output["mean"],
                 target=expression,
             )
+        else:
+            loss_expr = 0
         total_loss += loss_expr
         losses.update({"expr": loss_expr})
 
         # TASK 2. predict classes
         if len(self.classes) > 0:
             ## Calculate pairwise cosine similarity for the embeddings
-            # cos_sim_matrix = torch.nn.functional.cosine_similarity(output["cell_embs"].unsqueeze(2), output["cell_embs"].unsqueeze(1), dim=3).abs().mean(0)
+            cos_sim_matrix = (
+                torch.nn.functional.cosine_similarity(
+                    output["cell_embs"].unsqueeze(2),
+                    output["cell_embs"].unsqueeze(1),
+                    dim=3,
+                )
+                .abs()
+                .mean(0)
+            )
             ## Since we want to maximize dissimilarity, we minimize the negative of the average cosine similarity
             ## We subtract from 1 to ensure positive values, and take the mean off-diagonal (i != j)
-            # loss_class_emb_diss = cos_sim_matrix.fill_diagonal_(0).mean()
+            loss_class_emb_diss = cos_sim_matrix.fill_diagonal_(0).mean()
             ## Apply the custom dissimilarity loss to the cell embeddings
-            # losses.update({"class_emb_sim": loss_class_emb_diss})
-            # total_loss += self.class_embd_diss_scale * loss_class_emb_diss
+            losses.update({"class_emb_sim": loss_class_emb_diss})
+            total_loss += self.class_embd_diss_scale * loss_class_emb_diss
             ## compute class loss
             loss_cls = 0
             loss_adv_cls = 0
@@ -1126,11 +1141,20 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.log_adata(
                 gtclass=self.info, name="validation_part_" + str(self.counter)
             )
-            if (self.current_epoch + 1) % 20 == 0:
+            if (self.current_epoch + 1) % 40 == 0:
                 metrics = self._test()
                 self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
 
-    def _test(self):
+    def test_step(self, *args, **kwargs):
+        print("step")
+        pass
+
+    def on_test_epoch_end(self):
+        metrics = self._test(name="")
+        self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
+
+    def _test(self, name=""):
+        print("start test")
         metrics = {}
         model_copy = copy.deepcopy(self)
         res = embbed_task.default_benchmark(
@@ -1165,7 +1189,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         print(metrics)
         gc.collect()
         res = denoise_task.default_benchmark(
-            model_copy, FILEDIR + "/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad"
+            model_copy, FILEDIR + "/../../data/gNNpgpo6gATjuxTE7CCp.h5ad"
         )
         metrics.update(
             {
@@ -1179,37 +1203,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
         f.write(json.dumps({"denoise": res}, indent=4))
         f.close()
-        print("sroy")
-        res = grn_task.default_benchmark(
-            model_copy, "sroy", batch_size=32 if self.d_model <= 512 else 8
-        )
-        f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
-        f.write(json.dumps({"grn_sroy": res}, default=lambda o: str(o), indent=4))
-        f.close()
-        metrics.update(
-            {
-                "grn_sroy/auprc_self": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class_self" in k])
-                ),
-                "grn_sroy/epr_self": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class_self" in k])
-                ),
-                "grn_sroy/auprc_omni": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class_omni" in k])
-                ),
-                "grn_sroy/epr_omni": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class_omni" in k])
-                ),
-                "grn_sroy/epr": float(
-                    np.mean([i["epr"] for k, i in res.items() if "full_" in k])
-                ),
-                "grn_sroy/auprc": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "full_" in k])
-                ),
-            }
-        )
-        print(metrics)
-        gc.collect()
         res = grn_task.default_benchmark(
             model_copy, "gwps", batch_size=32 if self.d_model <= 512 else 8
         )
@@ -1241,8 +1234,38 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         print(metrics)
         gc.collect()
         res = grn_task.default_benchmark(
+            model_copy, "sroy", batch_size=32 if self.d_model <= 512 else 8
+        )
+        f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
+        f.write(json.dumps({"grn_sroy": res}, default=lambda o: str(o), indent=4))
+        f.close()
+        metrics.update(
+            {
+                "grn_sroy/auprc_self": float(
+                    np.mean([i["auprc"] for k, i in res.items() if "class_self" in k])
+                ),
+                "grn_sroy/epr_self": float(
+                    np.mean([i["epr"] for k, i in res.items() if "class_self" in k])
+                ),
+                "grn_sroy/auprc_omni": float(
+                    np.mean([i["auprc"] for k, i in res.items() if "class_omni" in k])
+                ),
+                "grn_sroy/epr_omni": float(
+                    np.mean([i["epr"] for k, i in res.items() if "class_omni" in k])
+                ),
+                "grn_sroy/epr": float(
+                    np.mean([i["epr"] for k, i in res.items() if "full_" in k])
+                ),
+                "grn_sroy/auprc": float(
+                    np.mean([i["auprc"] for k, i in res.items() if "full_" in k])
+                ),
+            }
+        )
+        print(metrics)
+        gc.collect()
+        res = grn_task.default_benchmark(
             model_copy,
-            FILEDIR + "/../../data/yBCKp6HmXuHa0cZptMo7.h5ad",
+            FILEDIR + "/../../data/gNNpgpo6gATjuxTE7CCp.h5ad",
             batch_size=32 if self.d_model <= 512 else 8,
         )
         f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
@@ -1364,34 +1387,33 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.pred_embedding (list, optional): the classes to predict. Defaults to [].
 
         """
-        if self.predict_mode == "none":
+        if predict_mode == "none":
             output = self.forward(
                 gene_pos,
                 expression,
                 depth_mult=expression.sum(1),
                 full_depth=depth,
-                get_attention_layer=self.get_attention_layer,
+                get_attention_layer=get_attention_layer,
                 do_class=True,
             )
-            if len(self.get_attention_layer) > 0:
+            if len(get_attention_layer) > 0:
                 self.attn.agg([i[:, :, :2, :] for i in output[1]], gene_pos)
                 output = output[0]
             cell_embs = output["cell_embs"]
-
         elif predict_mode == "denoise":
             output = self.forward(
                 gene_pos,
                 expression,
-                depth_mult=expression.sum(1) * self.predict_depth_mult,
-                full_depth=depth * self.predict_depth_mult,
-                get_attention_layer=self.get_attention_layer,
+                depth_mult=expression.sum(1) * depth_mult,
+                full_depth=depth * depth_mult,
+                get_attention_layer=get_attention_layer,
                 do_class=True,
             )
-            if len(self.get_attention_layer) > 0:
+            if len(get_attention_layer) > 0:
                 self.attn.agg([i[:, :, :2, :] for i in output[1]], gene_pos)
                 output = output[0]
             cell_embs = output["cell_embs"]
-        elif self.predict_mode == "generate":
+        elif predict_mode == "generate":
             output = self.forward(
                 gene_pos,
                 expression,
@@ -1413,9 +1435,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 "predict_mode needs to be one of ['none', 'denoise', 'generate']"
             )
 
-        if len(self.pred_embedding) == 0:
-            self.pred_embedding = self.classes
-        ind = [self.classes.index(i) + 2 for i in self.pred_embedding]
+        if len(pred_embedding) == 0:
+            pred_embedding = self.classes
+        ind = [self.classes.index(i) + 2 for i in pred_embedding]
         if not keep_output:
             return {
                 "embs": torch.mean(cell_embs[:, ind, :], dim=1),
@@ -1581,7 +1603,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.classes,
             self.pred if not self.keep_all_cls_pred else None,
             self.attn.get(),
-            self.trainer.global_step,
+            self.global_step,
             self.label_decoders,
             self.labels_hierarchy,
             gtclass,

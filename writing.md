@@ -18,10 +18,11 @@ scPrint: Solving the inherent issues of current expression LLMs using gene regul
 scPrint: (Towards?) an explainable scRNAseq foundational model for gene network inference
 scPrint: (towards?) single cell Foundation models
 learn the cell mechanism
-are unsupervised GRN predictors/cell modelers 
+are unsupervised GRN predictors/cell modelers
+
 
 ## Main
- 
+
 ### Definitions
 Understanding the cellular mechanism would be considered a milestone in biology. It would allow us to better predict cell behavior and the impact of new drugs. A step towards that goal is the inference of gene networks that explain the maintenance of gene expression across cells. [] Many approaches have been developed to infer such networks from shallow cell measurements and although other multi-omics approaches can greatly complement the inference of gene networks, scRNAseq remains the most commonly available and cheapest single-cell assay.
 Gene Regulatory networks can mean different things. Our goal is to consider them as a schematic representation of the cell’s internal behavior, a cell model at the level of transcripts. A gene network will thus encompass any set of genes that can impact another gene’s RNA abundance. Whether they are TFs recruiting polymerase or RNA-RNA interactions impacting the degradation of a gene. 
@@ -61,8 +62,7 @@ what biologists want to do, what they can do with this tool, how to do this, foc
 
 Given the relative infancy of these large models, we have produced our own called scPRINT. It builds on top of scGPT, Universal Cell Embedding and Geneformer. While adding many novelties and inductive biases to the model and its pretraining methodologies. We show that they help the model attain good zero shot abilities on many important tasks of cellular biology.
 First scPRINT is based on a bidirectional transformer with flashattention2 which helps the model generate fully connected gene x gene attention matrices at the scale of the genome. 
-
-### training
+training
 
 scPRINT is trained with a set of novel multi task pre-training using 50M cells from Cellxgene across multiple species, diseases and ethnicities. which represents roughly around 100 billion tokens.
 Its main pretraining task is denoising. In the context of expression data, we use downsampling of transcript count per cell as noise. 0 counts being a fully random, unknown profile.
@@ -116,6 +116,10 @@ First we look at how much information from omnipath is contained in the network.
 We do not expect most connections to be present in the cell type’s gene network as half of the genes will not even be expressed and many connections in omnipath might be only true in some cellular contexts. Moreover we do not expect most connections in our generated cell type specific network as omnipath only contains a tiny fraction of all true gene-gene connections.
 On this benchmark we look at AUC and EPR, two metrics often used in GRN benchmarks (beeline) (see methods), where we view our task as a binary classification of connections or not on all gene-gene pairs.
 AUC shows the area under the curve defined by the different precision, recall values as we increase the cutoff on the directed weighted graph predicted by our different tools.
+EPR corresponds to the expected precision recall for a cutoff that leaves as many connections in the ground 
+
+
+We focus more on TFs compared to GENIE3
 EPR corresponds to the expected precision recall for a cutoff that leaves as many connections in the ground truth as in the prediction. it is in the form 
 
 $EPR = \frac{2 \cdot precision \cdot recall}{precision + recall}$. 
@@ -195,7 +199,6 @@ labels prediction
 one might be interested in some rare cell states. Those have few cells and extracting information can be difficult. they are also often the most interesting. responsible for a breadth of disease and 
 based on the available transcriptomic profile and inferred  
 
-
 ## Discussion
 
 ### output
@@ -212,13 +215,11 @@ Moreover we would like to acknowledge the very important contributions without w
 ## Methods
 
 ### Denoising
-
 We view denoising as taking a cell profile xi = .. 
 that has a total count sum xi = ti
 we add a certain amount of noise by downsampling it to..
 
 ### Graphical model
-
 scPRINT’s transformer model outputs the parameters of a zero inflated negative binomial function.
 Based on the work of (counts) zero inflation is the best distribution for taking in account a broad range of transcriptomic measurement where some have enough dropout that a zero inflation term is needed to model it
 One can see a negative binomial distribution:
@@ -239,35 +240,27 @@ gene encoder
 naftali tishbi
 Classification as a pretraining task
 
-### Hierarchical Classifier
+Hierarchical Classifier
 
-### scDataloader
-
+scDataloader
 lamin.ai
 preprocessing
 h5ads
 random weighted sampling
 lightning datamodule
-
-### extracting meta-cell gene networks from attention matrices
-
+extracting meta-cell gene networks from attention matrices
 attention matrices equations
 mutli head per layer
 meta cell level equations
 doing classification
-
-### Gene networks from genome-wide perturb seq
-
+Gene networks from genome-wide perturb seq
 cutoff on diff expr of cells with KO A vs baseline
 for all diff expr
 giving a gene x gene directed weighted graph
-
-### BenGRN metrics on gene networks
-
+BenGRN metrics on gene networks
 EPR and AUC, enrichment
 
-## Availabability & Access
-
+Availabability & Access
 code on
 pretraining on
 model weights on
@@ -278,23 +271,15 @@ other datasets use on
 GrnnData
 BenGRN
 scDataLoader
-
-## Supplementary figures
-
+Supplementary figures
 [FIG S1] model size comparison
-
 [FIG S2] model performance increase on omnipath
 untrained, small, medium, large, vlarge, scGPT
-
 [FIG S3] model performance increase on classification
-
 [FIG S4] model performance increase on embedding task
-
 [FIG S5] ablation study ( impact on model performance at…)
-
 [FIG S6] overlap of different GRN ground truths
 saying that we don't expect a lot of overlap in any case
-
 [FIG S7] diff expr analysis on naive B cell vs rest
 
 [FIG S8] schematic representation of the hierarchical classifier

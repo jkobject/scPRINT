@@ -1,19 +1,19 @@
 trainer:
   #strategy: ddp_find_unused_parameters_true
-  num_nodes: 4
+  num_nodes: 2
   log_every_n_steps: 100
-  limit_train_batches: 15000
-  limit_val_batches: 3000
+  limit_train_batches: 48_000
+  limit_val_batches: 4_000
   reload_dataloaders_every_n_epochs: 1
-  accumulate_grad_batches: 3
+  accumulate_grad_batches: 8
   precision: 16-mixed
   callbacks:
     - class_path: scprint.trainer.TrainingMode
       init_args:
         do_denoise: True
-        noise: 
-          - 0.3
-        do_cce: False
+        noise:
+          - 0.6
+        do_cce: True
         do_ecs: False
         do_mvc: False
         do_generate: True
@@ -22,11 +22,9 @@ trainer:
         do_adv_batch: False
         run_full_forward: False
         do_cls: True
-        class_scale: 1.5
+        class_scale: 1
         warmup_duration: 1500
         fused_adam: True
-        lr_reduce_factor: .66
-        lr_reduce_patience: 2
         mask_ratio: []
 model:
   lr: 0.0001
@@ -43,7 +41,7 @@ data:
   collection_name: preprocessed dataset #all no zhang13M #preprocessed dataset #all no zhang13M
   how: random expr
   max_len: 2400
-  weight_scaler: 40
-  train_oversampling_per_epoch: 0.05
+  weight_scaler: 100
+  train_oversampling_per_epoch: 0.5
   batch_size: 1
   num_workers: 6
