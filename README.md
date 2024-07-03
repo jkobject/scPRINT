@@ -46,12 +46,20 @@ not my fault, scream at nvidia, pytorch, Tri Dao and OpenAI :wink:
 ```python
 conda create ...
 git clone https://github.com/jkobject/scPRINT
+git clone https://github.com/jkobject/GRnnData
+git clone https://github.com/jkobject/benGRN
 cd scPRINT
 git checkout dev
 git submodule init
 git submodule update
+pip install -e scDataloader
+pip install -e ../GRnnData/
+pip install -e ../benGRN/
+tall torch==2.0.0 torchvision==0.15.1 torchaudio==2.0.1
 # install pytorch as mentionned above if you have a GPU
 pip install -e .[dev]
+pip install 'lamindb[jupyter,bionty]'
+pip install triton==2.0.0.dev20221202 --no-deps
 # install triton as mentioned in .toml if you want to
 mkdocs serve # to view the dev documentation
 ```

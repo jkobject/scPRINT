@@ -17,7 +17,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 
-#from scprint.tasks import generate
+# from scprint.tasks import generate
 
 
 def make_adata(
@@ -108,7 +108,9 @@ def make_adata(
                         if true in cur_labels_hierarchy:
                             res.append(pred in cur_labels_hierarchy[true])
                         elif true not in class_topred:
-                            raise ValueError(f"true label {true} not in available classes")
+                            raise ValueError(
+                                f"true label {true} not in available classes"
+                            )
                         elif true != "unknown":
                             res.append(False)
                     elif true not in class_topred:
@@ -461,37 +463,54 @@ def translate(
 
 
 class Attention:
-    def __init__(self, gene_dim):
+    def __init__(self, gene_dim, comp_attn=False):
         self.data = None
         self.gene_dim = gene_dim
         self.div = None
+        if comp_attn:
+            self.attn = torch.zeros([gene_dim + 8, gene_dim + 8])
+        self.comp_attn = comp_attn
 
     def agg(self, x: list[Tensor], pos: Tensor):
-        pos = pos.detach().to("cpu")
-        if self.data is None:
-            self.data = torch.zeros([len(x), self.gene_dim] + list(x[0].shape[2:]))
-            self.div = torch.zeros(self.gene_dim)
-        for i in range(x[0].shape[0]):
-
-            loc = torch.cat([torch.Tensor([r for r in range(8)]), pos[i] + 8]).int()
-            for j in range(len(x)):
-                self.data[j, loc, :, :, :] += x[j][i].detach().to("cpu")
-            self.div[loc] += 1
+        if self.comp_attn:
+            for i in len(x):
+                for j in range(x[0].shape[0]):
+                    # for i in range(Qs.shape[0])
+                    loc = torch.cat(
+                        [torch.Tensor([r for r in range(8)]), pos[j] + 8]
+                    ).int()
+                    self.attn[loc, loc] += x[i, j, 0, :, :] @ x[i, j, 1, :, :].T
+            self.attn = self.attn / (x[0].shape[0] * len(x))
+        else:
+            pos = pos.detach().to("cpu")
+            if self.data is None:
+                self.data = torch.zeros([len(x), self.gene_dim] + list(x[0].shape[2:]))
+                self.div = torch.zeros(self.gene_dim)
+            for i in range(x[0].shape[0]):
+                loc = torch.cat([torch.Tensor([r for r in range(8)]), pos[i] + 8]).int()
+                for j in range(len(x)):
+                    self.data[j, loc, :, :, :] += x[j][i].detach().to("cpu")
+                self.div[loc] += 1
 
     def add(self, x: list[Tensor], pos: Tensor):
         pos = pos.detach().to("cpu")
         if self.data is None:
-
             self.data = torch.zeros([len(x), self.gene_dim] + list(x[0].shape[2:]))
             self.div = torch.zeros(self.gene_dim)
 
         for i in range(x[0].shape[0]):
-            #loc = torch.cat([torch.Tensor([r for r in range(8)]), pos[i] + 8]).int()
-            self.data.append(torch.cat([x[j][i].detach().to("cpu") for j in range(len(x))]))
-            #self.div[loc] += 1
+            # loc = torch.cat([torch.Tensor([r for r in range(8)]), pos[i] + 8]).int()
+            self.data.append(
+                torch.cat([x[j][i].detach().to("cpu") for j in range(len(x))])
+            )
+            # self.div[loc] += 1
 
     def get(self):
-        if self.data is None:
-            return None
-        # shape is (layers, genes, qkv, heads, emb)
-        return self.data / self.div.view(1, self.div.shape[0], 1, 1, 1)
+        if self.comp_attn:
+            loc = self.attn.sum(0) != 0
+            return self.attn[loc][:, loc].detach().cpu().numpy()
+        else:
+            if self.data is None:
+                return None
+            # shape is (layers, genes, qkv, heads, emb)
+            return self.data / self.div.view(1, self.div.shape[0], 1, 1, 1)
