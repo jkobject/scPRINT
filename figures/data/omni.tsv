@@ -1,0 +1,55 @@
+tool	name	EPR	AUPRC	RAND	TF_targ	TF_enr	TF_only	celltype
+GENIE3	kidney distal convoluted tubule epithelial cell	6.14	0.00261	0.00109	12.9	TRUE	TRUE	FALSE
+GENIE3	kidney distal convoluted tubule epithelial cell	1.59	0.00108	0.00109	3.2	FALSE	FALSE	TRUE
+GENIE3	kidney loop of Henle thick ascending limb epit...	4.07	0.00319	0.00121	2.5	TRUE	TRUE	TRUE
+GENIE3	kidney loop of Henle thick ascending limb epit...	0.43	0.00118	0.00121	7.5	FALSE	FALSE	TRUE
+GENIE3	kidney collecting duct principal cell	10.91	0.00500	0.00139	1.4	TRUE	TRUE	TRUE
+GENIE3	kidney collecting duct principal cell	1.48	0.00146	0.00139	4.3	FALSE	FALSE	TRUE
+GENIE3	mesangial cell	7.15	0.00279	0.00122	7.1	TRUE	TRUE	TRUE
+GENIE3	mesangial cell	0.75	0.00123	0.00122	2.4	FALSE	FALSE	FALSE
+GENIE3	blood vessel smooth muscle cell	6.58	0.00505	0.00165	3.8	TRUE	TRUE	TRUE
+GENIE3	blood vessel smooth muscle cell	1.11	0.00180	0.00165	5.7	FALSE	FALSE	TRUE
+GENIE3	podocyte	6.28	0.00493	0.00152	2.1	TRUE	TRUE	TRUE
+GENIE3	podocyte	0.82	0.00153	0.00152	2.1	FALSE	FALSE	TRUE
+GENIE3	macrophage	6.94	0.00427	0.00140	0.0	TRUE	TRUE	FALSE
+GENIE3	macrophage	1.13	0.00143	0.00140	7.3	FALSE	FALSE	FALSE
+GENIE3	leukocyte	14.29	0.00564	0.00142	0.0	TRUE	TRUE	TRUE
+GENIE3	leukocyte	1.38	0.00166	0.00142	5.3	FALSE	FALSE	FALSE
+GENIE3	kidney interstitial fibroblast	8.32	0.00624	0.00161	9.3	TRUE	TRUE	FALSE
+GENIE3	kidney interstitial fibroblast	1.13	0.00181	0.00161	7.0	FALSE	FALSE	TRUE
+scGPT	kidney distal convoluted tubule epithelial cell	0.42	0.00113	0.00106	0.0	TRUE	FALSE	TRUE
+scGPT	kidney distal convoluted tubule epithelial cell	5.49	0.00240	0.00106	0.0	TRUE	TRUE	TRUE
+scGPT	kidney loop of Henle thick ascending limb epit...	1.60	0.00136	0.00121	0.0	TRUE	FALSE	TRUE
+scGPT	kidney loop of Henle thick ascending limb epit...	7.50	0.00371	0.00121	0.0	TRUE	TRUE	TRUE
+scGPT	kidney collecting duct principal cell	0.67	0.00162	0.00136	0.0	TRUE	FALSE	TRUE
+scGPT	kidney collecting duct principal cell	8.96	0.00480	0.00136	0.0	TRUE	TRUE	TRUE
+scGPT	blood vessel smooth muscle cell	1.88	0.00195	0.00177	0.0	TRUE	FALSE	TRUE
+scGPT	blood vessel smooth muscle cell	6.53	0.00590	0.00177	0.0	TRUE	TRUE	TRUE
+scGPT	podocyte	1.54	0.00173	0.00152	0.0	TRUE	FALSE	TRUE
+scGPT	podocyte	7.60	0.00557	0.00152	0.0	TRUE	TRUE	TRUE
+scGPT	macrophage	2.42	0.00192	0.00164	0.0	TRUE	FALSE	TRUE
+scGPT	macrophage	8.94	0.00645	0.00164	0.0	TRUE	TRUE	TRUE
+scGPT	kidney interstitial fibroblast	1.70	0.00175	0.00154	0.0	TRUE	FALSE	TRUE
+scGPT	kidney interstitial fibroblast	5.05	0.00514	0.00154	0.0	TRUE	TRUE	FALSE
+scGPT	endothelial cell	1.22	0.00257	0.00271	0.0	FALSE	FALSE	FALSE
+scGPT	endothelial cell	6.27	0.01218	0.00271	0.0	TRUE	TRUE	FALSE
+scPRINT-mean	kidney distal convoluted tubule epithelial cell	2.78	0.00088	0.00083	14.7	TRUE	FALSE	TRUE
+scPRINT-class	kidney distal convoluted tubule epithelial cell	4.98	0.00099	0.00083	2.9	TRUE	FALSE	TRUE
+scPRINT-mean	kidney loop of Henle thick ascending limb epit...	2.46	0.00089	0.00083	7.7	TRUE	FALSE	TRUE
+scPRINT-class	kidney loop of Henle thick ascending limb epit...	5.32	0.00096	0.00083	7.7	TRUE	FALSE	TRUE
+scPRINT-mean	kidney collecting duct principal cell	1.02	0.00137	0.00126	12.5	TRUE	FALSE	FALSE
+scPRINT-class	kidney collecting duct principal cell	1.74	0.00189	0.00126	4.7	TRUE	FALSE	FALSE
+scPRINT-mean	mesangial cell	1.04	0.00126	0.00104	25.0	TRUE	FALSE	FALSE
+scPRINT-class	mesangial cell	2.21	0.00114	0.00104	25.0	TRUE	FALSE	FALSE
+scPRINT-mean	blood vessel smooth muscle cell	1.46	0.00169	0.00157	10.9	TRUE	FALSE	TRUE
+scPRINT-class	blood vessel smooth muscle cell	2.01	0.00203	0.00157	10.9	TRUE	FALSE	FALSE
+scPRINT-mean	podocyte	1.34	0.00151	0.00142	8.3	TRUE	FALSE	FALSE
+scPRINT-class	podocyte	1.75	0.00187	0.00142	8.3	TRUE	FALSE	FALSE
+scPRINT-mean	macrophage	0.88	0.00147	0.00135	16.7	TRUE	FALSE	FALSE
+scPRINT-class	macrophage	2.55	0.00201	0.00135	11.9	TRUE	FALSE	FALSE
+scPRINT-mean	leukocyte	2.14	0.00165	0.00138	41.7	TRUE	FALSE	FALSE
+scPRINT-class	leukocyte	1.03	0.00130	0.00138	8.3	TRUE	FALSE	TRUE
+scPRINT-mean	kidney interstitial fibroblast	1.41	0.00167	0.00138	11.1	FALSE	FALSE	FALSE
+scPRINT-class	kidney interstitial fibroblast	2.99	0.00144	0.00138	9.3	FALSE	FALSE	FALSE
+scPRINT-mean	endothelial cell	0.58	0.00141	0.00129	45.5	TRUE	FALSE	TRUE
+scPRINT-class	endothelial cell	0.49	0.00112	0.00129	9.1	TRUE	FALSE	TRUE

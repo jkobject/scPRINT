@@ -220,16 +220,16 @@ class Denoiser:
 
 
 def default_benchmark(
-    model, default_dataset=FILE_DIR + "/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad"
+    model, default_dataset=FILE_DIR + "/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad", max_len=5000,
 ):
     adata = sc.read_h5ad(default_dataset)
     denoise = Denoiser(
         model,
         batch_size=40,
-        max_len=4000,
-        plot_corr_size=1000,
+        max_len=max_len,
+        plot_corr_size=10_000,
         doplot=False,
-        num_workers=0,
+        num_workers=8,
         predict_depth_mult=10,
         downsample=0.7,
         devices=1,
