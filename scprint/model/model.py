@@ -49,6 +49,12 @@ from ..tasks import denoise as denoise_task
 FILEDIR = os.path.dirname(os.path.realpath(__file__))
 
 
+def is_interactive():
+    import __main__ as main
+
+    return not hasattr(main, "__file__")
+
+
 class scPrint(L.LightningModule, PyTorchModelHubMixin):
     def __init__(
         self,
@@ -388,7 +394,8 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         except RuntimeError as e:
             if "scPrint is not attached to a `Trainer`." in str(e):
                 print("RuntimeError caught: scPrint is not attached to a `Trainer`.")
-        # self.save_hyperparameters()
+        if not is_interactive():
+            self.save_hyperparameters()
 
     def _encoder(
         self,
