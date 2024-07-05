@@ -1513,4 +1513,76 @@
         "reco2full": 0.528044804516176,
         "noisy2full": 0.34551402512481555
     }
+}{
+    "grn_gwps": {
+        "mean": {
+            "precision": 0.02072508763433421,
+            "recall": 1.0,
+            "rand_precision": 0.02072944989230818,
+            "auprc": 0.03356924875829638,
+            "epr": 3.342505989338362
+        },
+        "mean_base": {
+            "TF_enr": true,
+            "significant_enriched_TFtargets": 12.068965517241379,
+            "precision": 0.001612544216131459,
+            "recall": 1.0,
+            "rand_precision": 0.0016130305081146108,
+            "auprc": 0.0019281226070292812,
+            "epr": 4.272535983382989
+        },
+        "omni": {
+            "precision": 0.02072508763433421,
+            "recall": 1.0,
+            "rand_precision": 0.02072944989230818,
+            "auprc": 0.021675808415323787,
+            "epr": 1.205246681369947
+        },
+        "omni_classifier": {
+            "used_heads": "6",
+            "precision": 0.001610562441384053,
+            "random_precision": 0.001610562441384053,
+            "recall": 1.0,
+            "predicted_true": 1067329.0,
+            "number_of_true": 1719.0
+        },
+        "omni_base": {
+            "TF_enr": true,
+            "enriched_terms_Regulators": [
+                "celltype.gmt__Immune system cells",
+                "celltype.gmt__Pulmonary alveolar type I cells",
+                "celltype.gmt__Enteroendocrine cells"
+            ],
+            "significant_enriched_TFtargets": 12.068965517241379,
+            "precision": 0.001612544216131459,
+            "recall": 1.0,
+            "rand_precision": 0.0016130305081146108,
+            "auprc": 0.0017751837160430743,
+            "epr": 5.386102303074806
+        },
+        "self": {
+            "precision": 0.02072508763433421,
+            "recall": 1.0,
+            "rand_precision": 0.02072944989230818,
+            "auprc": 0.032388176487652846,
+            "epr": 3.867972465414595
+        },
+        "self_classifier": {
+            "used_heads": "17",
+            "precision": 0.02150860776716941,
+            "random_precision": 0.02150860776716941,
+            "recall": 1.0,
+            "predicted_true": "6937920",
+            "number_of_true": "149225"
+        },
+        "self_base": {
+            "TF_enr": true,
+            "significant_enriched_TFtargets": 5.172413793103448,
+            "precision": 0.001612544216131459,
+            "recall": 1.0,
+            "rand_precision": 0.0016130305081146108,
+            "auprc": 0.00183710745368499,
+            "epr": 3.8078780270860797
+        }
+    }
 }

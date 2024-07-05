@@ -1211,24 +1211,12 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         f.close()
         metrics.update(
             {
-                "grn_gwps/auprc_self": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class_self" in k])
-                ),
-                "grn_gwps/epr_self": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class_self" in k])
-                ),
-                "grn_gwps/auprc_omni": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class_omni" in k])
-                ),
-                "grn_gwps/epr_omni": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class_omni" in k])
-                ),
-                "grn_gwps/auprc": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "max_all" in k])
-                ),
-                "grn_gwps/epr": float(
-                    np.mean([i["epr"] for k, i in res.items() if "max_all" in k])
-                ),
+                "grn_gwps/auprc_self": float(res["self"]["auprc"]),
+                "grn_gwps/epr_self": float(res["self"]["epr"]),
+                "grn_gwps/auprc_omni": float(res["omni"]["auprc"]),
+                "grn_gwps/epr_omni": float(res["omni"]["epr"]),
+                "grn_gwps/auprc": float(res["mean"]["auprc"]),
+                "grn_gwps/epr": float(res["mean"]["epr"]),
             }
         )
         print(metrics)
@@ -1242,22 +1230,58 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         metrics.update(
             {
                 "grn_sroy/auprc_self": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class_self" in k])
+                    np.mean(
+                        [
+                            i["auprc"]
+                            for k, i in res.items()
+                            if "self" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
                 ),
                 "grn_sroy/epr_self": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class_self" in k])
+                    np.mean(
+                        [
+                            i["epr"]
+                            for k, i in res.items()
+                            if "self" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
                 ),
                 "grn_sroy/auprc_omni": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class_omni" in k])
+                    np.mean(
+                        [
+                            i["auprc"]
+                            for k, i in res.items()
+                            if "omni" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
                 ),
                 "grn_sroy/epr_omni": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class_omni" in k])
-                ),
-                "grn_sroy/epr": float(
-                    np.mean([i["epr"] for k, i in res.items() if "full_" in k])
+                    np.mean(
+                        [
+                            i["epr"]
+                            for k, i in res.items()
+                            if "omni" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
                 ),
                 "grn_sroy/auprc": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "full_" in k])
+                    np.mean(
+                        [
+                            i["auprc"]
+                            for k, i in res.items()
+                            if "mean" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
+                ),
+                "grn_sroy/epr": float(
+                    np.mean(
+                        [
+                            i["epr"]
+                            for k, i in res.items()
+                            if "mean" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
                 ),
             }
         )
@@ -1274,14 +1298,18 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         metrics.update(
             {
                 "grn_omni/auprc_class": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class" in k])
+                    np.mean([i["auprc"] for k, i in res.items() if "_class" in k])
                 ),
                 "grn_omni/epr_class": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class" in k])
+                    np.mean([i["epr"] for k, i in res.items() if "_class" in k])
                 ),
                 "grn_omni/tf_enr_class": float(
                     np.sum(
-                        [i.get("TF_enr", False) for k, i in res.items() if "class" in k]
+                        [
+                            i.get("TF_enr", False)
+                            for k, i in res.items()
+                            if "_class" in k
+                        ]
                     )
                 ),
                 "grn_omni/tf_targ_enr_class": float(
@@ -1289,23 +1317,19 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                         [
                             i["significant_enriched_TFtargets"]
                             for k, i in res.items()
-                            if "class" in k
+                            if "_class" in k
                         ]
                     )
                 ),
                 "grn_omni/auprc": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class" not in k])
+                    np.mean([i["auprc"] for k, i in res.items() if "_mean" in k])
                 ),
                 "grn_omni/epr": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class" not in k])
+                    np.mean([i["epr"] for k, i in res.items() if "_mean" in k])
                 ),
                 "grn_omni/tf_enr": float(
                     np.sum(
-                        [
-                            i.get("TF_enr", False)
-                            for k, i in res.items()
-                            if "class" not in k
-                        ]
+                        [i.get("TF_enr", False) for k, i in res.items() if "_mean" in k]
                     )
                 ),
                 "grn_omni/tf_targ_enr": float(
@@ -1313,7 +1337,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                         [
                             i["significant_enriched_TFtargets"]
                             for k, i in res.items()
-                            if "class" not in k
+                            if "_mean" in k
                         ]
                     )
                 ),
@@ -1387,6 +1411,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.pred_embedding (list, optional): the classes to predict. Defaults to [].
 
         """
+        import pdb
+
+        pdb.set_trace()
         if predict_mode == "none":
             output = self.forward(
                 gene_pos,

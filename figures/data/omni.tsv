@@ -33,23 +33,53 @@ scGPT	kidney interstitial fibroblast	1.70	0.00175	0.00154	0.0	TRUE	FALSE	TRUE
 scGPT	kidney interstitial fibroblast	5.05	0.00514	0.00154	0.0	TRUE	TRUE	FALSE
 scGPT	endothelial cell	1.22	0.00257	0.00271	0.0	FALSE	FALSE	FALSE
 scGPT	endothelial cell	6.27	0.01218	0.00271	0.0	TRUE	TRUE	FALSE
-scPRINT-mean	kidney distal convoluted tubule epithelial cell	2.78	0.00088	0.00083	14.7	TRUE	FALSE	TRUE
-scPRINT-class	kidney distal convoluted tubule epithelial cell	4.98	0.00099	0.00083	2.9	TRUE	FALSE	TRUE
-scPRINT-mean	kidney loop of Henle thick ascending limb epit...	2.46	0.00089	0.00083	7.7	TRUE	FALSE	TRUE
-scPRINT-class	kidney loop of Henle thick ascending limb epit...	5.32	0.00096	0.00083	7.7	TRUE	FALSE	TRUE
-scPRINT-mean	kidney collecting duct principal cell	1.02	0.00137	0.00126	12.5	TRUE	FALSE	FALSE
-scPRINT-class	kidney collecting duct principal cell	1.74	0.00189	0.00126	4.7	TRUE	FALSE	FALSE
-scPRINT-mean	mesangial cell	1.04	0.00126	0.00104	25.0	TRUE	FALSE	FALSE
-scPRINT-class	mesangial cell	2.21	0.00114	0.00104	25.0	TRUE	FALSE	FALSE
-scPRINT-mean	blood vessel smooth muscle cell	1.46	0.00169	0.00157	10.9	TRUE	FALSE	TRUE
-scPRINT-class	blood vessel smooth muscle cell	2.01	0.00203	0.00157	10.9	TRUE	FALSE	FALSE
-scPRINT-mean	podocyte	1.34	0.00151	0.00142	8.3	TRUE	FALSE	FALSE
-scPRINT-class	podocyte	1.75	0.00187	0.00142	8.3	TRUE	FALSE	FALSE
-scPRINT-mean	macrophage	0.88	0.00147	0.00135	16.7	TRUE	FALSE	FALSE
-scPRINT-class	macrophage	2.55	0.00201	0.00135	11.9	TRUE	FALSE	FALSE
-scPRINT-mean	leukocyte	2.14	0.00165	0.00138	41.7	TRUE	FALSE	FALSE
-scPRINT-class	leukocyte	1.03	0.00130	0.00138	8.3	TRUE	FALSE	TRUE
-scPRINT-mean	kidney interstitial fibroblast	1.41	0.00167	0.00138	11.1	FALSE	FALSE	FALSE
-scPRINT-class	kidney interstitial fibroblast	2.99	0.00144	0.00138	9.3	FALSE	FALSE	FALSE
-scPRINT-mean	endothelial cell	0.58	0.00141	0.00129	45.5	TRUE	FALSE	TRUE
-scPRINT-class	endothelial cell	0.49	0.00112	0.00129	9.1	TRUE	FALSE	TRUE
+scPRINT-full	kidney distal convoluted tubule epithelial cell	1.794288	0.001008	0.00089	61.607143	FALSE	FALSE	FALSE
+scPRINT-mean	kidney distal convoluted tubule epithelial cell	2.662047	0.000876	0.000826	11.764706	TRUE	FALSE	FALSE
+scPRINT-mean	kidney distal convoluted tubule epithelial cell	4.246105	0.001663	0.000826	17.647059	TRUE	TRUE	TRUE
+scPRINT-class	kidney distal convoluted tubule epithelial cell	4.97999	0.000994	0.000826	2.941176	TRUE	FALSE	FALSE
+scPRINT-class	kidney distal convoluted tubule epithelial cell	12.416586	0.002227	0.000826	8.823529	TRUE	TRUE	FALSE
+scPRINT-full	kidney loop of Henle thick ascending limb epit...	1.630698	0.001012	0.00089	66.071429	FALSE	FALSE	FALSE
+scPRINT-mean	kidney loop of Henle thick ascending limb epit...	1.721485	0.000883	0.000834	11.538462	TRUE	FALSE	TRUE
+scPRINT-mean	kidney loop of Henle thick ascending limb epit...	10.35198	0.002635	0.000834	7.692308	TRUE	TRUE	TRUE
+scPRINT-class	kidney loop of Henle thick ascending limb epit...	5.31902	0.000959	0.000834	7.692308	TRUE	FALSE	TRUE
+scPRINT-class	kidney loop of Henle thick ascending limb epit...	18.579117	0.003498	0.000834	3.846154	TRUE	TRUE	TRUE
+scPRINT-full	kidney collecting duct principal cell	1.835201	0.001026	0.00089	66.964286	FALSE	FALSE	FALSE
+scPRINT-mean	kidney collecting duct principal cell	0.713462	0.001399	0.001259	15.625	TRUE	FALSE	FALSE
+scPRINT-mean	kidney collecting duct principal cell	7.304394	0.004012	0.001259	9.375	TRUE	TRUE	FALSE
+scPRINT-class	kidney collecting duct principal cell	1.737159	0.001889	0.001259	6.25	TRUE	FALSE	FALSE
+scPRINT-class	kidney collecting duct principal cell	12.32373	0.005571	0.001259	4.6875	TRUE	TRUE	FALSE
+scPRINT-full	mesangial cell	1.002681	0.001186	0.001082	36.065574	TRUE	FALSE	TRUE
+scPRINT-mean	mesangial cell	0.579329	0.001294	0.001044	34.375	TRUE	FALSE	FALSE
+scPRINT-mean	mesangial cell	10.646251	0.005068	0.001044	6.25	TRUE	TRUE	FALSE
+scPRINT-class	mesangial cell	2.208943	0.001144	0.001044	25	TRUE	FALSE	TRUE
+scPRINT-class	mesangial cell	7.403313	0.003852	0.001044	3.125	TRUE	TRUE	TRUE
+scPRINT-full	blood vessel smooth muscle cell	1.908858	0.001059	0.00089	70.535714	FALSE	FALSE	FALSE
+scPRINT-mean	blood vessel smooth muscle cell	1.618166	0.001737	0.001573	29.090909	TRUE	FALSE	FALSE
+scPRINT-mean	blood vessel smooth muscle cell	7.58206	0.005076	0.001573	9.090909	TRUE	TRUE	TRUE
+scPRINT-class	blood vessel smooth muscle cell	2.008982	0.002032	0.001573	14.545455	TRUE	FALSE	FALSE
+scPRINT-class	blood vessel smooth muscle cell	9.073573	0.005732	0.001573	7.272727	TRUE	TRUE	FALSE
+scPRINT-full	podocyte	1.647052	0.001029	0.00089	60.714286	FALSE	FALSE	FALSE
+scPRINT-mean	podocyte	1.176409	0.001522	0.001415	22.916667	TRUE	FALSE	FALSE
+scPRINT-mean	podocyte	9.123769	0.005065	0.001415	4.166667	TRUE	TRUE	FALSE
+scPRINT-class	podocyte	1.747142	0.001869	0.001415	8.333333	TRUE	FALSE	FALSE
+scPRINT-class	podocyte	16.012406	0.00725	0.001415	2.083333	TRUE	TRUE	FALSE
+scPRINT-full	macrophage	1.501247	0.001027	0.000887	61.261261	FALSE	FALSE	FALSE
+scPRINT-mean	macrophage	0.700754	0.001501	0.001351	28.571429	TRUE	FALSE	FALSE
+scPRINT-mean	macrophage	8.816314	0.004813	0.001351	14.285714	TRUE	TRUE	FALSE
+scPRINT-class	macrophage	2.552937	0.002008	0.001351	11.904762	TRUE	FALSE	FALSE
+scPRINT-class	macrophage	20.229272	0.007608	0.001351	9.52381	TRUE	TRUE	TRUE
+scPRINT-full	leukocyte	2.154522	0.001066	0.00089	68.75	FALSE	FALSE	FALSE
+scPRINT-mean	leukocyte	1.238022	0.001612	0.001381	45.833333	TRUE	FALSE	FALSE
+scPRINT-mean	leukocyte	8.847009	0.005505	0.001381	0	TRUE	TRUE	FALSE
+scPRINT-class	leukocyte	1.100045	0.001295	0.001381	8.333333	TRUE	FALSE	TRUE
+scPRINT-class	leukocyte	5.921457	0.004641	0.001381	0	TRUE	TRUE	FALSE
+scPRINT-full	kidney interstitial fibroblast	2.064421	0.001073	0.00089	62.5	FALSE	FALSE	FALSE
+scPRINT-mean	kidney interstitial fibroblast	1.043395	0.00173	0.001382	16.666667	FALSE	FALSE	FALSE
+scPRINT-mean	kidney interstitial fibroblast	9.22822	0.00501	0.001382	1.851852	TRUE	TRUE	FALSE
+scPRINT-class	kidney interstitial fibroblast	2.989635	0.001441	0.001382	7.407407	FALSE	FALSE	FALSE
+scPRINT-class	kidney interstitial fibroblast	4.796521	0.004122	0.001382	7.407407	TRUE	TRUE	FALSE
+scPRINT-full	endothelial cell	2.121755	0.001084	0.00089	64.285714	FALSE	FALSE	FALSE
+scPRINT-mean	endothelial cell	0.657581	0.001366	0.001289	36.363636	TRUE	FALSE	TRUE
+scPRINT-mean	endothelial cell	6.338245	0.005163	0.001289	9.090909	TRUE	TRUE	TRUE
+scPRINT-class	endothelial cell	0.492976	0.001111	0.001289	9.090909	TRUE	FALSE	TRUE
+scPRINT-class	endothelial cell	2.643786	0.004554	0.001289	0	TRUE	TRUE	TRUE
