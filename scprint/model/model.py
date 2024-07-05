@@ -1164,52 +1164,52 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         print("start test")
         metrics = {}
         model_copy = copy.deepcopy(self)
-        res = embbed_task.default_benchmark(
-            model_copy, default_dataset="lung", do_class=True, coarse=False
-        )
-        f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
-        f.write(json.dumps({"embed_lung": res}, indent=4))
-        f.close()
-        metrics.update(
-            {
-                "emb_lung/scib": float(res["scib"]["Total"]),
-                "emb_lung/ct_class": float(
-                    res["classif"]["cell_type_ontology_term_id"]["accuracy"]
-                ),
-            }
-        )
-        print(metrics)
-        res = embbed_task.default_benchmark(
-            model_copy, default_dataset="pancreas", do_class=True, coarse=False
-        )
-        f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
-        f.write(json.dumps({"embed_panc": res}, indent=4))
-        f.close()
-        metrics.update(
-            {
-                "emb_panc/scib": float(res["scib"]["Total"]),
-                "emb_panc/ct_class": float(
-                    res["classif"]["cell_type_ontology_term_id"]["accuracy"]
-                ),
-            }
-        )
-        print(metrics)
-        gc.collect()
-        res = denoise_task.default_benchmark(
-            model_copy, FILEDIR + "/../../data/gNNpgpo6gATjuxTE7CCp.h5ad"
-        )
-        metrics.update(
-            {
-                "denoise/reco2full_vs_noisy2full": float(
-                    res["reco2full"] - res["noisy2full"]
-                ),
-            }
-        )
-        gc.collect()
-        print(metrics)
-        f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
-        f.write(json.dumps({"denoise": res}, indent=4))
-        f.close()
+        # res = embbed_task.default_benchmark(
+        #    model_copy, default_dataset="lung", do_class=True, coarse=False
+        # )
+        # f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
+        # f.write(json.dumps({"embed_lung": res}, indent=4))
+        # f.close()
+        # metrics.update(
+        #    {
+        #        "emb_lung/scib": float(res["scib"]["Total"]),
+        #        "emb_lung/ct_class": float(
+        #            res["classif"]["cell_type_ontology_term_id"]["accuracy"]
+        #        ),
+        #    }
+        # )
+        # print(metrics)
+        # res = embbed_task.default_benchmark(
+        #    model_copy, default_dataset="pancreas", do_class=True, coarse=False
+        # )
+        # f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
+        # f.write(json.dumps({"embed_panc": res}, indent=4))
+        # f.close()
+        # metrics.update(
+        #    {
+        #        "emb_panc/scib": float(res["scib"]["Total"]),
+        #        "emb_panc/ct_class": float(
+        #            res["classif"]["cell_type_ontology_term_id"]["accuracy"]
+        #        ),
+        #    }
+        # )
+        # print(metrics)
+        # gc.collect()
+        # res = denoise_task.default_benchmark(
+        #    model_copy, FILEDIR + "/../../data/gNNpgpo6gATjuxTE7CCp.h5ad"
+        # )
+        # metrics.update(
+        #    {
+        #        "denoise/reco2full_vs_noisy2full": float(
+        #            res["reco2full"] - res["noisy2full"]
+        #        ),
+        #    }
+        # )
+        # gc.collect()
+        # print(metrics)
+        # f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
+        # f.write(json.dumps({"denoise": res}, indent=4))
+        # f.close()
         res = grn_task.default_benchmark(
             model_copy, "gwps", batch_size=32 if self.d_model <= 512 else 8
         )
@@ -1218,24 +1218,12 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         f.close()
         metrics.update(
             {
-                "grn_gwps/auprc_self": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class_self" in k])
-                ),
-                "grn_gwps/epr_self": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class_self" in k])
-                ),
-                "grn_gwps/auprc_omni": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class_omni" in k])
-                ),
-                "grn_gwps/epr_omni": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class_omni" in k])
-                ),
-                "grn_gwps/auprc": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "max_all" in k])
-                ),
-                "grn_gwps/epr": float(
-                    np.mean([i["epr"] for k, i in res.items() if "max_all" in k])
-                ),
+                "grn_gwps/auprc_self": float(res["self"]["auprc"]),
+                "grn_gwps/epr_self": float(res["self"]["epr"]),
+                "grn_gwps/auprc_omni": float(res["omni"]["auprc"]),
+                "grn_gwps/epr_omni": float(res["omni"]["epr"]),
+                "grn_gwps/auprc": float(res["mean"]["auprc"]),
+                "grn_gwps/epr": float(res["mean"]["epr"]),
             }
         )
         print(metrics)
@@ -1249,22 +1237,58 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         metrics.update(
             {
                 "grn_sroy/auprc_self": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class_self" in k])
+                    np.mean(
+                        [
+                            i["auprc"]
+                            for k, i in res.items()
+                            if "self" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
                 ),
                 "grn_sroy/epr_self": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class_self" in k])
+                    np.mean(
+                        [
+                            i["epr"]
+                            for k, i in res.items()
+                            if "self" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
                 ),
                 "grn_sroy/auprc_omni": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class_omni" in k])
+                    np.mean(
+                        [
+                            i["auprc"]
+                            for k, i in res.items()
+                            if "omni" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
                 ),
                 "grn_sroy/epr_omni": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class_omni" in k])
-                ),
-                "grn_sroy/epr": float(
-                    np.mean([i["epr"] for k, i in res.items() if "full_" in k])
+                    np.mean(
+                        [
+                            i["epr"]
+                            for k, i in res.items()
+                            if "omni" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
                 ),
                 "grn_sroy/auprc": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "full_" in k])
+                    np.mean(
+                        [
+                            i["auprc"]
+                            for k, i in res.items()
+                            if "mean" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
+                ),
+                "grn_sroy/epr": float(
+                    np.mean(
+                        [
+                            i["epr"]
+                            for k, i in res.items()
+                            if "mean" in k and "chip" not in k and "ko" not in k
+                        ]
+                    )
                 ),
             }
         )
@@ -1281,14 +1305,18 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         metrics.update(
             {
                 "grn_omni/auprc_class": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class" in k])
+                    np.mean([i["auprc"] for k, i in res.items() if "_class" in k])
                 ),
                 "grn_omni/epr_class": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class" in k])
+                    np.mean([i["epr"] for k, i in res.items() if "_class" in k])
                 ),
                 "grn_omni/tf_enr_class": float(
                     np.sum(
-                        [i.get("TF_enr", False) for k, i in res.items() if "class" in k]
+                        [
+                            i.get("TF_enr", False)
+                            for k, i in res.items()
+                            if "_class" in k
+                        ]
                     )
                 ),
                 "grn_omni/tf_targ_enr_class": float(
@@ -1296,23 +1324,19 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                         [
                             i["significant_enriched_TFtargets"]
                             for k, i in res.items()
-                            if "class" in k
+                            if "_class" in k
                         ]
                     )
                 ),
                 "grn_omni/auprc": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "class" not in k])
+                    np.mean([i["auprc"] for k, i in res.items() if "_mean" in k])
                 ),
                 "grn_omni/epr": float(
-                    np.mean([i["epr"] for k, i in res.items() if "class" not in k])
+                    np.mean([i["epr"] for k, i in res.items() if "_mean" in k])
                 ),
                 "grn_omni/tf_enr": float(
                     np.sum(
-                        [
-                            i.get("TF_enr", False)
-                            for k, i in res.items()
-                            if "class" not in k
-                        ]
+                        [i.get("TF_enr", False) for k, i in res.items() if "_mean" in k]
                     )
                 ),
                 "grn_omni/tf_targ_enr": float(
@@ -1320,7 +1344,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                         [
                             i["significant_enriched_TFtargets"]
                             for k, i in res.items()
-                            if "class" not in k
+                            if "_mean" in k
                         ]
                     )
                 ),
@@ -1394,6 +1418,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.pred_embedding (list, optional): the classes to predict. Defaults to [].
 
         """
+        import pdb
+
+        pdb.set_trace()
         if predict_mode == "none":
             output = self.forward(
                 gene_pos,
@@ -1448,18 +1475,22 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         if not keep_output:
             return {
                 "embs": torch.mean(cell_embs[:, ind, :], dim=1),
-                "class": torch.stack(
-                    [
-                        torch.argmax(output["cls_output_" + clsname], dim=1)
-                        for clsname in self.classes
-                    ]
-                ).transpose(0, 1)
-                if len(self.classes) > 0
-                else None,
+                "class": (
+                    torch.stack(
+                        [
+                            torch.argmax(output["cls_output_" + clsname], dim=1)
+                            for clsname in self.classes
+                        ]
+                    ).transpose(0, 1)
+                    if len(self.classes) > 0
+                    else None
+                ),
                 "pos": gene_pos,
-                "expr": [output["mean"], output["disp"], output["zero_logits"]]
-                if "disp" in output
-                else [output["mean"]],
+                "expr": (
+                    [output["mean"], output["disp"], output["zero_logits"]]
+                    if "disp" in output
+                    else [output["mean"]]
+                ),
             }
         if self.embs is None:
             self.embs = output[
@@ -1468,9 +1499,11 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.pred = (
                 torch.stack(
                     [
-                        torch.argmax(output["cls_output_" + clsname], dim=1)
-                        if not self.keep_all_cls_pred
-                        else output["cls_output_" + clsname]
+                        (
+                            torch.argmax(output["cls_output_" + clsname], dim=1)
+                            if not self.keep_all_cls_pred
+                            else output["cls_output_" + clsname]
+                        )
                         for clsname in self.classes
                     ]
                 ).transpose(0, 1)
@@ -1490,16 +1523,20 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.pred = torch.cat(
                 [
                     self.pred,
-                    torch.stack(
-                        [
-                            torch.argmax(output["cls_output_" + clsname], dim=1)
-                            if not self.keep_all_cls_pred
-                            else output["cls_output_" + clsname]
-                            for clsname in self.classes
-                        ]
-                    ).transpose(0, 1)
-                    if len(self.classes) > 0
-                    else None,
+                    (
+                        torch.stack(
+                            [
+                                (
+                                    torch.argmax(output["cls_output_" + clsname], dim=1)
+                                    if not self.keep_all_cls_pred
+                                    else output["cls_output_" + clsname]
+                                )
+                                for clsname in self.classes
+                            ]
+                        ).transpose(0, 1)
+                        if len(self.classes) > 0
+                        else None
+                    ),
                 ],
             )
             self.pos = torch.cat([self.pos, gene_pos])

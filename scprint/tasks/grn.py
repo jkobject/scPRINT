@@ -13,7 +13,7 @@ from grnndata import utils
 from torch.utils.data import DataLoader
 
 from lightning.pytorch import Trainer
-
+import joblib
 from typing import List
 from anndata import AnnData
 
@@ -420,7 +420,8 @@ def default_benchmark(
             min_valid_genes_id=5000,
             min_dataset_size=64,
         )
-        for da, spe, gt in [
+        clf_self = None
+        todo = [
             ("han", "human", "full"),
             ("mine", "human", "full"),
             ("han", "human", "chip"),
@@ -429,12 +430,11 @@ def default_benchmark(
             ("zhao", "mouse", "full"),
             ("tran", "mouse", "chip"),
             ("tran", "mouse", "ko"),
-        ]:
+        ]
+        for da, spe, gt in todo:
+            if gt != "full":
+                continue
             print(da + "_" + gt)
-            # for (da, spe, gt) in [("han", "human", "full"),# ("liu", "human", "chip"),
-            #                       #("liu", "human", "ko"), ("chen", "human", "full"),
-            #                       ("tran", "mouse", "full"), ("zhao", "mouse", "full"),
-            # ]:
             preadata = get_sroy_gt(get=da, species=spe, gt=gt)
             adata = preprocessor(preadata.copy())
             grn_inferer = GRNfer(
@@ -446,87 +446,107 @@ def default_benchmark(
                 filtration="none",
                 forward_mode="none",
                 num_genes=maxgenes,
-                num_workers=0,
+                num_workers=8,
                 max_cells=maxcells,
                 doplot=False,
                 batch_size=batch_size,
                 devices=1,
             )
-            print("running inference")
             grn = grn_inferer(layer=layers)
-            print("training classifier")
-            if clf_omni is not None:
-                grn.varp["classified"] = clf_omni.predict_proba(
-                    grn.varp["GRN"].reshape(-1, grn.varp["GRN"].shape[-1])
-                ).reshape(len(grn.var), len(grn.var), 2)[:, :, 1]
-            else:
-                grn, m, clf_omni = train_classifier(
-                    grn,
-                    C=0.01,
-                    train_size=0.9,
-                    class_weight={1: 200, 0: 1},
-                    shuffle=False,
-                )
             grn.varp["all"] = grn.varp["GRN"]
-            grn.varp["GRN"] = grn.varp["classified"]
             grn.var["ensembl_id"] = grn.var.index
             grn.var["symbol"] = make_index_unique(grn.var["symbol"].astype(str))
             grn.var.index = grn.var["symbol"]
-            print("calling bengrn")
-            metrics["class_omni_" + da + "_" + gt] = BenGRN(
+            grn.varp["GRN"] = grn.varp["all"].mean(-1).T
+            metrics["mean_" + da + "_" + gt] = BenGRN(
                 grn, do_auc=True, doplot=False
             ).compare_to(other=preadata)
-            ############################
-            grn.varp["GRN"] = grn.varp["all"]
-            del grn.varp["all"]
-            grn.var.index = grn.var["ensembl_id"]
-            ratio = (
-                (preadata.varp["GRN"] > 0).sum(0) * (preadata.varp["GRN"] > 0).sum(1)
-            ) / preadata.varp["GRN"].sum()
-            weight = {1: ratio, 0: 1}
-            grn, m, _ = train_classifier(
-                grn,
-                other=preadata,
-                C=0.5,
-                train_size=0.5,
-                class_weight=weight,
-                shuffle=False,
-            )
-            grn.varp["GRN"] = grn.varp["classified"]
-            grn.var.index = grn.var["symbol"]
-            metrics["class_self_" + da + "_" + gt] = BenGRN(
+            grn.varp["GRN"] = grn.varp["GRN"].T
+            metrics["mean_" + da + "_" + gt + "_base"] = BenGRN(
+                grn, do_auc=True, doplot=False
+            ).scprint_benchmark()
+
+            ## OMNI
+            if clf_omni is None:
+                _, m, clf_omni = train_classifier(
+                    grn,
+                    C=0.5,
+                    train_size=0.9,
+                    class_weight={1: 100, 0: 1},
+                    shuffle=True,
+                    return_full=False,
+                )
+                joblib.dump(clf_omni, "clf_omni.pkl")
+                metrics["omni_classifier"] = m
+            grn.varp["GRN"] = grn.varp["all"][:, :, clf_omni.coef_[0] > 0].mean(-1)
+            metrics["omni_" + da + "_" + gt + "_base"] = BenGRN(
+                grn, do_auc=True, doplot=True
+            ).scprint_benchmark()
+            grn.varp["GRN"] = grn.varp["GRN"].T
+            metrics["omni_" + da + "_" + gt] = BenGRN(
                 grn, do_auc=True, doplot=False
             ).compare_to(other=preadata)
-            metrics["class_self_" + da + "_" + gt].update({"classifier": m})
+
+            ## SELF
+            if clf_self is None:
+                grn.varp["GRN"] = np.transpose(grn.varp["all"], (1, 0, 2))
+                _, m, clf_self = train_classifier(
+                    grn,
+                    other=preadata,
+                    C=1,
+                    train_size=0.5,
+                    class_weight={1: 40, 0: 1},
+                    shuffle=False,
+                    return_full=False,
+                )
+                metrics["self_classifier"] = m
+            grn.varp["GRN"] = grn.varp["all"][:, :, clf_self.coef_[0] > 0].mean(-1).T
+            metrics["self_" + da + "_" + gt] = BenGRN(
+                grn, do_auc=True, doplot=False
+            ).compare_to(other=preadata)
+            grn.varp["GRN"] = grn.varp["GRN"].T
+            metrics["self_" + da + "_" + gt + "_base"] = BenGRN(
+                grn, do_auc=True, doplot=True
+            ).scprint_benchmark()
+
+            ## chip / ko
+            if (da, spe, "chip") in todo:
+                preadata = get_sroy_gt(get=da, species=spe, gt="chip")
+                grn.varp["GRN"] = grn.varp["all"].mean(-1).T
+                metrics["mean_" + da + "_" + "chip"] = BenGRN(
+                    grn, do_auc=True, doplot=False
+                ).compare_to(other=preadata)
+                grn.varp["GRN"] = (
+                    grn.varp["all"][:, :, clf_omni.coef_[0] > 0].mean(-1).T
+                )
+                metrics["omni_" + da + "_" + "chip"] = BenGRN(
+                    grn, do_auc=True, doplot=False
+                ).compare_to(other=preadata)
+                grn.varp["GRN"] = (
+                    grn.varp["all"][:, :, clf_self.coef_[0] > 0].mean(-1).T
+                )
+                metrics["self_" + da + "_" + "chip"] = BenGRN(
+                    grn, do_auc=True, doplot=False
+                ).compare_to(other=preadata)
+            if (da, spe, "ko") in todo:
+                preadata = get_sroy_gt(get=da, species=spe, gt="ko")
+                grn.varp["GRN"] = grn.varp["all"].mean(-1).T
+                metrics["mean_" + da + "_" + "ko"] = BenGRN(
+                    grn, do_auc=True, doplot=False
+                ).compare_to(other=preadata)
+                grn.varp["GRN"] = (
+                    grn.varp["all"][:, :, clf_omni.coef_[0] > 0].mean(-1).T
+                )
+                metrics["omni_" + da + "_" + "ko"] = BenGRN(
+                    grn, do_auc=True, doplot=False
+                ).compare_to(other=preadata)
+                grn.varp["GRN"] = (
+                    grn.varp["all"][:, :, clf_self.coef_[0] > 0].mean(-1).T
+                )
+                metrics["self_" + da + "_" + "ko"] = BenGRN(
+                    grn, do_auc=True, doplot=False
+                ).compare_to(other=preadata)
             del grn
-            gc.collect()
-            ############################
-            grn_inferer = GRNfer(
-                model,
-                adata,
-                how="random expr",
-                preprocess="softmax",
-                head_agg="max",
-                filtration="none",
-                forward_mode="none",
-                num_genes=3000,
-                max_cells=maxcells,
-                doplot=False,
-                num_workers=0,
-                batch_size=batch_size,
-                devices=1,
-            )
-            grn = grn_inferer(layer=layers)
-            del grn_inferer
-            gc.collect()
-            grn.var["ensembl_id"] = grn.var.index
-            grn.var["symbol"] = make_index_unique(grn.var["symbol"].astype(str))
-            grn.var.index = grn.var["symbol"]
-            metrics["full_" + da + "_" + gt] = BenGRN(
-                grn, do_auc=True, doplot=False
-            ).compare_to(other=preadata)
-            del grn
-            gc.collect()
     elif default_dataset == "gwps":
         if not os.path.exists(FILEDIR + "/../../data/perturb_gt.h5ad"):
             adata = get_perturb_gt()
@@ -537,7 +557,7 @@ def default_benchmark(
             force_preprocess=True,
             skip_validate=True,
             do_postp=False,
-            min_valid_genes_id=5000,
+            min_valid_genes_id=maxgenes,
             min_dataset_size=64,
         )
         nadata = preprocessor(adata.copy())
@@ -549,77 +569,73 @@ def default_benchmark(
             nadata,
             how="most var within",
             preprocess="softmax",
-            head_agg="mean",
-            filtration="none",
-            forward_mode="none",
-            num_genes=maxgenes,
-            max_cells=maxcells,
-            doplot=False,
-            num_workers=0,
-            batch_size=batch_size,
-            devices=1,
-        )
-        grn = grn_inferer(layer=layers)
-        metrics["max_all"] = BenGRN(grn, do_auc=True, doplot=False).compare_to(
-            other=adata
-        )
-        del grn
-        gc.collect()
-        grn_inferer = GRNfer(
-            model,
-            nadata,
-            how="most var within",
-            preprocess="softmax",
             head_agg="none",
             filtration="none",
             forward_mode="none",
             num_genes=maxgenes,
             max_cells=maxcells,
             doplot=False,
-            num_workers=0,
+            num_workers=8,
             batch_size=batch_size,
             devices=1,
         )
         grn = grn_inferer(layer=layers)
-        grn.var["ensembl_id"] = grn.var.index
-        grn.varp["GRN"] = np.transpose(grn.varp["GRN"], (1, 0, 2))
         grn.varp["all"] = grn.varp["GRN"]
 
-        grn, m, clf = train_classifier(
-            grn,
-            other=adata,
-            C=0.3,
-            train_size=0.3,
-            class_weight={1: 40, 0: 1},
-            doplot=False,
-            shuffle=False,
-            use_col="ensembl_id",
-        )
-        grn.varp["GRN"] = grn.varp["classified"]
-        metrics["class_self"] = BenGRN(grn, do_auc=True, doplot=False).compare_to(
-            other=adata
-        )
-        metrics["class_self"].update({"classifier": m})
+        grn.varp["GRN"] = grn.varp["all"].mean(-1).T
+        metrics["mean"] = BenGRN(grn, do_auc=True, doplot=False).compare_to(other=adata)
+        grn.var["ensembl_id"] = grn.var.index
+        grn.var.index = grn.var["symbol"]
+        grn.varp["GRN"] = grn.varp["all"].mean(-1)
+        metrics["mean_base"] = BenGRN(
+            grn, do_auc=True, doplot=False
+        ).scprint_benchmark()
+
         grn.varp["GRN"] = grn.varp["all"]
-        grn, m, clf_omni = train_classifier(
+        grn.var.index = grn.var["ensembl_id"]
+        _, m, clf_omni = train_classifier(
             grn,
-            C=0.1,
+            C=1,
             train_size=0.9,
             class_weight={1: 200, 0: 1},
-            doplot=False,
             shuffle=True,
+            doplot=False,
+            return_full=False,
             use_col="gene_name",
         )
-        grn.varp["GRN"] = grn.varp["classified"]
-        metrics["class_omni"] = BenGRN(grn, do_auc=True, doplot=False).compare_to(
-            other=adata
+        grn.varp["GRN"] = grn.varp["all"][:, :, clf_omni.coef_[0] > 0].mean(-1).T
+        metrics["omni"] = BenGRN(grn, do_auc=True, doplot=False).compare_to(other=adata)
+        metrics["omni_classifier"] = m
+        grn.var.index = grn.var["symbol"]
+        grn.varp["GRN"] = grn.varp["GRN"].T
+        metrics["omni_base"] = BenGRN(
+            grn, do_auc=True, doplot=False
+        ).scprint_benchmark()
+        grn.varp["GRN"] = np.transpose(grn.varp["all"], (1, 0, 2))
+        grn.var.index = grn.var["ensembl_id"]
+        _, m, clf_self = train_classifier(
+            grn,
+            other=adata,
+            C=0.5,
+            train_size=0.5,
+            class_weight={1: 20, 0: 1},
+            doplot=False,
+            shuffle=False,
+            return_full=False,
+            use_col="ensembl_id",
         )
-        metrics["class_omni"].update({"classifier": m})
+        grn.varp["GRN"] = grn.varp["all"][:, :, clf_self.coef_[0] > 0].mean(-1).T
+        metrics["self"] = BenGRN(grn, do_auc=True, doplot=False).compare_to(other=adata)
+        metrics["self_classifier"] = m
+        grn.var.index = grn.var["symbol"]
+        grn.varp["GRN"] = grn.varp["GRN"].T
+        metrics["self_base"] = BenGRN(
+            grn, do_auc=True, doplot=False
+        ).scprint_benchmark()
     else:
         adata = sc.read_h5ad(default_dataset)
         adata.var["isTF"] = False
         adata.var.loc[adata.var.symbol.isin(grnutils.TF), "isTF"] = True
-        metrics = {}
         for celltype in cell_types:
             print(celltype)
             grn_inferer = GRNfer(
@@ -630,17 +646,19 @@ def default_benchmark(
                 head_agg="max",
                 filtration="none",
                 forward_mode="none",
-                num_workers=0,
+                num_workers=8,
                 num_genes=2200,
                 max_cells=maxcells,
                 doplot=False,
                 batch_size=batch_size,
                 devices=1,
             )
-            grn = grn_inferer(layer=list(range(model.nlayers))[:], cell_type=celltype)
+            grn = grn_inferer(layer=layers, cell_type=celltype)
             grn.var.index = make_index_unique(grn.var["symbol"].astype(str))
-            m = BenGRN(grn, doplot=False).scprint_benchmark()
-            metrics[celltype + "_scprint"] = m
+            metrics[celltype + "_scprint"] = BenGRN(
+                grn, doplot=False
+            ).scprint_benchmark()
+            del grn
             grn_inferer = GRNfer(
                 model,
                 adata[adata.X.sum(1) > 500],
@@ -649,30 +667,35 @@ def default_benchmark(
                 head_agg="none",
                 filtration="none",
                 forward_mode="none",
-                num_workers=0,
+                num_workers=8,
                 num_genes=maxgenes,
                 max_cells=maxcells,
                 doplot=False,
                 batch_size=batch_size,
                 devices=1,
             )
-            del grn
-            gc.collect()
-            grn = grn_inferer(layer=list(range(model.nlayers))[:], cell_type=celltype)
-            grn, m, _ = train_classifier(
-                grn,
-                C=0.1,
-                train_size=0.5,
-                class_weight={1: 200, 0: 1},
-                shuffle=False,
-                doplot=False,
-            )
-            grn.varp["GRN"] = grn.varp["classified"]
+            grn = grn_inferer(layer=layers, cell_type=celltype)
             grn.var.index = make_index_unique(grn.var["symbol"].astype(str))
+            grn.varp["all"] = grn.varp["GRN"]
+            grn.varp["GRN"] = grn.varp["GRN"].mean(-1)
+            metrics[celltype + "_scprint_mean"] = BenGRN(grn).scprint_benchmark()
+            if clf_omni is None:
+                grn.varp["GRN"] = grn.varp["all"]
+                _, m, clf_omni = train_classifier(
+                    grn,
+                    C=1,
+                    train_size=0.6,
+                    max_iter=200,
+                    class_weight={1: 200, 0: 1},
+                    return_full=False,
+                    shuffle=True,
+                    doplot=False,
+                )
+                joblib.dump(clf_omni, "clf_omni.pkl")
+                metrics["classifier"] = m
+            grn.varp["GRN"] = grn.varp["all"][:, :, clf_omni.coef_[0] > 0].mean(-1)
             metrics[celltype + "_scprint_class"] = BenGRN(
                 grn, doplot=False
             ).scprint_benchmark()
-            metrics[celltype + "_scprint_class"].update({"classifier": m})
             del grn
-            gc.collect()
     return metrics

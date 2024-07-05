@@ -1,0 +1,138 @@
+project: scprint_scale
+seed_everything: 42
+ckpt_path: null
+set_float32_matmul_precision: True
+wandblog: all
+log_freq: 200
+log_graph: True
+trainer:
+  precision: 16-mixed
+  # profiler: simple
+  gradient_clip_val: 10
+  #strategy: ddp
+  log_every_n_steps: 50
+  limit_train_batches: 5000
+  limit_val_batches: 1000
+  reload_dataloaders_every_n_epochs: 1
+  accumulate_grad_batches: 1
+  max_time:
+    hours: 4
+  logger:
+    - class_path: lightning.pytorch.loggers.WandbLogger
+      init_args:
+        project: ${project}
+        save_dir: ./data/logs/
+  callbacks:
+    - class_path: scprint.trainer.TrainingMode
+      init_args:
+        do_denoise: True
+        noise:
+          - 0.3
+        do_cce: True
+        # cce_sim: 0.4
+        do_ecs: True
+        # ecs_threshold: 0.6
+        # ecs_scale: 10.0
+        do_mvc: False
+        mvc_scale: 0.05
+        do_generate: True
+        do_adv_cls: False
+        do_next_tp: False
+        do_cls: False
+        # class_scale: 500.0
+        warmup_duration: 500
+        weight_decay: 0.01
+        fused_adam: True
+        lr_patience: 1
+        mask_ratio: 
+          - 0.3
+    - class_path: lightning.pytorch.callbacks.StochasticWeightAveraging
+      init_args:
+        swa_lrs: 0.01
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        monitor: val_loss
+        save_top_k: -1
+    - class_path: lightning.pytorch.callbacks.EarlyStopping
+      init_args:
+        monitor: val_loss
+        patience: 10
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: epoch
+    #- class_path: lightning.pytorch.callbacks.LearningRateFinder
+    #init_args:
+    #  mode: exponential
+  #plugins:
+  #  - class_path: lightning.pytorch.plugins.environments.SLURMEnvironment
+  #    requeue_signal: signal.SIGHUP
+model:
+  nhead: 4
+  nlayers: 4
+  layers_cls: [128]
+  dropout: 0.1
+  transformer: flash
+  mvc_decoder: inner product
+  d_model: 128
+  residual_in_fp32: True
+  num_heads_kv: null
+  fused_dropout_add_ln: False
+  prenorm: True
+  fused_mlp: False
+  fused_bias_fc: False
+  drop_path_rate: 0.02
+  pred_embedding:
+    - cell_type_ontology_term_id
+    - disease_ontology_term_id
+    - self_reported_ethnicity_ontology_term_id
+    - sex_ontology_term_id
+data:
+  organisms:
+    - NCBITaxon:9606
+    - NCBITaxon:10090
+  gene_position_tolerance: 10_000
+  gene_embeddings: ./data/main/gene_embeddings.parquet
+  collection_name: preprocessed dataset
+  how: random expr
+  max_len: 1200
+  weight_scaler: 10
+  do_gene_pos: ./data/main/biomart_pos.parquet
+  add_zero_genes: 0
+  train_oversampling_per_epoch: 1
+  validation_split: 0.05
+  test_split: 0.05
+  batch_size: 64
+  num_workers: 16
+  # TODO: drop tissue & dev stage until part or is taken in account
+  hierarchical_clss:
+    - cell_type_ontology_term_id
+    # "tissue_ontology_term_id",
+    - disease_ontology_term_id
+    # "development_stage_ontology_term_id",
+    - assay_ontology_term_id
+    - self_reported_ethnicity_ontology_term_id
+  clss_to_weight:
+    - cell_type_ontology_term_id
+    # - tissue_ontology_term_id
+    - disease_ontology_term_id
+    # - development_stage_ontology_term_id
+    - assay_ontology_term_id
+    - self_reported_ethnicity_ontology_term_id
+    - sex_ontology_term_id
+    - organism_ontology_term_id
+  clss_to_pred: ${data.clss_to_weight}
+  all_clss:
+    - cell_type_ontology_term_id
+    # - tissue_ontology_term_id
+    - disease_ontology_term_id
+    # - development_stage_ontology_term_id
+    - assay_ontology_term_id
+    - self_reported_ethnicity_ontology_term_id
+    - sex_ontology_term_id
+    - organism_ontology_term_id
+    #- heat_diff
+    #- total_counts
+    #- nnz
+    #- dpt_group
+    # - dataset_id
+    # - cell_culture
