@@ -468,6 +468,7 @@ def default_benchmark(
 
             ## OMNI
             if clf_omni is None:
+                grn.varp["GRN"] = grn.varp["all"]
                 _, m, clf_omni = train_classifier(
                     grn,
                     C=0.5,
@@ -504,10 +505,11 @@ def default_benchmark(
             metrics["self_" + da + "_" + gt] = BenGRN(
                 grn, do_auc=True, doplot=False
             ).compare_to(other=preadata)
-            grn.varp["GRN"] = grn.varp["GRN"].T
-            metrics["self_" + da + "_" + gt + "_base"] = BenGRN(
-                grn, do_auc=True, doplot=True
-            ).scprint_benchmark()
+            if spe == "human":
+                grn.varp["GRN"] = grn.varp["GRN"].T
+                metrics["self_" + da + "_" + gt + "_base"] = BenGRN(
+                    grn, do_auc=True, doplot=True
+                ).scprint_benchmark()
 
             ## chip / ko
             if (da, spe, "chip") in todo:

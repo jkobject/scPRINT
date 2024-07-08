@@ -11,8 +11,6 @@ import lightning as L
 import os
 import numpy as np
 import copy
-import gc
-import json
 
 from huggingface_hub import PyTorchModelHubMixin
 import pandas as pd
@@ -41,10 +39,6 @@ from . import loss
 from .utils import simple_masker
 from . import utils
 from .loss import grad_reverse
-
-from ..tasks import cell_emb as embbed_task
-from ..tasks import grn as grn_task
-from ..tasks import denoise as denoise_task
 
 FILEDIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -1162,195 +1156,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
 
     def _test(self, name=""):
         print("start test")
-        metrics = {}
         model_copy = copy.deepcopy(self)
-        # res = embbed_task.default_benchmark(
-        #    model_copy, default_dataset="lung", do_class=True, coarse=False
-        # )
-        # f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
-        # f.write(json.dumps({"embed_lung": res}, indent=4))
-        # f.close()
-        # metrics.update(
-        #    {
-        #        "emb_lung/scib": float(res["scib"]["Total"]),
-        #        "emb_lung/ct_class": float(
-        #            res["classif"]["cell_type_ontology_term_id"]["accuracy"]
-        #        ),
-        #    }
-        # )
-        # print(metrics)
-        # res = embbed_task.default_benchmark(
-        #    model_copy, default_dataset="pancreas", do_class=True, coarse=False
-        # )
-        # f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
-        # f.write(json.dumps({"embed_panc": res}, indent=4))
-        # f.close()
-        # metrics.update(
-        #    {
-        #        "emb_panc/scib": float(res["scib"]["Total"]),
-        #        "emb_panc/ct_class": float(
-        #            res["classif"]["cell_type_ontology_term_id"]["accuracy"]
-        #        ),
-        #    }
-        # )
-        # print(metrics)
-        # gc.collect()
-        # res = denoise_task.default_benchmark(
-        #    model_copy, FILEDIR + "/../../data/gNNpgpo6gATjuxTE7CCp.h5ad"
-        # )
-        # metrics.update(
-        #    {
-        #        "denoise/reco2full_vs_noisy2full": float(
-        #            res["reco2full"] - res["noisy2full"]
-        #        ),
-        #    }
-        # )
-        # gc.collect()
-        # print(metrics)
-        # f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
-        # f.write(json.dumps({"denoise": res}, indent=4))
-        # f.close()
-        res = grn_task.default_benchmark(
-            model_copy, "gwps", batch_size=32 if self.d_model <= 512 else 8
-        )
-        f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
-        f.write(json.dumps({"grn_gwps": res}, default=lambda o: str(o), indent=4))
-        f.close()
-        metrics.update(
-            {
-                "grn_gwps/auprc_self": float(res["self"]["auprc"]),
-                "grn_gwps/epr_self": float(res["self"]["epr"]),
-                "grn_gwps/auprc_omni": float(res["omni"]["auprc"]),
-                "grn_gwps/epr_omni": float(res["omni"]["epr"]),
-                "grn_gwps/auprc": float(res["mean"]["auprc"]),
-                "grn_gwps/epr": float(res["mean"]["epr"]),
-            }
-        )
-        print(metrics)
-        gc.collect()
-        res = grn_task.default_benchmark(
-            model_copy, "sroy", batch_size=32 if self.d_model <= 512 else 8
-        )
-        f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
-        f.write(json.dumps({"grn_sroy": res}, default=lambda o: str(o), indent=4))
-        f.close()
-        metrics.update(
-            {
-                "grn_sroy/auprc_self": float(
-                    np.mean(
-                        [
-                            i["auprc"]
-                            for k, i in res.items()
-                            if "self" in k and "chip" not in k and "ko" not in k
-                        ]
-                    )
-                ),
-                "grn_sroy/epr_self": float(
-                    np.mean(
-                        [
-                            i["epr"]
-                            for k, i in res.items()
-                            if "self" in k and "chip" not in k and "ko" not in k
-                        ]
-                    )
-                ),
-                "grn_sroy/auprc_omni": float(
-                    np.mean(
-                        [
-                            i["auprc"]
-                            for k, i in res.items()
-                            if "omni" in k and "chip" not in k and "ko" not in k
-                        ]
-                    )
-                ),
-                "grn_sroy/epr_omni": float(
-                    np.mean(
-                        [
-                            i["epr"]
-                            for k, i in res.items()
-                            if "omni" in k and "chip" not in k and "ko" not in k
-                        ]
-                    )
-                ),
-                "grn_sroy/auprc": float(
-                    np.mean(
-                        [
-                            i["auprc"]
-                            for k, i in res.items()
-                            if "mean" in k and "chip" not in k and "ko" not in k
-                        ]
-                    )
-                ),
-                "grn_sroy/epr": float(
-                    np.mean(
-                        [
-                            i["epr"]
-                            for k, i in res.items()
-                            if "mean" in k and "chip" not in k and "ko" not in k
-                        ]
-                    )
-                ),
-            }
-        )
-        print(metrics)
-        gc.collect()
-        res = grn_task.default_benchmark(
-            model_copy,
-            FILEDIR + "/../../data/gNNpgpo6gATjuxTE7CCp.h5ad",
-            batch_size=32 if self.d_model <= 512 else 8,
-        )
-        f = open("metrics_step" + str(self.global_step) + "_" + name + ".json", "a")
-        f.write(json.dumps({"grn_omni": res}, default=lambda o: str(o), indent=4))
-        f.close()
-        metrics.update(
-            {
-                "grn_omni/auprc_class": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "_class" in k])
-                ),
-                "grn_omni/epr_class": float(
-                    np.mean([i["epr"] for k, i in res.items() if "_class" in k])
-                ),
-                "grn_omni/tf_enr_class": float(
-                    np.sum(
-                        [
-                            i.get("TF_enr", False)
-                            for k, i in res.items()
-                            if "_class" in k
-                        ]
-                    )
-                ),
-                "grn_omni/tf_targ_enr_class": float(
-                    np.mean(
-                        [
-                            i["significant_enriched_TFtargets"]
-                            for k, i in res.items()
-                            if "_class" in k
-                        ]
-                    )
-                ),
-                "grn_omni/auprc": float(
-                    np.mean([i["auprc"] for k, i in res.items() if "_mean" in k])
-                ),
-                "grn_omni/epr": float(
-                    np.mean([i["epr"] for k, i in res.items() if "_mean" in k])
-                ),
-                "grn_omni/tf_enr": float(
-                    np.sum(
-                        [i.get("TF_enr", False) for k, i in res.items() if "_mean" in k]
-                    )
-                ),
-                "grn_omni/tf_targ_enr": float(
-                    np.mean(
-                        [
-                            i["significant_enriched_TFtargets"]
-                            for k, i in res.items()
-                            if "_mean" in k
-                        ]
-                    )
-                ),
-                # 'grn_omni/ct': res['classif']['cell_type_ontology_term_id']['accuracy'],
-            }
-        )
+        name = "step" + str(self.global_step) + "_" + name
+        metrics = utils.test(model_copy, name, filedir=FILEDIR)
         print(metrics)
         print("done test")
         return metrics
@@ -1418,9 +1226,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.pred_embedding (list, optional): the classes to predict. Defaults to [].
 
         """
-        import pdb
 
-        pdb.set_trace()
         if predict_mode == "none":
             output = self.forward(
                 gene_pos,
