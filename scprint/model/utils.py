@@ -16,6 +16,7 @@ from anndata import AnnData
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
+import gc
 
 import gc
 import json
@@ -473,27 +474,32 @@ class Attention:
         self.data = None
         self.gene_dim = gene_dim
         self.div = None
-        if comp_attn:
-            self.attn = torch.zeros([gene_dim + 8, gene_dim + 8])
+        self.attn = None
         self.comp_attn = comp_attn
 
     def agg(self, x: list[Tensor], pos: Tensor):
         if self.comp_attn:
-            for i in len(x):
-                for j in range(x[0].shape[0]):
-                    # for i in range(Qs.shape[0])
-                    loc = torch.cat(
-                        [torch.Tensor([r for r in range(8)]), pos[j] + 8]
-                    ).int()
-                    self.attn[loc, loc] += x[i, j, 0, :, :] @ x[i, j, 1, :, :].T
-            self.attn = self.attn / (x[0].shape[0] * len(x))
+            if self.attn is None:
+                self.attn = torch.zeros([self.gene_dim, self.gene_dim], device="cuda")
+                self.div = torch.zeros(self.gene_dim, device="cuda")
+            for j in range(x[0].shape[0]):  # •cells, •context, •QK, •heads, •dim
+                loc = torch.cat([torch.arange(8, device="cuda"), pos[j] + 8]).int()
+                for i in range(len(x)):
+                    for k in range(x[0].shape[3]):
+                        self.attn[loc[:, None], loc] += torch.nn.functional.softmax(
+                            (x[i][j, :, 0, k, :] @ x[i][j, :, 1, k, :].T)
+                            * (x[0].shape[-1] ** -0.5),
+                            dim=-1,
+                        )
+                    self.div[loc] += x[0].shape[3] * len(x)
+            torch.cuda.empty_cache()
         else:
             pos = pos.detach().to("cpu")
             if self.data is None:
                 self.data = torch.zeros([len(x), self.gene_dim] + list(x[0].shape[2:]))
                 self.div = torch.zeros(self.gene_dim)
             for i in range(x[0].shape[0]):
-                loc = torch.cat([torch.Tensor([r for r in range(8)]), pos[i] + 8]).int()
+                loc = torch.cat([torch.arange(8), pos[i] + 8]).int()
                 for j in range(len(x)):
                     self.data[j, loc, :, :, :] += x[j][i].detach().to("cpu")
                 self.div[loc] += 1
@@ -513,8 +519,13 @@ class Attention:
 
     def get(self):
         if self.comp_attn:
-            loc = self.attn.sum(0) != 0
-            return self.attn[loc][:, loc].detach().cpu().numpy()
+            loc = self.attn.sum(1) != 0
+            return (
+                (self.attn[loc][:, loc] / (self.attn.sum(1)[loc] + 0.0001))
+                .detach()
+                .cpu()
+                .numpy()
+            )
         else:
             if self.data is None:
                 return None

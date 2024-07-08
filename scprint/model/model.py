@@ -1226,7 +1226,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.pred_embedding (list, optional): the classes to predict. Defaults to [].
 
         """
-
         if predict_mode == "none":
             output = self.forward(
                 gene_pos,

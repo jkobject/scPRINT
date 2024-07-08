@@ -202,6 +202,7 @@ class GRNfer:
 
     def aggregate(self, attn):
         if self.head_agg == "mean_full":
+            self.curr_genes = [i for i in self.model.genes if i in self.curr_genes]
             return attn
         badloc = torch.isnan(attn.sum((0, 2, 3, 4)))
         attn = attn[:, ~badloc, :, :, :]
