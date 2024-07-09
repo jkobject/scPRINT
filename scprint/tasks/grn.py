@@ -161,6 +161,8 @@ class GRNfer:
         else:
             raise ValueError("how must be one of 'most var', 'random expr'")
         subadata = subadata[: self.max_cells] if self.max_cells else subadata
+        if len(subadata) == 0:
+            raise ValueError("no cells in the dataset")
         adataset = SimpleAnnDataset(
             subadata, obs_to_output=["organism_ontology_term_id"]
         )
@@ -394,7 +396,7 @@ def default_benchmark(
     default_dataset="sroy",
     cell_types=[
         "kidney distal convoluted tubule epithelial cell",
-        "kidney loop of Henle thick ascending limb epithelial cell"
+        "kidney loop of Henle thick ascending limb epithelial cell",
         "kidney collecting duct principal cell",
         # 'mesangial cell',
         "blood vessel smooth muscle cell",
@@ -656,7 +658,13 @@ def default_benchmark(
                 batch_size=batch_size,
                 devices=1,
             )
-            grn = grn_inferer(layer=layers, cell_type=celltype)
+            try:
+                grn = grn_inferer(layer=layers, cell_type=celltype)
+            except:
+                import pdb
+
+                pdb.set_trace()
+                grn = grn_inferer(layer=layers, cell_type=celltype)
             grn.var.index = make_index_unique(grn.var["symbol"].astype(str))
             metrics[celltype + "_scprint"] = BenGRN(
                 grn, doplot=False
@@ -681,7 +689,9 @@ def default_benchmark(
             grn.var.index = make_index_unique(grn.var["symbol"].astype(str))
             grn.varp["all"] = grn.varp["GRN"]
             grn.varp["GRN"] = grn.varp["GRN"].mean(-1)
-            metrics[celltype + "_scprint_mean"] = BenGRN(grn).scprint_benchmark()
+            metrics[celltype + "_scprint_mean"] = BenGRN(
+                grn, doplot=False
+            ).scprint_benchmark()
             if clf_omni is None:
                 grn.varp["GRN"] = grn.varp["all"]
                 _, m, clf_omni = train_classifier(

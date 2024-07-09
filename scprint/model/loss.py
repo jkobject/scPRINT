@@ -8,10 +8,10 @@ def mse(input: Tensor, target: Tensor) -> Tensor:
     """
     Compute the MSE loss between input and target.
     """
-    input = torch.log2(input+1)
-    input = (input / torch.sum(input, dim=1, keepdim=True))*10000
-    target = torch.log2(target+1)
-    target = target / torch.sum(target, dim=1, keepdim=True)*10000
+    input = torch.log2(input + 1)
+    input = (input / torch.sum(input, dim=1, keepdim=True)) * 10000
+    target = torch.log2(target + 1)
+    target = target / torch.sum(target, dim=1, keepdim=True) * 10000
     return F.mse_loss(input, target, reduction="mean")
 
 
@@ -119,7 +119,7 @@ def zinb(
 
     Returns
     -------
-    If 'mean' is 'True' ZINB loss value gets returned, otherwise Torch tensor of losses gets returned.
+    ZINB loss value
     """
     #  uses log(sigmoid(x)) = -softplus(-x)
     softplus_pi = F.softplus(-pi)

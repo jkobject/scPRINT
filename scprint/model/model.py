@@ -1202,7 +1202,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         predict_mode="none",
         pred_embedding=[],
         get_attention_layer=[],
-        depth_mult=3,
+        depth_mult=6,
         keep_output=True,
         max_size_in_mem=100_000,
         name="",
