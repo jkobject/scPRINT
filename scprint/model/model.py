@@ -1143,25 +1143,21 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 gtclass=self.info, name="validation_part_" + str(self.counter)
             )
             if (self.current_epoch + 1) % 40 == 0:
-                metrics = self._test()
-                self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
+                self.on_test_epoch_end()
 
     def test_step(self, *args, **kwargs):
         print("step")
         pass
 
     def on_test_epoch_end(self):
-        metrics = self._test(name="")
-        self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
-
-    def _test(self, name=""):
         print("start test")
+        name = ""
         model_copy = copy.deepcopy(self)
         name = "step" + str(self.global_step) + "_" + name
         metrics = utils.test(model_copy, name, filedir=FILEDIR)
         print(metrics)
         print("done test")
-        return metrics
+        self.log_dict(metrics, sync_dist=True, rank_zero_only=True)
 
     def on_predict_epoch_start(self):
         """@see pl.LightningModule"""

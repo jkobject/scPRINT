@@ -535,154 +535,154 @@ class Attention:
 
 def test(model, name, filedir):
     metrics = {}
-    # res = embbed_task.default_benchmark(
-    #    model, default_dataset="lung", do_class=True, coarse=False
-    # )
-    # f = open("metrics_"+name+ ".json", "a")
-    # f.write(json.dumps({"embed_lung": res}, indent=4))
-    # f.close()
-    # metrics.update(
-    #    {
-    #        "emb_lung/scib": float(res["scib"]["Total"]),
-    #        "emb_lung/ct_class": float(
-    #            res["classif"]["cell_type_ontology_term_id"]["accuracy"]
-    #        ),
-    #    }
-    # )
-    # print(metrics)
-    # res = embbed_task.default_benchmark(
-    #    model, default_dataset="pancreas", do_class=True, coarse=False
-    # )
-    # f = open("metric" + name + ".json", "a")
-    # f.write(json.dumps({"embed_panc": res}, indent=4))
-    # f.close()
-    # metrics.update(
-    #    {
-    #        "emb_panc/scib": float(res["scib"]["Total"]),
-    #        "emb_panc/ct_class": float(
-    #            res["classif"]["cell_type_ontology_term_id"]["accuracy"]
-    #        ),
-    #    }
-    # )
-    # print(metrics)
-    # gc.collect()
-    # res = denoise_task.default_benchmark(
-    #    model, filedir + "/../../data/gNNpgpo6gATjuxTE7CCp.h5ad"
-    # )
-    # metrics.update(
-    #    {
-    #        "denoise/reco2full_vs_noisy2full": float(
-    #            res["reco2full"] - res["noisy2full"]
-    #        ),
-    #    }
-    # )
-    # gc.collect()
-    # print(metrics)
-    # f = open("metric" + name + ".json", "a")
-    # f.write(json.dumps({"denoise": res}, indent=4))
-    # f.close()
-    # res = grn_task.default_benchmark(
-    #    model, "gwps", batch_size=32 if model.d_model <= 512 else 8
-    # )
-    # f = open("metric" + name + ".json", "a")
-    # f.write(json.dumps({"grn_gwps": res}, default=lambda o: str(o), indent=4))
-    # f.close()
-    # metrics.update(
-    #    {
-    #        "grn_gwps/auprc_self": float(res["self"]["auprc"]),
-    #        "grn_gwps/epr_self": float(res["self"]["epr"]),
-    #        "grn_gwps/auprc_omni": float(res["omni"]["auprc"]),
-    #        "grn_gwps/epr_omni": float(res["omni"]["epr"]),
-    #        "grn_gwps/auprc": float(res["mean"]["auprc"]),
-    #        "grn_gwps/epr": float(res["mean"]["epr"]),
-    #    }
-    # )
-    # print(metrics)
-    # gc.collect()
-    # res = grn_task.default_benchmark(
-    #    model, "sroy", batch_size=32 if model.d_model <= 512 else 8
-    # )
-    # f = open("metric" + name + ".json", "a")
-    # f.write(json.dumps({"grn_sroy": res}, default=lambda o: str(o), indent=4))
-    # f.close()
-    # metrics.update(
-    #    {
-    #        "grn_sroy/auprc_self": float(
-    #            np.mean(
-    #                [
-    #                    i["auprc"]
-    #                    for k, i in res.items()
-    #                    if "self_" in k
-    #                    and "chip_" not in k
-    #                    and "ko_" not in k
-    #                    and "classifier" not in k
-    #                ]
-    #            )
-    #        ),
-    #        "grn_sroy/epr_self": float(
-    #            np.mean(
-    #                [
-    #                    i["epr"]
-    #                    for k, i in res.items()
-    #                    if "self_" in k
-    #                    and "chip" not in k
-    #                    and "ko" not in k
-    #                    and "classifier" not in k
-    #                ]
-    #            )
-    #        ),
-    #        "grn_sroy/auprc_omni": float(
-    #            np.mean(
-    #                [
-    #                    i["auprc"]
-    #                    for k, i in res.items()
-    #                    if "omni_" in k
-    #                    and "chip" not in k
-    #                    and "ko" not in k
-    #                    and "classifier" not in k
-    #                ]
-    #            )
-    #        ),
-    #        "grn_sroy/epr_omni": float(
-    #            np.mean(
-    #                [
-    #                    i["epr"]
-    #                    for k, i in res.items()
-    #                    if "omni_" in k
-    #                    and "chip" not in k
-    #                    and "ko" not in k
-    #                    and "classifier" not in k
-    #                ]
-    #            )
-    #        ),
-    #        "grn_sroy/auprc": float(
-    #            np.mean(
-    #                [
-    #                    i["auprc"]
-    #                    for k, i in res.items()
-    #                    if "mean_" in k
-    #                    and "chip" not in k
-    #                    and "ko" not in k
-    #                    and "classifier" not in k
-    #                ]
-    #            )
-    #        ),
-    #        "grn_sroy/epr": float(
-    #            np.mean(
-    #                [
-    #                    i["epr"]
-    #                    for k, i in res.items()
-    #                    if "mean_" in k
-    #                    and "chip" not in k
-    #                    and "ko" not in k
-    #                    and "classifier" not in k
-    #                ]
-    #            )
-    #        ),
-    #    }
-    # )
-    # print(metrics)
-    # gc.collect()
+    res = embbed_task.default_benchmark(
+        model, default_dataset="lung", do_class=True, coarse=False
+    )
+    f = open("metrics_" + name + ".json", "a")
+    f.write(json.dumps({"embed_lung": res}, indent=4))
+    f.close()
+    metrics.update(
+        {
+            "emb_lung/scib": float(res["scib"]["Total"]),
+            "emb_lung/ct_class": float(
+                res["classif"]["cell_type_ontology_term_id"]["accuracy"]
+            ),
+        }
+    )
+    print(metrics)
+    res = embbed_task.default_benchmark(
+        model, default_dataset="pancreas", do_class=True, coarse=False
+    )
+    f = open("metric" + name + ".json", "a")
+    f.write(json.dumps({"embed_panc": res}, indent=4))
+    f.close()
+    metrics.update(
+        {
+            "emb_panc/scib": float(res["scib"]["Total"]),
+            "emb_panc/ct_class": float(
+                res["classif"]["cell_type_ontology_term_id"]["accuracy"]
+            ),
+        }
+    )
+    print(metrics)
+    gc.collect()
+    res = denoise_task.default_benchmark(
+        model, filedir + "/../../data/gNNpgpo6gATjuxTE7CCp.h5ad"
+    )
+    metrics.update(
+        {
+            "denoise/reco2full_vs_noisy2full": float(
+                res["reco2full"] - res["noisy2full"]
+            ),
+        }
+    )
+    gc.collect()
+    print(metrics)
+    f = open("metric" + name + ".json", "a")
+    f.write(json.dumps({"denoise": res}, indent=4))
+    f.close()
+    res = grn_task.default_benchmark(
+        model, "gwps", batch_size=32 if model.d_model <= 512 else 8
+    )
+    f = open("metric" + name + ".json", "a")
+    f.write(json.dumps({"grn_gwps": res}, default=lambda o: str(o), indent=4))
+    f.close()
+    metrics.update(
+        {
+            "grn_gwps/auprc_self": float(res["self"]["auprc"]),
+            "grn_gwps/epr_self": float(res["self"]["epr"]),
+            "grn_gwps/auprc_omni": float(res["omni"]["auprc"]),
+            "grn_gwps/epr_omni": float(res["omni"]["epr"]),
+            "grn_gwps/auprc": float(res["mean"]["auprc"]),
+            "grn_gwps/epr": float(res["mean"]["epr"]),
+        }
+    )
+    print(metrics)
+    gc.collect()
+    res = grn_task.default_benchmark(
+        model, "sroy", batch_size=32 if model.d_model <= 512 else 8
+    )
+    f = open("metric" + name + ".json", "a")
+    f.write(json.dumps({"grn_sroy": res}, default=lambda o: str(o), indent=4))
+    f.close()
+    metrics.update(
+        {
+            "grn_sroy/auprc_self": float(
+                np.mean(
+                    [
+                        i["auprc"]
+                        for k, i in res.items()
+                        if "self_" in k
+                        and "chip_" not in k
+                        and "ko_" not in k
+                        and "classifier" not in k
+                    ]
+                )
+            ),
+            "grn_sroy/epr_self": float(
+                np.mean(
+                    [
+                        i["epr"]
+                        for k, i in res.items()
+                        if "self_" in k
+                        and "chip" not in k
+                        and "ko" not in k
+                        and "classifier" not in k
+                    ]
+                )
+            ),
+            "grn_sroy/auprc_omni": float(
+                np.mean(
+                    [
+                        i["auprc"]
+                        for k, i in res.items()
+                        if "omni_" in k
+                        and "chip" not in k
+                        and "ko" not in k
+                        and "classifier" not in k
+                    ]
+                )
+            ),
+            "grn_sroy/epr_omni": float(
+                np.mean(
+                    [
+                        i["epr"]
+                        for k, i in res.items()
+                        if "omni_" in k
+                        and "chip" not in k
+                        and "ko" not in k
+                        and "classifier" not in k
+                    ]
+                )
+            ),
+            "grn_sroy/auprc": float(
+                np.mean(
+                    [
+                        i["auprc"]
+                        for k, i in res.items()
+                        if "mean_" in k
+                        and "chip" not in k
+                        and "ko" not in k
+                        and "classifier" not in k
+                    ]
+                )
+            ),
+            "grn_sroy/epr": float(
+                np.mean(
+                    [
+                        i["epr"]
+                        for k, i in res.items()
+                        if "mean_" in k
+                        and "chip" not in k
+                        and "ko" not in k
+                        and "classifier" not in k
+                    ]
+                )
+            ),
+        }
+    )
+    print(metrics)
+    gc.collect()
     res = grn_task.default_benchmark(
         model,
         filedir + "/../../data/yBCKp6HmXuHa0cZptMo7.h5ad",
@@ -734,3 +734,4 @@ def test(model, name, filedir):
             # 'grn_omni/ct': res['classif']['cell_type_ontology_term_id']['accuracy'],
         }
     )
+    return metrics
