@@ -133,12 +133,24 @@ class FlashTransformerEncoder(nn.Module):
         named_apply(_init_weights, self)
 
     def forward(
-        self, hidden_states: Tensor, mask: Optional[Tensor] = None, return_qkv=[]
+        self,
+        hidden_states: Tensor,
+        mask: Optional[Tensor] = None,
+        return_qkv=[],
+        bias: torch.Tensor = None,
+        bias_layer=[],
     ) -> Tensor:
         residual = None
         qkvs = []
+        if bias is not None and bias.dim() == 2:
+            bias = bias.unsqueeze(0).unsqueeze(0)
         for i, block in enumerate(self.blocks):
-            hidden_states = block(hidden_states, residual, return_qkv=(i in return_qkv))
+            hidden_states = block(
+                hidden_states,
+                residual,
+                return_qkv=(i in return_qkv),
+                bias=bias if i in bias_layer else None,
+            )
             if i in return_qkv:
                 qkvs.append(hidden_states[-1])
                 hidden_states, residual = (

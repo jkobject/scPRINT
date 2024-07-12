@@ -32,6 +32,7 @@ class TrainingMode(Callback):
         lr: float = 0.001,
         optim: str = "adamW",
         weight_decay: float = 0.01,
+        name="",
     ):
         """
         TrainingMode a callback to set the training specific info to the model.
@@ -71,6 +72,7 @@ class TrainingMode(Callback):
         self.do_cls = do_cls
         self.do_adv_batch = do_adv_batch
         self.run_full_forward = run_full_forward
+        self.name = name
 
     def __repr__(self):
         return (
@@ -101,7 +103,8 @@ class TrainingMode(Callback):
             f"mvc_scale={self.mvc_scale}, "
             f"do_cls={self.do_cls}, "
             f"do_adv_batch={self.do_adv_batch}, "
-            f"run_full_forward={self.run_full_forward})"
+            f"run_full_forward={self.run_full_forward}), "
+            f"name={self.name})"
         )
 
     def setup(self, trainer, model, stage=None):
@@ -134,4 +137,5 @@ class TrainingMode(Callback):
         model.lr = self.lr
         model.optim = self.optim
         model.weight_decay = self.weight_decay
+        model.name = self.name
         # model.configure_optimizers()

@@ -11,7 +11,7 @@ import lightning as L
 import os
 import numpy as np
 import copy
-
+from scipy.sparse import load_npz
 from huggingface_hub import PyTorchModelHubMixin
 import pandas as pd
 from functools import partial
@@ -59,6 +59,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         normalization: str = "sum",
         d_model: int = 512,
         nhead: int = 8,
+        attn_bias: str = "motif",
         d_hid: int = 512,
         edge_dim: int = 12,
         nlayers: int = 6,
@@ -143,6 +144,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         self.lr_reduce_patience = 1
         self.lr_reduce_factor = 0.6
         self.lr_reduce_monitor = "val_loss"
+        self.name = ""
         self.lr = lr
         self.lrfinder_steps = 0
         self.doplot = True
@@ -158,6 +160,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         self.normalization = normalization
         self.organisms = organisms
         self.edge_dim = edge_dim
+        self.attn_bias = attn_bias
         self.nlayers = nlayers
         self.gene_pos_enc = gene_pos_enc
         self.mvc_decoder = mvc_decoder
@@ -287,6 +290,8 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 raise ValueError("flash transformer requires flash package")
                 # NOT flash transformer using the special tritton kernel
                 # or parallelMHA (add the process group thing and faster)
+            if attn_bias != "none":
+                self.nbias = load_npz(FILEDIR + "/../../data/bias_sparse.npz")
             self.transformer = FlashTransformerEncoder(
                 d_model,
                 nhead,
@@ -550,9 +555,33 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 - "cls_output": the output of the classifier
         """
         encoding = self._encoder(gene_pos, expression, mask, full_depth, timepoint)
-        transformer_output = self.transformer(encoding, return_qkv=get_attention_layer)
-        depth_mult = expression.sum(1) if depth_mult is None else depth_mult
 
+        if self.attn_bias != "none":
+            bias = torch.zeros(
+                (
+                    gene_pos.shape[0],
+                    gene_pos.shape[1] + 2 + len(self.classes),
+                    gene_pos.shape[1] + 2 + len(self.classes),
+                ),
+                device=self.device,
+                dtype=torch.float32,
+            )
+            bias[:, gene_pos.shape[1] :, : 2 + len(self.classes)] = (
+                -10_000
+            )  # do not pay attentino to the cls embeddings
+            for i, pos in enumerate(gene_pos):  # for all gene_pos batch elements we get the connections
+                pos = pos.to("cpu")
+                bias[i, 8:, 8:] = torch.tensor(
+                    self.nbias[pos[:, None], pos].todense()
+                ).to(self.device, dtype=torch.float32)
+        transformer_output = self.transformer(
+            encoding,
+            return_qkv=get_attention_layer,
+            attn_bias=bias,
+            bias_layer=list(range(self.nlayers - 1)),
+        )
+
+        depth_mult = expression.sum(1) if depth_mult is None else depth_mult
         if len(get_attention_layer) > 0:
             transformer_output, qkvs = transformer_output
             return (
@@ -1151,9 +1180,8 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
 
     def on_test_epoch_end(self):
         print("start test")
-        name = ""
         model_copy = copy.deepcopy(self)
-        name = "step" + str(self.global_step) + "_" + name
+        name = self.name + "_step" + str(self.global_step)
         metrics = utils.test(model_copy, name, filedir=FILEDIR)
         print(metrics)
         print("done test")
@@ -1187,7 +1215,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.pred_embedding,
             self.get_attention_layer,
             self.predict_depth_mult,
-            name="predict",
         )
 
     def _predict(
@@ -1201,7 +1228,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         depth_mult=6,
         keep_output=True,
         max_size_in_mem=100_000,
-        name="",
     ):
         """
         @see predict_step will save output of predict in multiple self variables
@@ -1353,7 +1379,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         if self.embs is not None:
             if self.embs.shape[0] > max_size_in_mem:
                 print("logging")
-                self.log_adata(name=name + "_part_" + str(self.counter))
+                self.log_adata(name="predict_part_" + str(self.counter))
                 self.counter += 1
                 self.pos = None
                 self.expr_pred = None
@@ -1452,7 +1478,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.label_decoders,
             self.labels_hierarchy,
             gtclass,
-            name + "_" + str(self.global_rank),
+            self.name + "_" + name + "_" + str(self.global_rank),
             mdir,
             self.doplot,
         )
