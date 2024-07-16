@@ -59,7 +59,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         normalization: str = "sum",
         d_model: int = 512,
         nhead: int = 8,
-        attn_bias: str = "motif",
+        attn_bias: str = "none",
         d_hid: int = 512,
         edge_dim: int = 12,
         nlayers: int = 6,
@@ -291,7 +291,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 # NOT flash transformer using the special tritton kernel
                 # or parallelMHA (add the process group thing and faster)
             if attn_bias != "none":
-                self.nbias = load_npz(FILEDIR + "/../../data/bias_sparse.npz")
+                self.nbias = torch.Tensor(
+                    load_npz(FILEDIR + "/../../data/bias_sparse.npz").todense()
+                ).to(device="cuda", dtype=torch.float16)
             self.transformer = FlashTransformerEncoder(
                 d_model,
                 nhead,
@@ -546,7 +548,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         Returns:
             dict of output Tensors: A dictionary containing the output tensors from the forward pass.
                 The keys of the dictionary depend on the input flags (get_gene_emb, do_sample, get_attention_layer).
-                at minima, the dictionary contains the following:
+                at minima, the dictionary codntains the following:
                 - "mean": the mean expression levels
                 - "zero_logits": the logits for zero-inflated expression levels
                 - "disp": the dispersion parameter
@@ -557,27 +559,22 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         encoding = self._encoder(gene_pos, expression, mask, full_depth, timepoint)
 
         if self.attn_bias != "none":
+            num = len(self.classes) + 2
             bias = torch.zeros(
                 (
                     gene_pos.shape[0],
-                    gene_pos.shape[1] + 2 + len(self.classes),
-                    gene_pos.shape[1] + 2 + len(self.classes),
+                    gene_pos.shape[1] + num,
+                    gene_pos.shape[1] + num,
                 ),
-                device=self.device,
-                dtype=torch.float32,
+                device="cuda",
+                dtype=torch.float16,
             )
-            bias[:, gene_pos.shape[1] :, : 2 + len(self.classes)] = (
-                -10_000
-            )  # do not pay attentino to the cls embeddings
-            for i, pos in enumerate(gene_pos):  # for all gene_pos batch elements we get the connections
-                pos = pos.to("cpu")
-                bias[i, 8:, 8:] = torch.tensor(
-                    self.nbias[pos[:, None], pos].todense()
-                ).to(self.device, dtype=torch.float32)
+            bias[:, num:, :num] = -10_000  # do not pay attention to the cls embeddings
+            bias[:, num:, num:] = self.nbias[gene_pos[:, :, None], gene_pos[:, None, :]]
         transformer_output = self.transformer(
             encoding,
             return_qkv=get_attention_layer,
-            attn_bias=bias,
+            bias=bias if self.attn_bias != "none" else None,
             bias_layer=list(range(self.nlayers - 1)),
         )
 
@@ -656,7 +653,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             factor=self.lr_reduce_factor,
             verbose=True,
         )
-        print(bool(self.trainer.val_dataloaders))
         lr_dict = {
             "scheduler": lr_scheduler,
             # The unit of the scheduler's step size, could also be 'step'.
@@ -1136,7 +1132,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                     depth,
                     pred_embedding=self.pred_embedding,
                     max_size_in_mem=100_000,
-                    name="validation",
                 )
         else:
             self.info = batch["class"]
