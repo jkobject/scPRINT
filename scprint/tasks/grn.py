@@ -161,6 +161,8 @@ class GRNfer:
         else:
             raise ValueError("how must be one of 'most var', 'random expr'")
         subadata = subadata[: self.max_cells] if self.max_cells else subadata
+        if len(subadata) == 0:
+            raise ValueError("no cells in the dataset")
         adataset = SimpleAnnDataset(
             subadata, obs_to_output=["organism_ontology_term_id"]
         )
@@ -394,15 +396,15 @@ def default_benchmark(
     default_dataset="sroy",
     cell_types=[
         "kidney distal convoluted tubule epithelial cell",
-        "kidney loop of Henle thick ascending limb epithelial cell"
+        "kidney loop of Henle thick ascending limb epithelial cell",
         "kidney collecting duct principal cell",
-        # 'mesangial cell',
+        "mesangial cell",
         "blood vessel smooth muscle cell",
         "podocyte",
         "macrophage",
         "leukocyte",
         "kidney interstitial fibroblast",
-        # 'endothelial cell',
+        "endothelial cell",
     ],
     maxlayers=16,
     maxgenes=5000,
@@ -469,6 +471,7 @@ def default_benchmark(
 
             ## OMNI
             if clf_omni is None:
+                grn.varp["GRN"] = grn.varp["all"]
                 _, m, clf_omni = train_classifier(
                     grn,
                     C=0.5,
@@ -505,10 +508,11 @@ def default_benchmark(
             metrics["self_" + da + "_" + gt] = BenGRN(
                 grn, do_auc=True, doplot=False
             ).compare_to(other=preadata)
-            grn.varp["GRN"] = grn.varp["GRN"].T
-            metrics["self_" + da + "_" + gt + "_base"] = BenGRN(
-                grn, do_auc=True, doplot=True
-            ).scprint_benchmark()
+            if spe == "human":
+                grn.varp["GRN"] = grn.varp["GRN"].T
+                metrics["self_" + da + "_" + gt + "_base"] = BenGRN(
+                    grn, do_auc=True, doplot=True
+                ).scprint_benchmark()
 
             ## chip / ko
             if (da, spe, "chip") in todo:
@@ -654,12 +658,14 @@ def default_benchmark(
                 batch_size=batch_size,
                 devices=1,
             )
+
             grn = grn_inferer(layer=layers, cell_type=celltype)
             grn.var.index = make_index_unique(grn.var["symbol"].astype(str))
             metrics[celltype + "_scprint"] = BenGRN(
                 grn, doplot=False
             ).scprint_benchmark()
             del grn
+            gc.collect()
             grn_inferer = GRNfer(
                 model,
                 adata[adata.X.sum(1) > 500],
@@ -679,7 +685,9 @@ def default_benchmark(
             grn.var.index = make_index_unique(grn.var["symbol"].astype(str))
             grn.varp["all"] = grn.varp["GRN"]
             grn.varp["GRN"] = grn.varp["GRN"].mean(-1)
-            metrics[celltype + "_scprint_mean"] = BenGRN(grn).scprint_benchmark()
+            metrics[celltype + "_scprint_mean"] = BenGRN(
+                grn, doplot=False
+            ).scprint_benchmark()
             if clf_omni is None:
                 grn.varp["GRN"] = grn.varp["all"]
                 _, m, clf_omni = train_classifier(
@@ -699,4 +707,5 @@ def default_benchmark(
                 grn, doplot=False
             ).scprint_benchmark()
             del grn
+            gc.collect()
     return metrics

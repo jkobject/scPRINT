@@ -57,6 +57,7 @@ class FlashSelfAttention(nn.Module):
         max_seqlen: Optional[int] = None,
         cu_seqlens_k: Optional[torch.Tensor] = None,
         max_seqlen_k: Optional[int] = None,
+        bias: Optional[torch.Tensor] = None,
         **kwargs,
     ):
         """Implements the multihead softmax attention.
@@ -78,11 +79,11 @@ class FlashSelfAttention(nn.Module):
         assert qkv.is_cuda
         causal = self.causal if causal is None else causal
         return flash_attn_qkvpacked_func(
-            qkv,
-            None,
+            qkv=qkv,
+            bias=bias,
             # self.drop.p if self.training else 0.0,
-            causal,
-            self.softmax_scale,
+            causal=causal,
+            softmax_scale=self.softmax_scale,
         )
 
 

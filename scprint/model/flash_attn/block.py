@@ -133,6 +133,7 @@ class Block(nn.Module):
         self,
         hidden_states: Tensor,
         residual: Optional[Tensor] = None,
+        bias: Optional[Tensor] = None,
         src_mask: Optional[Tensor] = None,
         is_causal: Optional[bool] = None,
         src_key_padding_mask: Optional[Tensor] = None,
@@ -192,7 +193,7 @@ class Block(nn.Module):
             if mixer_subset is not None:
                 mixer_kwargs["mixer_subset"] = mixer_subset
             hidden_states = self.mixer(
-                hidden_states, return_qkv=return_qkv, **mixer_kwargs
+                hidden_states, return_qkv=return_qkv, bias=bias, **mixer_kwargs
             )
             if return_qkv:
                 qkv = hidden_states[1]
@@ -247,6 +248,7 @@ class Block(nn.Module):
             mixer_out = self.mixer(
                 hidden_states,
                 return_qkv=return_qkv,
+                bias=bias,
                 **(mixer_kwargs if mixer_kwargs is not None else {})
             )
             if return_qkv:

@@ -49,7 +49,7 @@ model:
   prenorm: True
   fused_mlp: False
   fused_bias_fc: False
-  drop_path_rate: 0.02
+  drop_path_rate: 0
   freeze_embeddings: True
   pred_embedding:
     - cell_type_ontology_term_id
