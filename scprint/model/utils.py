@@ -553,7 +553,7 @@ def test(model, name, filedir):
     res = embbed_task.default_benchmark(
         model, default_dataset="pancreas", do_class=True, coarse=False
     )
-    f = open("metric" + name + ".json", "a")
+    f = open("metrics_" + name + ".json", "a")
     f.write(json.dumps({"embed_panc": res}, indent=4))
     f.close()
     metrics.update(
@@ -578,13 +578,13 @@ def test(model, name, filedir):
     )
     gc.collect()
     print(metrics)
-    f = open("metric" + name + ".json", "a")
+    f = open("metrics_" + name + ".json", "a")
     f.write(json.dumps({"denoise": res}, indent=4))
     f.close()
     res = grn_task.default_benchmark(
         model, "gwps", batch_size=32 if model.d_model <= 512 else 8
     )
-    f = open("metric" + name + ".json", "a")
+    f = open("metrics_" + name + ".json", "a")
     f.write(json.dumps({"grn_gwps": res}, default=lambda o: str(o), indent=4))
     f.close()
     metrics.update(
@@ -602,7 +602,7 @@ def test(model, name, filedir):
     res = grn_task.default_benchmark(
         model, "sroy", batch_size=32 if model.d_model <= 512 else 8
     )
-    f = open("metric" + name + ".json", "a")
+    f = open("metrics_" + name + ".json", "a")
     f.write(json.dumps({"grn_sroy": res}, default=lambda o: str(o), indent=4))
     f.close()
     metrics.update(
@@ -612,10 +612,10 @@ def test(model, name, filedir):
                     [
                         i["auprc"]
                         for k, i in res.items()
-                        if "self_" in k
-                        and "chip_" not in k
-                        and "ko_" not in k
-                        and "classifier" not in k
+                        if k.startswith("self_")
+                        and not any(
+                            x in k for x in ["chip_", "ko_", "classifier", "_base"]
+                        )
                     ]
                 )
             ),
@@ -624,10 +624,10 @@ def test(model, name, filedir):
                     [
                         i["epr"]
                         for k, i in res.items()
-                        if "self_" in k
-                        and "chip" not in k
-                        and "ko" not in k
-                        and "classifier" not in k
+                        if k.startswith("self_")
+                        and not any(
+                            x in k for x in ["chip_", "ko_", "classifier", "_base"]
+                        )
                     ]
                 )
             ),
@@ -636,10 +636,10 @@ def test(model, name, filedir):
                     [
                         i["auprc"]
                         for k, i in res.items()
-                        if "omni_" in k
-                        and "chip" not in k
-                        and "ko" not in k
-                        and "classifier" not in k
+                        if k.startswith("omni_")
+                        and not any(
+                            x in k for x in ["chip_", "ko_", "classifier", "_base"]
+                        )
                     ]
                 )
             ),
@@ -648,10 +648,10 @@ def test(model, name, filedir):
                     [
                         i["epr"]
                         for k, i in res.items()
-                        if "omni_" in k
-                        and "chip" not in k
-                        and "ko" not in k
-                        and "classifier" not in k
+                        if k.startswith("omni_")
+                        and not any(
+                            x in k for x in ["chip_", "ko_", "classifier", "_base"]
+                        )
                     ]
                 )
             ),
@@ -660,10 +660,10 @@ def test(model, name, filedir):
                     [
                         i["auprc"]
                         for k, i in res.items()
-                        if "mean_" in k
-                        and "chip" not in k
-                        and "ko" not in k
-                        and "classifier" not in k
+                        if k.startswith("mean_")
+                        and not any(
+                            x in k for x in ["chip_", "ko_", "classifier", "_base"]
+                        )
                     ]
                 )
             ),
@@ -672,10 +672,10 @@ def test(model, name, filedir):
                     [
                         i["epr"]
                         for k, i in res.items()
-                        if "mean_" in k
-                        and "chip" not in k
-                        and "ko" not in k
-                        and "classifier" not in k
+                        if k.startswith("mean_")
+                        and not any(
+                            x in k for x in ["chip_", "ko_", "classifier", "_base"]
+                        )
                     ]
                 )
             ),
@@ -688,7 +688,7 @@ def test(model, name, filedir):
         filedir + "/../../data/yBCKp6HmXuHa0cZptMo7.h5ad",
         batch_size=32 if model.d_model <= 512 else 8,
     )
-    f = open("metric" + name + ".json", "a")
+    f = open("metrics_" + name + ".json", "a")
     f.write(json.dumps({"grn_omni": res}, default=lambda o: str(o), indent=4))
     f.close()
     metrics.update(

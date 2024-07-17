@@ -465,9 +465,10 @@ def default_benchmark(
                 grn, do_auc=True, doplot=False
             ).compare_to(other=preadata)
             grn.varp["GRN"] = grn.varp["GRN"].T
-            metrics["mean_" + da + "_" + gt + "_base"] = BenGRN(
-                grn, do_auc=True, doplot=False
-            ).scprint_benchmark()
+            if spe == "human":
+                metrics["mean_" + da + "_" + gt + "_base"] = BenGRN(
+                    grn, do_auc=True, doplot=False
+                ).scprint_benchmark()
 
             ## OMNI
             if clf_omni is None:
@@ -476,16 +477,17 @@ def default_benchmark(
                     grn,
                     C=0.5,
                     train_size=0.9,
-                    class_weight={1: 100, 0: 1},
+                    class_weight={1: 1000, 0: 1},
                     shuffle=True,
                     return_full=False,
                 )
                 joblib.dump(clf_omni, "clf_omni.pkl")
                 metrics["omni_classifier"] = m
             grn.varp["GRN"] = grn.varp["all"][:, :, clf_omni.coef_[0] > 0].mean(-1)
-            metrics["omni_" + da + "_" + gt + "_base"] = BenGRN(
-                grn, do_auc=True, doplot=True
-            ).scprint_benchmark()
+            if spe == "human":
+                metrics["omni_" + da + "_" + gt + "_base"] = BenGRN(
+                    grn, do_auc=True, doplot=True
+                ).scprint_benchmark()
             grn.varp["GRN"] = grn.varp["GRN"].T
             metrics["omni_" + da + "_" + gt] = BenGRN(
                 grn, do_auc=True, doplot=False
@@ -602,7 +604,7 @@ def default_benchmark(
             grn,
             C=1,
             train_size=0.9,
-            class_weight={1: 200, 0: 1},
+            class_weight={1: 1000, 0: 1},
             shuffle=True,
             doplot=False,
             return_full=False,
@@ -623,7 +625,7 @@ def default_benchmark(
             other=adata,
             C=0.5,
             train_size=0.5,
-            class_weight={1: 20, 0: 1},
+            class_weight={1: 40, 0: 1},
             doplot=False,
             shuffle=False,
             return_full=False,
@@ -638,6 +640,7 @@ def default_benchmark(
             grn, do_auc=True, doplot=False
         ).scprint_benchmark()
     else:
+        # max_genes=4000
         adata = sc.read_h5ad(default_dataset)
         adata.var["isTF"] = False
         adata.var.loc[adata.var.symbol.isin(grnutils.TF), "isTF"] = True
@@ -694,8 +697,8 @@ def default_benchmark(
                     grn,
                     C=1,
                     train_size=0.6,
-                    max_iter=200,
-                    class_weight={1: 200, 0: 1},
+                    max_iter=300,
+                    class_weight={1: 1000, 0: 1},
                     return_full=False,
                     shuffle=True,
                     doplot=False,

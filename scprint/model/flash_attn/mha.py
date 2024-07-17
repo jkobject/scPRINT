@@ -79,11 +79,11 @@ class FlashSelfAttention(nn.Module):
         assert qkv.is_cuda
         causal = self.causal if causal is None else causal
         return flash_attn_qkvpacked_func(
-            qkv=qkv,
-            bias=bias,
+            qkv,
+            bias,
             # self.drop.p if self.training else 0.0,
-            causal=causal,
-            softmax_scale=self.softmax_scale,
+            causal,
+            self.softmax_scale,
         )
 
 

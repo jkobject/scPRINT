@@ -165,6 +165,8 @@ class Embedder:
                 mdir
                 + "/step_"
                 + str(self.model.global_step)
+                + "_"
+                + self.model.name
                 + "_predict_part_"
                 + str(self.model.counter)
                 + "_"
