@@ -150,7 +150,7 @@ class GRNfer:
             diff_expr_genes = [
                 gene for gene in diff_expr_genes if gene in self.model.genes
             ]
-            self.curr_genes = diff_expr_genes[:5000] + self.genes
+            self.curr_genes = diff_expr_genes[:self.num_genes] + self.genes
             self.curr_genes.sort()
         elif self.how == "random expr":
             self.curr_genes = self.model.genes

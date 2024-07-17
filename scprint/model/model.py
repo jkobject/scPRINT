@@ -1517,6 +1517,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.embs = torch.cat(
                 [self.embs, output["cls_output_" + "cell_type_ontology_term_id"]]
             )
+            # [self.embs, torch.mean(cell_embs[:, ind, :], dim=1)]
             self.pred = torch.cat(
                 [
                     self.pred,
