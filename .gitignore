@@ -168,3 +168,5 @@ notebooks/tests/lightning_logs/*
 notebooks/additional/lightning_logs/*
 lightning_logs/
 collator_output.txt
+data/bias_sparse.npz
+todel/
