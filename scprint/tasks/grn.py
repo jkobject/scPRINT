@@ -480,9 +480,9 @@ def default_benchmark(
                 grn.varp["GRN"] = grn.varp["all"]
                 _, m, clf_omni = train_classifier(
                     grn,
-                    C=0.5,
+                    C=1,
                     train_size=0.9,
-                    class_weight={1: 1000, 0: 1},
+                    class_weight={1: 800, 0: 1},
                     shuffle=True,
                     return_full=False,
                 )
@@ -609,7 +609,7 @@ def default_benchmark(
             grn,
             C=1,
             train_size=0.9,
-            class_weight={1: 1000, 0: 1},
+            class_weight={1: 800, 0: 1},
             shuffle=True,
             doplot=False,
             return_full=False,
@@ -628,7 +628,7 @@ def default_benchmark(
         _, m, clf_self = train_classifier(
             grn,
             other=adata,
-            C=0.5,
+            C=1,
             train_size=0.5,
             class_weight={1: 40, 0: 1},
             doplot=False,
@@ -703,7 +703,7 @@ def default_benchmark(
                     C=1,
                     train_size=0.6,
                     max_iter=300,
-                    class_weight={1: 1000, 0: 1},
+                    class_weight={1: 800, 0: 1},
                     return_full=False,
                     shuffle=True,
                     doplot=False,
