@@ -41,29 +41,35 @@ pip install scprint
 You should be good to go. You need those specific versions for everything to work.. 
 not my fault, scream at nvidia, pytorch, Tri Dao and OpenAI :wink:
 
-
 ### in dev mode
 
 ```python
 conda create ...
-git clone https://github.com/jkobject/scPRINT
+git clone https://github.com/jkcobject/scPRINT
 git clone https://github.com/jkobject/GRnnData
 git clone https://github.com/jkobject/benGRN
 cd scPRINT
 git checkout dev
 git submodule init
 git submodule update
+pip install 'lamindb[jupyter,bionty]'
 pip install -e scDataloader
 pip install -e ../GRnnData/
 pip install -e ../benGRN/
-tall torch==2.0.0 torchvision==0.15.1 torchaudio==2.0.1
+pip install torch==2.0.0 torchvision==0.15.1 torchaudio==2.0.1
 # install pytorch as mentionned above if you have a GPU
-pip install -e .[dev]
-pip install 'lamindb[jupyter,bionty]'
-pip install triton==2.0.0.dev20221202 --no-deps
+pip install -e ".[dev]"
+pip install -r requirements-dev.txt
+pip install triton==2.0.0.dev20221202 --no-deps # only if you have a matching gpu (e.g. not available for apple GPUs for now)
+# install triton as mentioned in .toml if you want to
+mkdocs serve # to view the dev documentation
 ```
 
 ## Usage
+
+if you want to use the scDataloader's multi dataset mode or some of the functions of the model you might need to use lamin.ai, in that case connect with google or github to [lamin.ai](https://lamin.ai/login), then be sure to connect before running anything (or before starting a notebook): `lamin login <email> --key <API-key>`
+
+If you do not have triton installed
 
 ```py
 from lightning.pytorch import Trainer

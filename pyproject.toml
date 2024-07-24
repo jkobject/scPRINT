@@ -70,6 +70,7 @@ torch = "2.0.0"
 torchvision = "0.15.0"
 torchaudio = "2.0.0"
 pytorch-fast-transformers = "*"
+tensorly = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"

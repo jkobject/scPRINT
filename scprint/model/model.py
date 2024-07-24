@@ -18,7 +18,6 @@ from functools import partial
 
 try:
     from .flash_attn import FlashTransformerEncoder
-    from .hashformer import Hashformer
 except ModuleNotFoundError as e:
     print(e)
     print(
@@ -26,9 +25,7 @@ except ModuleNotFoundError as e:
         you likely don't have the right hardware or didn't \
         make the right installation"
     )
-    MHA = None
-    Block = None
-    Hashformer = None
+    FlashTransformerEncoder = None
 
 from . import encoders
 from . import decoders
@@ -257,32 +254,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             # linear transformer using the fast transformer package
             self.transformer = FastTransformerEncoder(
                 d_model, nhead, d_hid, nlayers, dropout, "linear"
-            )
-        # flashsparse
-        elif transformer == "flashsparse":
-            if Hashformer is None:
-                raise ValueError("Hashformer transformer requires cuda kernels")
-            self.transformer = Hashformer(
-                d_model,
-                nlayers,
-                2,
-                nhead,
-            )
-        # flash EGT
-        # We found that the results can be further improved by freezing the
-        # node channel layers and training the edge channel layers for a
-        # few additional epochs.
-        # However, its effect on transfer learning has not yet been studied.
-        # That is why we include checkpoints for both tuned and untuned models.
-        # https://github.com/shamim-hussain/egt/blob/master/README.md
-        # https://github.com/shamim-hussain/egt_pytorch
-        elif transformer == "scprint":
-            self.transformer = EGT(
-                num_layers=nlayers,
-                feat_size=d_model,
-                edge_feat_size=edge_dim,
-                num_heads=nhead,
-                num_virtual_nodes=len(self.classes),
             )
         # regular or flash
         else:
