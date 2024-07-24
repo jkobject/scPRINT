@@ -1,0 +1,7 @@
+model:
+  nhead: 2
+  nlayers: 8
+  layers_cls: [256]
+  d_model: 256
+data:
+  collection_name: all no zhang13M #preprocessed dataset
