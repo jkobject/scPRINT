@@ -1,25 +1,26 @@
 
-# scprint
+# scprint: Large Cell Model for scRNAseq data
 
-[![codecov](https://codecov.io/gh/jkobject/scPRINT/branch/main/graph/badge.svg?token=scPRINT_token_here)](https://codecov.io/gh/jkobject/scPRINT)
-[![CI](https://github.com/jkobject/scPRINT/actions/workflows/main.yml/badge.svg)](https://github.com/jkobject/scPRINT/actions/workflows/main.yml)
+[![PyPI version](https://badge.fury.io/py/scprint.svg)](https://badge.fury.io/py/scprint)
+[![Documentation Status](https://readthedocs.org/projects/scprint/badge/?version=latest)](https://scprint.readthedocs.io/en/latest/?badge=latest)
+[![Downloads](https://pepy.tech/badge/scprint)](https://pepy.tech/project/scprint)
+[![Downloads](https://pepy.tech/badge/scprint/month)](https://pepy.tech/project/scprint)
+[![Downloads](https://pepy.tech/badge/scprint/week)](https://pepy.tech/project/scprint)
+[![GitHub issues](https://img.shields.io/github/issues/jkobject/scPRINT)](https://img.shields.io/github/issues/jkobject/scPRINT)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![DOI](https://zenodo.org/badge/391909874.svg)](https://zenodo.org/badge/latestdoi/391909874)
 
-Awesome Large Transcriptional Model created by Jeremie Kalfon
+![logo](logo.png)
 
-scprint = single cell pretrained regulation inference neural network from transcripts
+scPRINT is a novel transformer model for the inference of gene regulatory network from scRNAseq data. It uses novel encoding and decoding schemes as well as new pre-training methodologies to learn a model of the cell. But scPRINT can do lots of things: [Read the paper!]()
 
-using: 
-
+![figure1](figure1.png)
 
 ## Install it from PyPI
 
-first have a good version of pytorch installed
+If you want to be using flashattention2, know that it only supports torch==2.0.0 for now.
 
-you might need to make it match your cuda version etc..
-
-We only support torch>=2.0.0
-
-then install laminDB
+🚨 **Important Notice:** Only the **development install** currently works (see [dev mode](#in-dev-mode))! 🚨
 
 ```bash
 pip install 'lamindb[jupyter,bionty]'
@@ -60,8 +61,6 @@ tall torch==2.0.0 torchvision==0.15.1 torchaudio==2.0.1
 pip install -e .[dev]
 pip install 'lamindb[jupyter,bionty]'
 pip install triton==2.0.0.dev20221202 --no-deps
-# install triton as mentioned in .toml if you want to
-mkdocs serve # to view the dev documentation
 ```
 
 ## Usage
@@ -71,36 +70,29 @@ from lightning.pytorch import Trainer
 from scprint import scPrint
 from scdataloader import DataModule
 
-...
+datamodule = DataModule(...)
 model = scPrint(...)
 trainer = Trainer(...)
 trainer.fit(model, datamodule=datamodule)
+...
 ```
+
+or
 
 ```bash
-$ python -m scPrint/__main__.py
-#or
-$ scprint fit/train/predict/test
+$ scprint fit/train/predict/test --config config/[medium|large|vlarge] ...
 ```
 
-for more information on usage please see the documentation in https://jkobject.com/scPrint
+for more information on usage please see the documentation in [https://www.jkobject.com/scPrint/](https://www.jkobject.com/scPrint/)
 
 ## Development
 
 Read the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
-### What is included?
-
-- 📃 Documentation structure using [mkdocs](http://www.mkdocs.org)
-- 🧪 Testing structure using [pytest](https://docs.pytest.org/en/latest/)
-  If you want [codecov](https://about.codecov.io/sign-up/) Reports and Automatic Release to [PyPI](https://pypi.org)  
-  On the new repository `settings->secrets` add your `PYPI_API_TOKEN` and `CODECOV_TOKEN` (get the tokens on respective websites)
-- ✅ Code linting using [flake8](https://flake8.pycqa.org/en/latest/)
-- 📊 Code coverage reports using [codecov](https://about.codecov.io/sign-up/)
-- 🛳️ Automatic release to [PyPI](https://pypi.org) using [twine](https://twine.readthedocs.io/en/latest/) and github actions.
-
-
 acknowledgement:
 [python template](https://github.com/rochacbruno/python-project-template)
-[scGPT]()
-[laminDB]()
+[laminDB](https://lamin.ai/)
+[Lightning](https://lightning.ai/)
+
+Awesome Large Cell Model created by Jeremie Kalfon.
+

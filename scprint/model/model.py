@@ -1315,9 +1315,8 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 ),
             }
         if self.embs is None:
-            self.embs = output[
-                "cls_output_" + "cell_type_ontology_term_id"
-            ]  # torch.mean(cell_embs[:, ind, :], dim=1)
+            self.embs = torch.mean(cell_embs[:, ind, :], dim=1)
+            #self.embs = output["cls_output_" + "cell_type_ontology_term_id"]
             self.pred = (
                 torch.stack(
                     [
@@ -1340,9 +1339,9 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             )
         else:
             self.embs = torch.cat(
-                [self.embs, output["cls_output_" + "cell_type_ontology_term_id"]]
+               # [self.embs, output["cls_output_" + "cell_type_ontology_term_id"]]
+                [self.embs, torch.mean(cell_embs[:, ind, :], dim=1)]
             )
-            # [self.embs, torch.mean(cell_embs[:, ind, :], dim=1)]
             self.pred = torch.cat(
                 [
                     self.pred,
