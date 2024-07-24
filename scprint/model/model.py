@@ -124,7 +124,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         self.ecs_threshold = 0.3
         self.ecs_scale = 0.05
         self.do_mvc = False
-        self.mvc_scale = 0.05
+        self.mvc_scale = 1.0
         self.class_embd_diss_scale = 0.2
         self.do_adv_cls = False
         self.adv_class_scale = 0.1
@@ -290,10 +290,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 raise ValueError("flash transformer requires flash package")
                 # NOT flash transformer using the special tritton kernel
                 # or parallelMHA (add the process group thing and faster)
-            if attn_bias != "none":
-                self.nbias = torch.Tensor(
-                    load_npz(FILEDIR + "/../../data/bias_sparse.npz").todense()
-                ).to(device="cuda", dtype=torch.float16)
             self.transformer = FlashTransformerEncoder(
                 d_model,
                 nhead,
@@ -559,6 +555,10 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         encoding = self._encoder(gene_pos, expression, mask, full_depth, timepoint)
 
         if self.attn_bias != "none":
+            if not hasattr(self, "nbias"):
+                self.nbias = torch.Tensor(
+                    load_npz(FILEDIR + "/../../data/bias_sparse.npz").todense()
+                ).to(device=gene_pos.device, dtype=torch.float16)
             num = len(self.classes) + 2
             bias = torch.zeros(
                 (
@@ -566,7 +566,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                     gene_pos.shape[1] + num,
                     gene_pos.shape[1] + num,
                 ),
-                device="cuda",
+                device=gene_pos.device,
                 dtype=torch.float16,
             )
             bias[:, num:, :num] = -10_000  # do not pay attention to the cls embeddings
@@ -975,7 +975,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             )
             ## Since we want to maximize dissimilarity, we minimize the negative of the average cosine similarity
             ## We subtract from 1 to ensure positive values, and take the mean off-diagonal (i != j)
-            loss_class_emb_diss = cos_sim_matrix.fill_diagonal_(0).mean()
+            loss_class_emb_diss = cos_sim_matrix.fill_diagonal_(0).mean()            
             ## Apply the custom dissimilarity loss to the cell embeddings
             losses.update({"class_emb_sim": loss_class_emb_diss})
             total_loss += self.class_embd_diss_scale * loss_class_emb_diss
@@ -1166,7 +1166,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             self.log_adata(
                 gtclass=self.info, name="validation_part_" + str(self.counter)
             )
-            if (self.current_epoch + 1) % 40 == 0:
+            if (self.current_epoch + 1) % 30 == 0:
                 self.on_test_epoch_end()
 
     def test_step(self, *args, **kwargs):
