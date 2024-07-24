@@ -462,11 +462,13 @@ def translate(
     else:
         return None
     if type(val) is str:
+        if val == "unknown":
+            return {val: val}
         return {val: obj.loc[val]["name"]}
     elif type(val) is list or type(val) is set:
-        return {i: obj.loc[i]["name"] for i in set(val)}
+        return {i: obj.loc[i]["name"] if i != "unknown" else i for i in set(val)}
     elif type(val) is dict or type(val) is Counter:
-        return {obj.loc[k]["name"]: v for k, v in val.items()}
+        return {obj.loc[k]["name"] if k != "unknown" else k: v for k, v in val.items()}
 
 
 class Attention:

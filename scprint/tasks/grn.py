@@ -46,6 +46,7 @@ class GRNfer:
         adata: AnnData,
         batch_size: int = 64,
         num_workers: int = 8,
+        drop_unexpressed: bool = False,
         num_genes: int = 3000,
         precision: str = "16-mixed",
         cell_type_col="cell_type",
@@ -106,6 +107,7 @@ class GRNfer:
         self.head_agg = head_agg
         self.max_cells = max_cells
         self.curr_genes = None
+        self.drop_unexpressed = drop_unexpressed
         self.precision = precision
         ##elf.trainer = Trainer(precision=precision, devices=devices, use_distributed_sampler=False)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
@@ -160,6 +162,9 @@ class GRNfer:
             self.curr_genes = self.genes
         else:
             raise ValueError("how must be one of 'most var', 'random expr'")
+        if self.drop_unexpressed:
+            expr = subadata.var[(subadata.X.sum(0) > 0).tolist()[0]].index.tolist()
+            self.curr_genes = [i for i in self.curr_genes if i in expr]
         subadata = subadata[: self.max_cells] if self.max_cells else subadata
         if len(subadata) == 0:
             raise ValueError("no cells in the dataset")
@@ -475,9 +480,9 @@ def default_benchmark(
                 grn.varp["GRN"] = grn.varp["all"]
                 _, m, clf_omni = train_classifier(
                     grn,
-                    C=0.5,
+                    C=1,
                     train_size=0.9,
-                    class_weight={1: 1000, 0: 1},
+                    class_weight={1: 800, 0: 1},
                     shuffle=True,
                     return_full=False,
                 )
@@ -604,7 +609,7 @@ def default_benchmark(
             grn,
             C=1,
             train_size=0.9,
-            class_weight={1: 1000, 0: 1},
+            class_weight={1: 800, 0: 1},
             shuffle=True,
             doplot=False,
             return_full=False,
@@ -623,7 +628,7 @@ def default_benchmark(
         _, m, clf_self = train_classifier(
             grn,
             other=adata,
-            C=0.5,
+            C=1,
             train_size=0.5,
             class_weight={1: 40, 0: 1},
             doplot=False,
@@ -698,7 +703,7 @@ def default_benchmark(
                     C=1,
                     train_size=0.6,
                     max_iter=300,
-                    class_weight={1: 1000, 0: 1},
+                    class_weight={1: 800, 0: 1},
                     return_full=False,
                     shuffle=True,
                     doplot=False,

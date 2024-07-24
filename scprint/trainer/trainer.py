@@ -14,7 +14,7 @@ class TrainingMode(Callback):
         ecs_threshold: float = 0.3,
         ecs_scale: float = 0.05,  # .1
         do_mvc: bool = False,
-        mvc_scale: float = 1,
+        mvc_scale: float = 1.0,
         do_adv_cls: bool = False,
         do_next_tp: bool = False,
         do_generate: bool = True,
