@@ -59,6 +59,7 @@ pykeops = "*"
 louvain = "*"
 hdbscan = "*"
 scib-metrics = "*"
+scikit-misc = "*"
 zarr = "*"
 galore-torch = { git = "https://github.com/jiaweizzhao/GaLore", branch = "master" }
 
