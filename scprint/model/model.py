@@ -16,22 +16,11 @@ from huggingface_hub import PyTorchModelHubMixin
 import pandas as pd
 from functools import partial
 
-try:
-    from .flash_attn import FlashTransformerEncoder
-except ModuleNotFoundError as e:
-    print(e)
-    print(
-        "can't use flash attention and triton kernel,\
-        you likely don't have the right hardware or didn't \
-        make the right installation"
-    )
-    FlashTransformerEncoder = None
-
+from .flash_attn import FlashTransformerEncoder
 from . import encoders
 from . import decoders
 
 # from .linear_transformer import FastTransformerEncoderWrapper as FastTransformerEncoder
-from .EGT import EGT
 from . import loss
 from .utils import simple_masker
 from . import utils
@@ -257,10 +246,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             )
         # regular or flash
         else:
-            if transformer == "flash" and FlashTransformerEncoder is None:
-                raise ValueError("flash transformer requires flash package")
-                # NOT flash transformer using the special tritton kernel
-                # or parallelMHA (add the process group thing and faster)
             self.transformer = FlashTransformerEncoder(
                 d_model,
                 nhead,
@@ -946,7 +931,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             )
             ## Since we want to maximize dissimilarity, we minimize the negative of the average cosine similarity
             ## We subtract from 1 to ensure positive values, and take the mean off-diagonal (i != j)
-            loss_class_emb_diss = cos_sim_matrix.fill_diagonal_(0).mean()            
+            loss_class_emb_diss = cos_sim_matrix.fill_diagonal_(0).mean()
             ## Apply the custom dissimilarity loss to the cell embeddings
             losses.update({"class_emb_sim": loss_class_emb_diss})
             total_loss += self.class_embd_diss_scale * loss_class_emb_diss
@@ -1287,7 +1272,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             }
         if self.embs is None:
             self.embs = torch.mean(cell_embs[:, ind, :], dim=1)
-            #self.embs = output["cls_output_" + "cell_type_ontology_term_id"]
+            # self.embs = output["cls_output_" + "cell_type_ontology_term_id"]
             self.pred = (
                 torch.stack(
                     [
@@ -1310,7 +1295,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             )
         else:
             self.embs = torch.cat(
-               # [self.embs, output["cls_output_" + "cell_type_ontology_term_id"]]
+                # [self.embs, output["cls_output_" + "cell_type_ontology_term_id"]]
                 [self.embs, torch.mean(cell_embs[:, ind, :], dim=1)]
             )
             self.pred = torch.cat(

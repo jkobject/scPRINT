@@ -9,13 +9,19 @@ import torch
 import torch.nn as nn
 from einops import rearrange, repeat
 
-from .flashattention import (
-    flash_attn_kvpacked_func,
-    flash_attn_qkvpacked_func,
-    # flash_attn_varlen_kvpacked_func,
-    # flash_attn_varlen_qkvpacked_func,
-    # flash_attn_with_kvcache,
-)
+try:
+    from .flashattention import (
+        flash_attn_kvpacked_func,
+        flash_attn_qkvpacked_func,
+        # flash_attn_varlen_kvpacked_func,
+        # flash_attn_varlen_qkvpacked_func,
+        # flash_attn_with_kvcache,
+    )
+except ModuleNotFoundError as e:
+    print(e)
+    print("FlashAttention is not installed, not using it..")
+    flash_attn_kvpacked_func = None
+    flash_attn_qkvpacked_func = None
 
 flash_attn_varlen_kvpacked_func = None
 flash_attn_varlen_qkvpacked_func = None
@@ -372,6 +378,10 @@ class MHA(nn.Module):
         self.dwconv = dwconv
         self.rotary_emb_dim = rotary_emb_dim
         self.use_flash_attn = use_flash_attn
+        if self.use_flash_attn and (flash_attn_kvpacked_func is None):
+            raise ValueError("flash transformer requires flash package")
+            # NOT flash transformer using the special tritton kernel
+            # or parallelMHA (add the process group thing and faster)
         self.return_residual = return_residual
         self.checkpointing = checkpointing
         alibi_slopes = None

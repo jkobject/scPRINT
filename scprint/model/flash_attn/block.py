@@ -11,7 +11,12 @@ from torchvision.ops import StochasticDepth
 
 from .mha import MHA
 from .mlp import Mlp
-from .layer_norm import layer_norm_fn, RMSNorm
+
+try:
+    from .layer_norm import layer_norm_fn, RMSNorm
+except ModuleNotFoundError:
+    layer_norm_fn = None
+    RMSNorm = None
 
 
 class Block(nn.Module):
