@@ -180,7 +180,7 @@ class SelfAttention(nn.Module):
         self.softmax_scale = softmax_scale
         self.drop = nn.Dropout(attention_dropout)
 
-    def forward(self, qkv, causal=None, key_padding_mask=None):
+    def forward(self, qkv, causal=None, key_padding_mask=None, bias=None):
         """
         Implements the multihead softmax attention.
 
@@ -233,7 +233,7 @@ class CrossAttention(nn.Module):
         self.softmax_scale = softmax_scale
         self.drop = nn.Dropout(attention_dropout)
 
-    def forward(self, q, kv, causal=None, key_padding_mask=None):
+    def forward(self, q, kv, causal=None, key_padding_mask=None, bias=None):
         """Implements the multihead softmax attention.
         Arguments
         ---------

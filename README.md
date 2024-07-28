@@ -69,7 +69,6 @@ git clone https://github.com/jkcobject/scPRINT
 git clone https://github.com/jkobject/GRnnData
 git clone https://github.com/jkobject/benGRN
 cd scPRINT
-git checkout dev
 git submodule init
 git submodule update
 pip install 'lamindb[jupyter,bionty]'
@@ -166,7 +165,7 @@ for more information on usage please see the documentation in [https://www.jkobj
 
 ### Model Weights
 
-Model weights are available on [hugging face](https://huggingface.co/jkobject).
+Model weights are available on [hugging face](https://huggingface.co/jkobject/scPRINT/).
 
 ## Development
 
