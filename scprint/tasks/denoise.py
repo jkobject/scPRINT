@@ -44,6 +44,7 @@ class Denoiser:
         predict_depth_mult: int = 4,
         downsample: Optional[float] = None,
         devices: List[int] = [0],
+        dtype: torch.dtype = torch.float16,
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -70,6 +71,7 @@ class Denoiser:
         self.how = how
         self.downsample = downsample
         self.precision = precision
+        self.dtype = dtype
         # self.trainer = Trainer(precision=precision, devices=devices)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
@@ -115,7 +117,7 @@ class Denoiser:
         self.model.on_predict_epoch_start()
         self.model.eval()
         device = self.model.device.type
-        with torch.no_grad(), torch.autocast(device_type=device, dtype=torch.float16):
+        with torch.no_grad(), torch.autocast(device_type=device, dtype=self.dtype):
             for batch in tqdm(dataloader):
                 gene_pos, expression, depth = (
                     batch["genes"].to(device),
