@@ -1,5 +1,5 @@
 
-# scprint: Large Cell Model for scRNAseq data
+# scPRINT: Large Cell Model for scRNAseq data
 
 [![PyPI version](https://badge.fury.io/py/scprint.svg)](https://badge.fury.io/py/scprint)
 [![Documentation Status](https://readthedocs.org/projects/scprint/badge/?version=latest)](https://scprint.readthedocs.io/en/latest/?badge=latest)
@@ -12,51 +12,22 @@
 
 ![logo](logo.png)
 
-scPRINT is a large transformer model built for the inference of gene network (connections between genes explaining the cell's expression profile) from scRNAseq data.
+scPRINT is a large transformer model built for the inference of gene networks (connections between genes explaining the cell's expression profile) from scRNAseq data.
 
-It uses novel encoding and decoding of the cell expression profile as well as new pre-training methodologies to learn a cell model.
+It uses novel encoding and decoding of the cell expression profile and new pre-training methodologies to learn a cell model.
 
-scPRINT can do lots of things:
+scPRINT can be used to perform the following analyses:
 
 - __expression denoising__: increase the resolution of your scRNAseq data
 - __cell embedding__: generate a low-dimensional representation of your dataset
 - __label prediction__: predict the cell type, disease, sequencer, sex, and ethnicity of your cells
 - __gene network inference__: generate a gene network from any cell or cell cluster in your scRNAseq dataset
 
-[Read the paper!]() if you want to know more about scPRINT.
+[Read the paper!]() if you would like to know more about scPRINT.
 
 ![figure1](figure1.png)
 
-## Install it from PyPI
-
-If you want to be using flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.
-
-👷 WIP ...
-
-<!---
-
-```bash
-pip install 'lamindb[jupyter,bionty]'
-```
-
-then install scPrint
-
-```bash
-pip install scprint
-```
-> if you have a GPU that you want to use, you will benefit from flashattention. and you will have to do some more specific installs:
-
-1. find the version of torch 2.0.0 / torchvision 0.15.0 / torchaudio 2.0.0 that match your nvidia drivers on the torch website.
-2. apply the install command
-3. do `pip install pytorch-fast-transformers torchtext==0.15.1`
-4. do `pip install triton==2.0.0.dev20221202 --no-deps`
-
-You should be good to go. You need those specific versions for everything to work...
-
-This is not my fault, scream at nvidia :wink:
--->
-
-## Install it in dev mode
+## Install `scPRINT` in developers mode
 
 For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Python 3.10.
 
@@ -84,7 +55,9 @@ pip install triton==2.0.0.dev20221202 --no-deps # only if you have a compatible 
 mkdocs serve # to view the dev documentation
 ```
 
-We use additional packages we developped, refer to their documentation for more information:
+We make use of some additional packages we developed alongside scPRint.
+
+Please refer to their documentation for more information:
 
 - [scDataLoader](https://github.com/jkobject/scDataLoader): a dataloader for training large cell models.
 - [GRnnData](https://github.com/cantinilab/GRnnData): a package to work with gene networks from single cell data.
@@ -92,15 +65,45 @@ We use additional packages we developped, refer to their documentation for more 
 
 ### lamin.ai
 
-⚠️ if you want to use the scDataloader's multi dataset mode or if you want to preprocess datasets and other functions of the model, you will need to use lamin.ai.
+⚠️ if you want to use the scDataloader's multi-dataset mode or if you want to preprocess datasets and other functions of the model, you will need to use lamin.ai.
 
-In that case connect with google or github to [lamin.ai](https://lamin.ai/login), then be sure to connect before running anything (or before starting a notebook): `lamin login <email> --key <API-key>`. Follow the instructions on [their website](https://docs.lamin.ai/guide).
+In that case, connect with google or github to [lamin.ai](https://lamin.ai/login), then be sure to connect before running anything (or before starting a notebook): `lamin login <email> --key <API-key>`. Follow the instructions on [their website](https://docs.lamin.ai/guide).
+
+## Install it from PyPI 
+
+**(Work In Progress)**
+
+<!---
+If you want to use flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.
+
+
+```bash
+pip install 'lamindb[jupyter,bionty]'
+```
+
+then install scPRINT
+
+```bash
+pip install scprint
+```
+> if you have a GPU that you want to use, you will benefit from flashattention. and you will have to do some more specific installs:
+
+1. find the version of torch 2.0.0 / torchvision 0.15.0 / torchaudio 2.0.0 that match your nvidia drivers on the torch website.
+2. apply the install command
+3. do `pip install pytorch-fast-transformers torchtext==0.15.1`
+4. do `pip install triton==2.0.0.dev20221202 --no-deps`
+
+You should be good to go. You need those specific versions for everything to work...
+
+This is not my fault, scream at nvidia :wink:
+-->
+
 
 ## Usage
 
 ### scPRINT's basic commands
 
-This is the most minimal example of how scprint gets used:
+This is the most minimal example of how scPRINT works:
 
 ```py
 from lightning.pytorch import Trainer
@@ -114,7 +117,7 @@ trainer.fit(model, datamodule=datamodule)
 ...
 ```
 
-or
+or, from a bash command line
 
 ```bash
 $ scprint fit/train/predict/test --config config/[medium|large|vlarge] ...
@@ -122,7 +125,7 @@ $ scprint fit/train/predict/test --config config/[medium|large|vlarge] ...
 
 ### Notes on GPU/CPU usage with triton
 
-If you do not have [triton](https://triton-lang.org/main/python-api/triton.html) installed you will not be able to take advantage of gpu acceleration, but you can still use the model on the cpu.
+If you do not have [triton](https://triton-lang.org/main/python-api/triton.html) installed you will not be able to take advantage of GPU acceleration, but you can still use the model on the CPU.
 
 In that case, if loading from a checkpoint that was trained with flashattention, you will need to specify `transformer="normal"` in the `load_from_checkpoint` function like so:
 
@@ -142,15 +145,15 @@ We now explore the different usages of scPRINT:
 
 ### I want to generate cell embeddings and cell label predictions from scRNAseq data:
 
--> refer to the embeddings and cell annotations section in [this notebook](./notebooks/cancer_usecase.ipynb).
+-> Refer to the embeddings and cell annotations section in [this notebook](./notebooks/cancer_usecase.ipynb).
 
 ### I want to denoising my scRNAseq dataset:
 
--> refer to the Denoising of B-cell section in [this notebook](./notebooks/cancer_usecase.ipynb).
+-> Refer to the Denoising of B-cell section in [this notebook](./notebooks/cancer_usecase.ipynb).
 
 -> More example in our benchmark notebook [./notebooks/assessments/bench_denoising.ipynb](./notebooks/assessments/bench_denoising.ipynb).
 
-### I want to generate an atlas level embedding
+### I want to generate an atlas-level embedding
 
 -> refer to the notebook [nice_umap.ipynb](./figures/nice_umap.ipynb).
 
