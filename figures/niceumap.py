@@ -6,22 +6,20 @@ from anndata.experimental import concat_on_disk
 from umap import UMAP
 import os
 
-# srun -p gpu -q gpu --gres=gpu:A40:4,gmem:40G --cpus-per-task 16 --mem-per-gpu 32G --ntasks-per-node=4 scprint predict --config config/base.yml --config config/pretrain_medium.yml --config config/predict.yml --ckpt_path /pasteur/zeus/projets/p02/ml4ig_hot/Users/jkalfon/scprint_scale/vbd8bavn/checkpoints/epoch=17-step=90000.ckpt --model.pred_embedding ["cell_type_ontology_term_id"]
-# conda activate scprint17
-# srun -p ml4ig -c 32 --mem 90G python figures/niceumap.py
+
+
 name = "o2uniqsx"
 # Assuming the data files are in the "./data/" directory
 data_directory = "./data/"
-# file_list = os.listdir(data_directory)
+file_list = os.listdir(data_directory)
 ## Filter out only the files with the 'h5ad' extension
-# h5ad_files = [file for file in file_list if file.endswith('.h5ad') and "step_0_predict_part" in file]
+h5ad_files = [file for file in file_list if file.endswith('.h5ad') and "step_0_predict_part" in file]
 ## Sort the files to maintain order
-# h5ad_files.sort()
+h5ad_files.sort()
 ## Update the list 'l' with the full paths of the 'h5ad' files
-# h5ad_files = [os.path.join(data_directory, file) for file in h5ad_files]
-#
-#
-# concat_on_disk(h5ad_files, data_directory+name+"_predict.h5ad", uns_merge="same", index_unique="_")
+h5ad_files = [os.path.join(data_directory, file) for file in h5ad_files]
+
+concat_on_disk(h5ad_files, data_directory+name+"_predict.h5ad", uns_merge="same", index_unique="_")
 adata = sc.read_h5ad(data_directory + name + "_predict.h5ad")
 # adata = adata[:100_000]
 # sc.pp.neighbors(adata, use_rep="X", n_neighbors=15)

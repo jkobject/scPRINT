@@ -8,12 +8,15 @@ from functools import partial
 import sys
 import os
 
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 ########
 from . import MHA, Block, Mlp
-from .layer_norm import layer_norm_fn
+
+try:
+    from .layer_norm import layer_norm_fn
+except ModuleNotFoundError:
+    layer_norm_fn = None
 
 FusedMLP = None
 

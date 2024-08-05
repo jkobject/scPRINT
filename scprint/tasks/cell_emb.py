@@ -48,6 +48,7 @@ class Embedder:
         doplot: bool = True,
         keep_all_cls_pred: bool = False,
         devices: List[int] = [0],
+        dtype: torch.dtype = torch.float16,
     ):
         """
         Embedder a class to embed and annotate cells using a model
