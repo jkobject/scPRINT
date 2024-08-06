@@ -33,14 +33,13 @@ FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 class Denoiser:
     def __init__(
         self,
-        model: torch.nn.Module,
         batch_size: int = 10,
         num_workers: int = 1,
-        max_len: int = 20_000,
+        max_len: int = 5_000,
         precision: str = "16-mixed",
         how="most var",
-        plot_corr_size: int = 64,
-        doplot: bool = True,
+        plot_corr_size: int = 10_000,
+        doplot: bool = False,
         predict_depth_mult: int = 4,
         downsample: Optional[float] = None,
         devices: List[int] = [0],
@@ -61,7 +60,6 @@ class Denoiser:
             model_name (str, optional): The name of the model to be used. Defaults to "scprint".
             output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
         """
-        self.model = model
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.max_len = max_len
@@ -75,7 +73,7 @@ class Denoiser:
         # self.trainer = Trainer(precision=precision, devices=devices)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
-    def __call__(self, adata: AnnData):
+    def __call__(self, model: torch.nn.Module, adata: AnnData):
         if os.path.exists("collator_output.txt"):
             os.remove("collator_output.txt")
         random_indices = None
@@ -97,8 +95,8 @@ class Denoiser:
             genelist = adata.var.index[adata.var.highly_variable]
             print(len(genelist))
         col = Collator(
-            organisms=self.model.organisms,
-            valid_genes=self.model.genes,
+            organisms=model.organisms,
+            valid_genes=model.genes,
             max_len=self.max_len,
             how="some" if self.how == "most var" else self.how,
             genelist=genelist if self.how == "most var" else [],
@@ -113,10 +111,10 @@ class Denoiser:
             shuffle=False,
         )
 
-        self.model.doplot = self.doplot
-        self.model.on_predict_epoch_start()
-        self.model.eval()
-        device = self.model.device.type
+        model.doplot = self.doplot
+        model.on_predict_epoch_start()
+        model.eval()
+        device = model.device.type
         with torch.no_grad(), torch.autocast(device_type=device, dtype=self.dtype):
             for batch in tqdm(dataloader):
                 gene_pos, expression, depth = (
@@ -124,7 +122,7 @@ class Denoiser:
                     batch["x"].to(device),
                     batch["depth"].to(device),
                 )
-                self.model._predict(
+                model._predict(
                     gene_pos,
                     expression,
                     depth,
@@ -133,12 +131,12 @@ class Denoiser:
                 )
         torch.cuda.empty_cache()
         self.genes = (
-            self.model.pos
+            model.pos
             if self.how != "most var"
-            else list(set(self.model.genes) & set(genelist))
+            else list(set(model.genes) & set(genelist))
         )
         if self.downsample is not None:
-            reco = self.model.expr_pred[0]
+            reco = model.expr_pred[0]
             reco = reco.cpu().numpy()
             tokeep = np.isnan(reco).sum(1) == 0
             reco = reco[tokeep]
@@ -158,7 +156,7 @@ class Denoiser:
                         true[
                             i,
                             adata.var.index.get_indexer(
-                                np.array(self.model.genes)[val]
+                                np.array(model.genes)[val]
                             ),
                         ].copy()
                         for i, val in enumerate(self.genes.cpu().numpy())
@@ -204,14 +202,14 @@ class Denoiser:
             #        ].diagonal()
             #    ),
             # }
-            return (
-                metrics,
-                random_indices[tokeep] if random_indices is not None else None,
-                self.genes,
-                self.model.expr_pred[0][tokeep],
-            )
         else:
-            return random_indices, self.genes, self.model.expr_pred[0]
+            metrics=None
+        return (
+            metrics,
+            random_indices[tokeep] if random_indices is not None else None,
+            self.genes.cpu().numpy(),
+            model.expr_pred[0][tokeep].cpu().numpy(),
+        )
 
 
 # testdatasets=['/R4ZHoQegxXdSFNFY5LGe.h5ad', '/SHV11AEetZOms4Wh7Ehb.h5ad',
@@ -266,7 +264,6 @@ def open_benchmark(model):
     nadata = preprocessor(adata.copy())
 
     denoise = Denoiser(
-        model,
         batch_size=32,
         max_len=15_800,
         plot_corr_size=10_000,
@@ -274,7 +271,7 @@ def open_benchmark(model):
         predict_depth_mult=1.2,
         downsample=None,
     )
-    expr = denoise(nadata)
+    expr = denoise(model, nadata)
     denoised = ad.AnnData(
         expr.cpu().numpy(),
         var=nadata.var.loc[

@@ -23,7 +23,7 @@ scPRINT can be used to perform the following analyses:
 - __label prediction__: predict the cell type, disease, sequencer, sex, and ethnicity of your cells
 - __gene network inference__: generate a gene network from any cell or cell cluster in your scRNAseq dataset
 
-[Read the paper!]() if you would like to know more about scPRINT.
+[Read the paper!](https://www.biorxiv.org/content/10.1101/2024.07.29.605556v1) if you would like to know more about scPRINT.
 
 ![figure1](figure1.png)
 
@@ -112,8 +112,13 @@ from scdataloader import DataModule
 
 datamodule = DataModule(...)
 model = scPrint(...)
+# to train / fit / test the model
 trainer = Trainer(...)
 trainer.fit(model, datamodule=datamodule)
+# to do predictions Denoiser, Embedder, GNInfer
+denoiser = Denoiser(...)
+adata = sc.read_h5ad(...)
+denoiser(model, adata=adata)
 ...
 ```
 

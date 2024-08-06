@@ -39,18 +39,16 @@ import pandas as pd
 FILEDIR = os.path.dirname(os.path.realpath(__file__))
 
 
-class GRNfer:
+class GNInfer:
     def __init__(
         self,
-        model: torch.nn.Module,
-        adata: AnnData,
+        layer: list[int],
         batch_size: int = 64,
         num_workers: int = 8,
         drop_unexpressed: bool = False,
         num_genes: int = 3000,
         precision: str = "16-mixed",
         cell_type_col="cell_type",
-        model_name: str = "scprint",
         how: str = "random expr",  # random expr, most var withing, most var across, given
         preprocess="softmax",  # sinkhorn, softmax, none
         head_agg="mean",  # mean, sum, none
@@ -66,6 +64,7 @@ class GRNfer:
         loc="./",
         dtype=torch.float16,
         devices: List[int] = [0],
+        locname: str = "",
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -79,12 +78,12 @@ class GRNfer:
             add_zero_genes (int, optional): The number of zero genes to add to the gene sequence. Defaults to 100.
             precision (str, optional): The precision to be used in the Trainer. Defaults to "16-mixed".
             pred_embedding (List[str], optional): The list of labels to be used for plotting embeddings. Defaults to [ "cell_type_ontology_term_id", "disease_ontology_term_id", "self_reported_ethnicity_ontology_term_id", "sex_ontology_term_id", ].
-            model_name (str, optional): The name of the model to be used. Defaults to "scprint".
             output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
         """
-        self.model = model
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.layer = layer
+        self.locname=locname
         self.how = how
         assert self.how in [
             "most var within",
@@ -93,8 +92,6 @@ class GRNfer:
             "given",
         ], "how must be one of 'most var within', 'most var across', 'random expr', 'given'"
         self.num_genes = num_genes
-        self.model_name = model_name
-        self.adata = adata
         self.preprocess = preprocess
         self.cell_type_col = cell_type_col
         self.filtration = filtration
@@ -113,24 +110,24 @@ class GRNfer:
         ##elf.trainer = Trainer(precision=precision, devices=devices, use_distributed_sampler=False)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
-    def __call__(self, layer, cell_type=None, locname=""):
+    def __call__(self, model: torch.nn.Module, adata: AnnData, cell_type=None):
         # Add at least the organism you are working with
-        subadata = self.predict(layer, cell_type)
-        adjacencies = self.aggregate(self.model.attn.get())
+        subadata = self.predict(model, adata, self.layer, cell_type)
+        adjacencies = self.aggregate(model.attn.get(), model.genes)
         if self.head_agg == "none":
-            return self.save(adjacencies[8:, 8:, :], subadata, locname)
+            return self.save(adjacencies[8:, 8:, :], subadata)
         else:
-            return self.save(self.filter(adjacencies)[8:, 8:], subadata, locname)
+            return self.save(self.filter(adjacencies)[8:, 8:], subadata)
 
-    def predict(self, layer, cell_type=None):
+    def predict(self, model, adata, layer, cell_type=None):
         self.curr_genes = None
-        self.model.pred_log_adata = False
+        model.pred_log_adata = False
         if cell_type is not None:
-            subadata = self.adata[
-                self.adata.obs[self.cell_type_col] == cell_type
+            subadata = adata[
+                adata.obs[self.cell_type_col] == cell_type
             ].copy()
         else:
-            subadata = self.adata.copy()
+            subadata = adata.copy()
         if self.how == "most var within":
             sc.pp.highly_variable_genes(
                 subadata, flavor="seurat_v3", n_top_genes=self.num_genes
@@ -144,19 +141,19 @@ class GRNfer:
             )
         elif self.how == "most var across" and cell_type is not None:
             sc.tl.rank_genes_groups(
-                self.adata,
-                mask_var=self.adata.var.index.isin(self.model.genes),
+                adata,
+                mask_var=adata.var.index.isin(model.genes),
                 groupby=self.cell_type_col,
                 groups=[cell_type],
             )
-            diff_expr_genes = self.adata.uns["rank_genes_groups"]["names"][cell_type]
+            diff_expr_genes = adata.uns["rank_genes_groups"]["names"][cell_type]
             diff_expr_genes = [
-                gene for gene in diff_expr_genes if gene in self.model.genes
+                gene for gene in diff_expr_genes if gene in model.genes
             ]
             self.curr_genes = diff_expr_genes[:self.num_genes] + self.genes
             self.curr_genes.sort()
         elif self.how == "random expr":
-            self.curr_genes = self.model.genes
+            self.curr_genes = model.genes
             # raise ValueError("cannot do it yet")
             pass
         elif self.how == "given" and len(self.genes) > 0:
@@ -173,8 +170,8 @@ class GRNfer:
             subadata, obs_to_output=["organism_ontology_term_id"]
         )
         self.col = Collator(
-            organisms=self.model.organisms,
-            valid_genes=self.model.genes,
+            organisms=model.organisms,
+            valid_genes=model.genes,
             how="some" if self.how != "random expr" else "random expr",
             genelist=self.curr_genes if self.how != "random expr" else [],
         )
@@ -185,11 +182,11 @@ class GRNfer:
             num_workers=self.num_workers,
             shuffle=False,
         )
-        self.model.attn.comp_attn = self.head_agg == "mean_full"
-        self.model.doplot = self.doplot
-        self.model.on_predict_epoch_start()
-        self.model.eval()
-        device = self.model.device.type
+        model.attn.comp_attn = self.head_agg == "mean_full"
+        model.doplot = self.doplot
+        model.on_predict_epoch_start()
+        model.eval()
+        device = model.device.type
 
         with torch.no_grad(), torch.autocast(device_type=device, dtype=dtype):
             for batch in tqdm(dataloader):
@@ -198,7 +195,7 @@ class GRNfer:
                     batch["x"].to(device),
                     batch["depth"].to(device),
                 )
-                self.model._predict(
+                model._predict(
                     gene_pos,
                     expression,
                     depth,
@@ -208,16 +205,16 @@ class GRNfer:
                 torch.cuda.empty_cache()
         return subadata
 
-    def aggregate(self, attn):
+    def aggregate(self, attn, genes):
         if self.head_agg == "mean_full":
-            self.curr_genes = [i for i in self.model.genes if i in self.curr_genes]
+            self.curr_genes = [i for i in genes if i in self.curr_genes]
             return attn
         badloc = torch.isnan(attn.sum((0, 2, 3, 4)))
         attn = attn[:, ~badloc, :, :, :]
         self.curr_genes = (
             np.array(self.curr_genes)[~badloc[8:]]
             if self.how == "random expr"
-            else [i for i in self.model.genes if i in self.curr_genes]
+            else [i for i in genes if i in self.curr_genes]
         )
         if self.doplot:
             sns.set_theme(
@@ -446,9 +443,8 @@ def default_benchmark(
             print(da + "_" + gt)
             preadata = get_sroy_gt(get=da, species=spe, gt=gt)
             adata = preprocessor(preadata.copy())
-            grn_inferer = GRNfer(
-                model,
-                adata,
+            grn_inferer = GNInfer(
+                layer=layers,
                 how="most var within",
                 preprocess="softmax",
                 head_agg="none",
@@ -461,7 +457,7 @@ def default_benchmark(
                 batch_size=batch_size,
                 devices=1,
             )
-            grn = grn_inferer(layer=layers)
+            grn = grn_inferer(model, adata)
             grn.varp["all"] = grn.varp["GRN"]
             grn.var["ensembl_id"] = grn.var.index
             grn.var["symbol"] = make_index_unique(grn.var["symbol"].astype(str))
@@ -577,9 +573,8 @@ def default_benchmark(
         adata.var["isTF"] = False
         adata.var.loc[adata.var.gene_name.isin(grnutils.TF), "isTF"] = True
         adata.var["isTF"].sum()
-        grn_inferer = GRNfer(
-            model,
-            nadata,
+        grn_inferer = GNInfer(
+            layer=layers,
             how="most var within",
             preprocess="softmax",
             head_agg="none",
@@ -592,7 +587,7 @@ def default_benchmark(
             batch_size=batch_size,
             devices=1,
         )
-        grn = grn_inferer(layer=layers)
+        grn = grn_inferer(model, nadata)
         grn.varp["all"] = grn.varp["GRN"]
 
         grn.varp["GRN"] = grn.varp["all"].mean(-1).T
@@ -652,9 +647,8 @@ def default_benchmark(
         adata.var.loc[adata.var.symbol.isin(grnutils.TF), "isTF"] = True
         for celltype in cell_types:
             print(celltype)
-            grn_inferer = GRNfer(
-                model,
-                adata[adata.X.sum(1) > 500],
+            grn_inferer = GNInfer(
+                layer=layers,
                 how="random expr",
                 preprocess="softmax",
                 head_agg="max",
@@ -668,16 +662,15 @@ def default_benchmark(
                 devices=1,
             )
 
-            grn = grn_inferer(layer=layers, cell_type=celltype)
+            grn = grn_inferer(model, adata[adata.X.sum(1) > 500], cell_type=celltype)
             grn.var.index = make_index_unique(grn.var["symbol"].astype(str))
             metrics[celltype + "_scprint"] = BenGRN(
                 grn, doplot=False
             ).scprint_benchmark()
             del grn
             gc.collect()
-            grn_inferer = GRNfer(
-                model,
-                adata[adata.X.sum(1) > 500],
+            grn_inferer = GNInfer(
+                layer=layers,
                 how="most var across",
                 preprocess="softmax",
                 head_agg="none",
@@ -690,7 +683,7 @@ def default_benchmark(
                 batch_size=batch_size,
                 devices=1,
             )
-            grn = grn_inferer(layer=layers, cell_type=celltype)
+            grn = grn_inferer(model, adata[adata.X.sum(1) > 500], cell_type=celltype)
             grn.var.index = make_index_unique(grn.var["symbol"].astype(str))
             grn.varp["all"] = grn.varp["GRN"]
             grn.varp["GRN"] = grn.varp["GRN"].mean(-1)

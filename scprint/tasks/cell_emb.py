@@ -29,7 +29,6 @@ FILE_LOC = os.path.dirname(os.path.realpath(__file__))
 class Embedder:
     def __init__(
         self,
-        model: torch.nn.Module,
         batch_size: int = 64,
         num_workers: int = 8,
         how: str = "random expr",
@@ -43,12 +42,12 @@ class Embedder:
             "self_reported_ethnicity_ontology_term_id",
             "sex_ontology_term_id",
         ],
-        model_name: str = "scprint",
         plot_corr_size: int = 64,
         doplot: bool = True,
         keep_all_cls_pred: bool = False,
         devices: List[int] = [0],
         dtype: torch.dtype = torch.float16,
+        output_expression: str = "none",
     ):
         """
         Embedder a class to embed and annotate cells using a model
@@ -62,10 +61,8 @@ class Embedder:
             add_zero_genes (int, optional): The number of zero genes to add to the gene sequence. Defaults to 100.
             precision (str, optional): The precision to be used in the Trainer. Defaults to "16-mixed".
             pred_embedding (List[str], optional): The list of labels to be used for plotting embeddings. Defaults to [ "cell_type_ontology_term_id", "disease_ontology_term_id", "self_reported_ethnicity_ontology_term_id", "sex_ontology_term_id", ].
-            model_name (str, optional): The name of the model to be used. Defaults to "scprint".
             output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
         """
-        self.model = model
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.how = how
@@ -73,21 +70,20 @@ class Embedder:
         self.add_zero_genes = add_zero_genes
         self.pred_embedding = pred_embedding
         self.keep_all_cls_pred = keep_all_cls_pred
-        self.model_name = model_name
         self.plot_corr_size = plot_corr_size
         self.precision = precision
         self.doplot = doplot
         self.doclass = doclass
-        self.model.doplot = doplot
         self.trainer = Trainer(precision=precision, devices=devices)
+        self.output_expression = output_expression
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
-    def __call__(self, adata: AnnData, cache=False, output_expression: str = "none"):
+    def __call__(self, model: torch.nn.Module, adata: AnnData, cache=False):
         # one of "all" "sample" "none"
         try:
             mdir = (
-                self.model.logger.save_dir
-                if self.model.logger.save_dir is not None
+                model.logger.save_dir
+                if model.logger.save_dir is not None
                 else "data"
             )
         except:
@@ -96,19 +92,20 @@ class Embedder:
             file = (
                 mdir
                 + "/step_"
-                + str(self.model.global_step)
+                + str(model.global_step)
                 + "_predict_part_"
-                + str(self.model.counter)
+                + str(model.counter)
                 + "_"
-                + str(self.model.global_rank)
+                + str(model.global_rank)
                 + ".h5ad"
             )
             hasfile = os.path.exists(file)
         except:
             hasfile = False
+        
         if not cache or not hasfile:
-            self.model.predict_mode = "none"
-            self.model.keep_all_cls_pred = self.keep_all_cls_pred
+            model.predict_mode = "none"
+            model.keep_all_cls_pred = self.keep_all_cls_pred
             # Add at least the organism you are working with
             if self.how == "most var":
                 sc.pp.highly_variable_genes(
@@ -119,8 +116,8 @@ class Embedder:
                 adata, obs_to_output=["organism_ontology_term_id"]
             )
             col = Collator(
-                organisms=self.model.organisms,
-                valid_genes=self.model.genes,
+                organisms=model.organisms,
+                valid_genes=model.genes,
                 how=self.how if self.how != "most var" else "some",
                 max_len=self.max_len,
                 add_zero_genes=self.add_zero_genes,
@@ -133,9 +130,10 @@ class Embedder:
                 num_workers=self.num_workers,
                 shuffle=False,
             )
-            self.model.eval()
-            self.model.on_predict_epoch_start()
-            device = self.model.device.type
+            model.eval()
+            model.on_predict_epoch_start()
+            device = model.device.type
+            model.doplot = self.doplot
             with torch.no_grad(), torch.autocast(
                 device_type=device, dtype=torch.float16
             ):
@@ -145,7 +143,7 @@ class Embedder:
                         batch["x"].to(device),
                         batch["depth"].to(device),
                     )
-                    self.model._predict(
+                    model._predict(
                         gene_pos,
                         expression,
                         depth,
@@ -153,11 +151,11 @@ class Embedder:
                         pred_embedding=self.pred_embedding,
                     )
                     torch.cuda.empty_cache()
-            self.model.log_adata(name="predict_part_" + str(self.model.counter))
+            model.log_adata(name="predict_part_" + str(model.counter))
             try:
                 mdir = (
-                    self.model.logger.save_dir
-                    if self.model.logger.save_dir is not None
+                    model.logger.save_dir
+                    if model.logger.save_dir is not None
                     else "data"
                 )
             except:
@@ -165,41 +163,41 @@ class Embedder:
             file = (
                 mdir
                 + "/step_"
-                + str(self.model.global_step)
+                + str(model.global_step)
                 + "_"
-                + self.model.name
+                + model.name
                 + "_predict_part_"
-                + str(self.model.counter)
+                + str(model.counter)
                 + "_"
-                + str(self.model.global_rank)
+                + str(model.global_rank)
                 + ".h5ad"
             )
 
         pred_adata = sc.read_h5ad(file)
-        if output_expression == "all":
-            adata.obsm["scprint_mu"] = self.model.expr_pred[0]
-            adata.obsm["scprint_theta"] = self.model.expr_pred[1]
-            adata.obsm["scprint_pi"] = self.model.expr_pred[2]
-            adata.obsm["scprint_pos"] = self.model.pos.cpu().numpy()
-        elif output_expression == "sample":
+        if self.output_expression == "all":
+            adata.obsm["scprint_mu"] = model.expr_pred[0]
+            adata.obsm["scprint_theta"] = model.expr_pred[1]
+            adata.obsm["scprint_pi"] = model.expr_pred[2]
+            adata.obsm["scprint_pos"] = model.pos.cpu().numpy()
+        elif self.output_expression == "sample":
             adata.obsm["scprint_expr"] = (
                 utils.zinb_sample(
-                    self.model.expr_pred[0],
-                    self.model.expr_pred[1],
-                    self.model.expr_pred[2],
+                    model.expr_pred[0],
+                    model.expr_pred[1],
+                    model.expr_pred[2],
                 )
                 .cpu()
                 .numpy()
             )
-            adata.obsm["scprint_pos"] = self.model.pos.cpu().numpy()
-        elif output_expression == "old":
-            expr = np.array(self.model.expr_pred[0])
+            adata.obsm["scprint_pos"] = model.pos.cpu().numpy()
+        elif self.output_expression == "old":
+            expr = np.array(model.expr_pred[0])
             expr[
                 np.random.binomial(
                     1,
                     p=np.array(
                         torch.nn.functional.sigmoid(
-                            self.model.expr_pred[2].to(torch.float32)
+                            model.expr_pred[2].to(torch.float32)
                         )
                     ),
                 ).astype(bool)
@@ -207,21 +205,21 @@ class Embedder:
             expr[expr <= 0.3] = 0
             expr[(expr >= 0.3) & (expr <= 1)] = 1
             adata.obsm["scprint_expr"] = expr.astype(int)
-            adata.obsm["scprint_pos"] = self.model.pos.cpu().numpy()
+            adata.obsm["scprint_pos"] = model.pos.cpu().numpy()
         else:
             pass
         pred_adata.obs.index = adata.obs.index
         adata.obsm["scprint_umap"] = pred_adata.obsm["X_umap"]
         # adata.obsm["scprint_leiden"] = pred_adata.obsm["leiden"]
-        adata.obsm[self.model_name] = pred_adata.X
+        adata.obsm["scprint"] = pred_adata.X
         pred_adata.obs.index = adata.obs.index
         adata.obs = pd.concat([adata.obs, pred_adata.obs], axis=1)
         if self.keep_all_cls_pred:
-            allclspred = self.model.pred
+            allclspred = model.pred
             columns = []
-            for cl in self.model.classes:
-                n = self.model.label_counts[cl]
-                columns += [self.model.label_decoders[cl][i] for i in range(n)]
+            for cl in model.classes:
+                n = model.label_counts[cl]
+                columns += [model.label_decoders[cl][i] for i in range(n)]
             allclspred = pd.DataFrame(
                 allclspred, columns=columns, index=adata.obs.index
             )
@@ -229,13 +227,13 @@ class Embedder:
 
         metrics = {}
         if self.doclass and not self.keep_all_cls_pred:
-            for cl in self.model.classes:
+            for cl in model.classes:
                 res = []
                 if cl not in adata.obs.columns:
                     continue
-                class_topred = self.model.label_decoders[cl].values()
+                class_topred = model.label_decoders[cl].values()
 
-                if cl in self.model.labels_hierarchy:
+                if cl in model.labels_hierarchy:
                     # class_groupings = {
                     #    k: [
                     #        i.ontology_id
@@ -244,10 +242,10 @@ class Embedder:
                     #    for k in set(adata.obs[cl].unique()) - set(class_topred)
                     # }
                     cur_labels_hierarchy = {
-                        self.model.label_decoders[cl][k]: [
-                            self.model.label_decoders[cl][i] for i in v
+                        model.label_decoders[cl][k]: [
+                            model.label_decoders[cl][i] for i in v
                         ]
-                        for k, v in self.model.labels_hierarchy[cl].items()
+                        for k, v in model.labels_hierarchy[cl].items()
                     }
                 else:
                     cur_labels_hierarchy = {}
@@ -284,7 +282,7 @@ class Embedder:
         # metrics.update(m)
         return adata, metrics
 
-    def compute_reconstruction(self, adata, plot_corr_size=64):
+    def compute_reconstruction(self, model, adata, plot_corr_size=64):
         if plot_corr_size < 1:
             raise ValueError("plot_corr_size should be greater than 0")
         sc.pp.highly_variable_genes(adata, flavor="seurat_v3", n_top_genes=self.max_len)
@@ -296,8 +294,8 @@ class Embedder:
             adata[random_indices], obs_to_output=["organism_ontology_term_id"]
         )
         col = Collator(
-            organisms=self.model.organisms,
-            valid_genes=self.model.genes,
+            organisms=model.organisms,
+            valid_genes=model.genes,
             how="some",
             genelist=highly_variable,
         )
@@ -308,14 +306,14 @@ class Embedder:
             num_workers=self.num_workers,
             shuffle=False,
         )
-        self.model.pred_log_adata = False
-        self.model.predict_mode = "generate"
+        model.pred_log_adata = False
+        model.predict_mode = "generate"
 
         # self.trainer.num_predict_batches = 1
 
-        self.trainer.predict(self.model, dataloader)
+        self.trainer.predict(model, dataloader)
 
-        res = self.model.expr_pred
+        res = model.expr_pred
         # pos = adata.obsm["scprint_pos"][random_indices]
         if len(res) > 1:
             out = (
@@ -329,7 +327,7 @@ class Embedder:
             )
             try:
                 mean_expr = pd.read_parquet("../../data/avg_expr.parquet")
-                genes_used = [self.model.genes[int(i)] for i in self.model.pos[0]]
+                genes_used = [model.genes[int(i)] for i in model.pos[0]]
                 mean_expr = mean_expr[mean_expr.index.isin(genes_used)][
                     ["avg_expr", "avg_expr_wexpr"]
                 ].values
@@ -345,7 +343,7 @@ class Embedder:
 
             to = adata[
                 random_indices,
-                adata.var.index.isin(set(highly_variable) & set(self.model.genes)),
+                adata.var.index.isin(set(highly_variable) & set(model.genes)),
             ].X.todense()
             metrics = compute_corr(
                 out,
@@ -435,12 +433,11 @@ def default_benchmark(model, default_dataset="pancreas", do_class=True, coarse=F
     adata.obs["organism_ontology_term_id"] = "NCBITaxon:9606"
     adata = preprocessor(adata.copy())
     embedder = Embedder(
-        model,
         pred_embedding=["cell_type_ontology_term_id"],
         doclass=(default_dataset not in ["pancreas", "lung"]),
         devices=1,
     )
-    embed_adata, metrics = embedder(adata.copy())
+    embed_adata, metrics = embedder(model, adata.copy())
 
     bm = Benchmarker(
         embed_adata,
