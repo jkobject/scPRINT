@@ -1,13 +1,10 @@
-# Documentation for the `utils`
+# Documentation for the `utils` modules
 
-::: scprint.cli
+::: scprint.utils.sinkhorn
     handler: python
 
-::: scprint.utils
+::: scprint.utils.utils
     handler: python
 
-::: scprint.__main__
-    handler: python
-
-::: scprint.trainer.trainer
+::: scprint.utils.get_seq
     handler: python

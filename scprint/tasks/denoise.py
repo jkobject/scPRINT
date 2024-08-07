@@ -4,24 +4,22 @@ import matplotlib.pyplot as plt
 import torch
 
 from scdataloader.data import SimpleAnnDataset
-from scdataloader import Collator
+from scdataloader import Collator, Preprocessor
 from scprint.model import utils
+from scprint.tasks import compute_corr
+
 import bionty as bt
 from torch.utils.data import DataLoader
-from typing import Tuple
 import sklearn.metrics
 import pandas as pd
 
 from lightning.pytorch import Trainer
 import anndata as ad
-
-from typing import List, Optional
 from anndata import AnnData
-from scprint.tasks import compute_corr
-from scdataloader import Preprocessor
+
+from typing import List, Optional, Tuple, Any
 
 from scipy.sparse import issparse
-
 from scipy.stats import spearmanr
 import os
 from tqdm import tqdm
@@ -33,35 +31,34 @@ FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 class Denoiser:
     def __init__(
         self,
-        model: torch.nn.Module,
         batch_size: int = 10,
         num_workers: int = 1,
-        max_len: int = 20_000,
+        max_len: int = 5_000,
         precision: str = "16-mixed",
-        how="most var",
-        plot_corr_size: int = 64,
-        doplot: bool = True,
+        how: str = "most var",
+        plot_corr_size: int = 10_000,
+        doplot: bool = False,
         predict_depth_mult: int = 4,
         downsample: Optional[float] = None,
         devices: List[int] = [0],
         dtype: torch.dtype = torch.float16,
     ):
         """
-        Embedder a class to embed and annotate cells using a model
+        Denoiser class for denoising scRNA-seq data using a scPRINT model
 
         Args:
-            model (torch.nn.Module): The model to be used for embedding and annotating cells.
-            batch_size (int, optional): The size of the batches to be used in the DataLoader. Defaults to 64.
-            num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 8.
-            how (str, optional): The method to be used for selecting valid genes. Defaults to "most expr".
-            max_len (int, optional): The maximum length of the gene sequence. Defaults to 1000.
-            add_zero_genes (int, optional): The number of zero genes to add to the gene sequence. Defaults to 100.
-            precision (str, optional): The precision to be used in the Trainer. Defaults to "16-mixed".
-            pred_embedding (List[str], optional): The list of labels to be used for plotting embeddings. Defaults to [ "cell_type_ontology_term_id", "disease_ontology_term_id", "self_reported_ethnicity_ontology_term_id", "sex_ontology_term_id", ].
-            model_name (str, optional): The name of the model to be used. Defaults to "scprint".
-            output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
+            batch_size (int, optional): Batch size for processing. Defaults to 10.
+            num_workers (int, optional): Number of workers for data loading. Defaults to 1.
+            max_len (int, optional): Maximum number of genes to consider. Defaults to 5000.
+            precision (str, optional): Precision type for computations. Defaults to "16-mixed".
+            how (str, optional): Method to select genes. Options are "most var". Defaults to "most var".
+            plot_corr_size (int, optional): Number of cells to use for plotting correlation. Defaults to 10000.
+            doplot (bool, optional): Whether to generate plots. Defaults to False.
+            predict_depth_mult (int, optional): Multiplier for prediction depth. Defaults to 4.
+            downsample (Optional[float], optional): Fraction of data to downsample. Defaults to None.
+            devices (List[int], optional): List of device IDs to use. Defaults to [0].
+            dtype (torch.dtype, optional): Data type for computations. Defaults to torch.float16.
         """
-        self.model = model
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.max_len = max_len
@@ -75,7 +72,17 @@ class Denoiser:
         # self.trainer = Trainer(precision=precision, devices=devices)
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
-    def __call__(self, adata: AnnData):
+    def __call__(self, model: torch.nn.Module, adata: AnnData):
+        """
+        __call__ calling the function
+
+        Args:
+            model (torch.nn.Module): The scPRINT model to be used for denoising.
+            adata (AnnData): The annotated data matrix of shape n_obs x n_vars. Rows correspond to cells and columns to genes.
+
+        Returns:
+            AnnData: The denoised annotated data matrix.
+        """
         if os.path.exists("collator_output.txt"):
             os.remove("collator_output.txt")
         random_indices = None
@@ -97,8 +104,8 @@ class Denoiser:
             genelist = adata.var.index[adata.var.highly_variable]
             print(len(genelist))
         col = Collator(
-            organisms=self.model.organisms,
-            valid_genes=self.model.genes,
+            organisms=model.organisms,
+            valid_genes=model.genes,
             max_len=self.max_len,
             how="some" if self.how == "most var" else self.how,
             genelist=genelist if self.how == "most var" else [],
@@ -113,10 +120,10 @@ class Denoiser:
             shuffle=False,
         )
 
-        self.model.doplot = self.doplot
-        self.model.on_predict_epoch_start()
-        self.model.eval()
-        device = self.model.device.type
+        model.doplot = self.doplot
+        model.on_predict_epoch_start()
+        model.eval()
+        device = model.device.type
         with torch.no_grad(), torch.autocast(device_type=device, dtype=self.dtype):
             for batch in tqdm(dataloader):
                 gene_pos, expression, depth = (
@@ -124,7 +131,7 @@ class Denoiser:
                     batch["x"].to(device),
                     batch["depth"].to(device),
                 )
-                self.model._predict(
+                model._predict(
                     gene_pos,
                     expression,
                     depth,
@@ -133,12 +140,14 @@ class Denoiser:
                 )
         torch.cuda.empty_cache()
         self.genes = (
-            self.model.pos
+            model.pos.cpu().numpy()
             if self.how != "most var"
-            else list(set(self.model.genes) & set(genelist))
+            else list(set(model.genes) & set(genelist))
         )
+        tokeep = None
+        metrics = None
         if self.downsample is not None:
-            reco = self.model.expr_pred[0]
+            reco = model.expr_pred[0]
             reco = reco.cpu().numpy()
             tokeep = np.isnan(reco).sum(1) == 0
             reco = reco[tokeep]
@@ -157,11 +166,9 @@ class Denoiser:
                     [
                         true[
                             i,
-                            adata.var.index.get_indexer(
-                                np.array(self.model.genes)[val]
-                            ),
+                            adata.var.index.get_indexer(np.array(model.genes)[val]),
                         ].copy()
-                        for i, val in enumerate(self.genes.cpu().numpy())
+                        for i, val in enumerate(self.genes)
                     ]
                 )
             # reco[true==0] = 0
@@ -204,14 +211,20 @@ class Denoiser:
             #        ].diagonal()
             #    ),
             # }
-            return (
-                metrics,
-                random_indices[tokeep] if random_indices is not None else None,
-                self.genes,
-                self.model.expr_pred[0][tokeep],
-            )
-        else:
-            return random_indices, self.genes, self.model.expr_pred[0]
+        return (
+            metrics,
+            (
+                random_indices[tokeep]
+                if random_indices is not None and tokeep is not None
+                else random_indices
+            ),
+            self.genes,
+            (
+                model.expr_pred[0][tokeep].cpu().numpy()
+                if tokeep is not None
+                else model.expr_pred[0].cpu().numpy()
+            ),
+        )
 
 
 # testdatasets=['/R4ZHoQegxXdSFNFY5LGe.h5ad', '/SHV11AEetZOms4Wh7Ehb.h5ad',
@@ -222,8 +235,21 @@ class Denoiser:
 
 
 def default_benchmark(
-    model, default_dataset=FILE_DIR + "/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad", max_len=5000,
+    model: Any,
+    default_dataset: str = FILE_DIR + "/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad",
+    max_len: int = 5000,
 ):
+    """
+    default_benchmark function used to run the default denoising benchmark of scPRINT
+
+    Args:
+        model (Any): The scPRINT model to be used for the benchmark.
+        default_dataset (str, optional): Path to the default dataset to use for benchmarking. Defaults to FILE_DIR + "/../../data/r4iCehg3Tw5IbCLiCIbl.h5ad".
+        max_len (int, optional): Maximum number of genes to consider. Defaults to 5000.
+
+    Returns:
+        dict: A dictionary containing the benchmark metrics.
+    """
     adata = sc.read_h5ad(default_dataset)
     denoise = Denoiser(
         model,
@@ -266,7 +292,6 @@ def open_benchmark(model):
     nadata = preprocessor(adata.copy())
 
     denoise = Denoiser(
-        model,
         batch_size=32,
         max_len=15_800,
         plot_corr_size=10_000,
@@ -274,7 +299,7 @@ def open_benchmark(model):
         predict_depth_mult=1.2,
         downsample=None,
     )
-    expr = denoise(nadata)
+    expr = denoise(model, nadata)
     denoised = ad.AnnData(
         expr.cpu().numpy(),
         var=nadata.var.loc[

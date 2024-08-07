@@ -74,30 +74,37 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         scPrint transformer for single cell biology and the inference of Gene Regulatory networks
 
         Args:
-            genes (list): the genenames with which the model will work
-            precpt_gene_emb (np.array, optional): The gene embeddings. should be of size len(genes), d_model.
-                it should be in the same order as the genes. Defaults to None.
-            gene_pos_enc (list, optional): The gene position encoding. Should be of the same size as genes.
-                for each gene in genes, gives it a location value. Defaults to None.
-            d_model (int, optional): The dimension of the model. Defaults to 512.
-            nhead (int, optional): The number of heads in the multiheadattention models. Defaults to 8.
-            d_hid (int, optional): The dimension of the feedforward network model. Defaults to 512.
-            nlayers (int, optional): The number of layers in the transformer model. Defaults to 6.
-            nlayers_cls (int, optional): The number of layers in the classifier. Defaults to 3.
-            classes (dict, optional): The classes to predict with number of classes for each. Defaults to {}.
-            labels_hierarchy (dict, optional): The class hierarchy for classes that have hierarchical classes. Defaults to {}.
-            dropout (float, optional): The dropout value. Defaults to 0.5.
-            transformer: (flag, optional) the transformer type to use. one of "linear", "flash", "flashsparse", "scprint". Defaults to "flash".
-            domain_spec_batchnorm (str, optional): Whether to apply domain specific batch normalization. Defaults to False.
-            expr_emb_style (str, optional): The style of input embedding (one of "continuous_concat", "binned_pos", "full_pos"). Defaults to "continuous_concat".
-            mvc_decoder (str, optional): The style of MVC decoder one of "None", "inner product", "concat query", "sum query". Defaults to "inner product".
-            pred_embedding (list, optional): The list of classes to use for plotting embeddings. Defaults to [].
-            cell_emb_style (str, optional): The style of cell embedding. one of "cls", "avg-pool", "w-pool". Defaults to "cls".
-            lr (float, optional): The learning rate. Defaults to 0.001.
-            label_decoders: (dict, optional) the label decoders to use for plotting the umap during validations. Defaults to None.
+            genes (list): List of gene names the model will work with.
+            precpt_gene_emb (np.array, optional): Gene embeddings of size (len(genes), d_model). Should be in the same order as the genes. Defaults to None.
+            gene_pos_enc (list, optional): Gene position encoding of the same size as genes. Provides a location value for each gene in genes. Defaults to None.
+            d_model (int, optional): Dimension of the model. Defaults to 512.
+            nhead (int, optional): Number of heads in the multihead attention models. Defaults to 8.
+            d_hid (int, optional): Dimension of the feedforward network model. Defaults to 512.
+            nlayers (int, optional): Number of layers in the transformer model. Defaults to 6.
+            expr_encoder_layers (int, optional): Number of layers in the expression encoder. Defaults to 2.
+            layers_cls (list[int], optional): List specifying the number of layers in the classifier. Defaults to [].
+            classes (Dict[str, int], optional): Classes to predict with the number of classes for each. Defaults to {}.
+            labels_hierarchy (Dict[str, Dict[int, list[int]]], optional): Class hierarchy for classes with hierarchical classes. Defaults to {}.
+            dropout (float, optional): Dropout value. Defaults to 0.2.
+            transformer (str, optional): Transformer type to use. One of "linear", "flash", "flashsparse", "scprint". Defaults to "fast".
+            domain_spec_batchnorm (str, optional): Whether to apply domain-specific batch normalization. Defaults to "None".
+            expr_emb_style (str, optional): Style of input embedding. One of "continuous", "binned_pos", "cont_pos". Defaults to "continuous".
+            mvc_decoder (str, optional): Style of MVC decoder. One of "None", "inner product", "concat query", "sum query". Defaults to "None".
+            pred_embedding (list[str], optional): List of classes to use for plotting embeddings. Defaults to [].
+            cell_emb_style (str, optional): Style of cell embedding. One of "cls", "avg-pool", "w-pool". Defaults to "cls".
+            freeze_embeddings (bool, optional): Whether to freeze the embeddings during training. Defaults to True.
+            label_decoders (Optional[Dict[str, Dict[int, str]]], optional): Label decoders to use for plotting the UMAP during validations. Defaults to None.
+            zinb (bool, optional): Whether to use Zero-Inflated Negative Binomial distribution. Defaults to True.
+            lr (float, optional): Learning rate. Defaults to 0.0001.
+            optim (str, optional): Optimizer type. Defaults to "adamW".
+            weight_decay (float, optional): Weight decay for the optimizer. Defaults to 0.01.
+            **flash_attention_kwargs (dict): Additional keyword arguments for the model. see @flashformer.py
+
+        Notes:
+            for other parameters of the model that are not part of its class definition, see @trainer.trainer.py
 
         Raises:
-            ValueError: If the expr_emb_style is not one of "category", "continuous", "none".
+            ValueError: If the expr_emb_style is not one of "continuous", "binned_pos", "cont_pos".
         """
         super().__init__()
         # training flags
@@ -882,8 +889,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 Defaults to False.
             do_adv_cls (bool, optional): A flag to indicate whether to perform adversarial classification.
                 Defaults to False.
-            do_mvc (bool, optional): A flag to indicate whether to perform masked value prediction for cell embedding.
-                Defaults to False.
 
         Raises:
             ValueError: Raised when an invalid operation or input is encountered.
@@ -1000,20 +1005,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             losses.update({"ecs": loss_ecs})
         return losses, total_loss
 
-    def on_before_backward(self, loss: Tensor):
-        pass
-
-    def on_after_backward(self):
-        pass
-
-    def on_before_optimizer_step(self, optimizer):
-        pass
-
-    def configure_gradient_clipping(
-        self, optimizer, gradient_clip_val, gradient_clip_algorithm
-    ):
-        pass
-
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
         """@see pl.LightningModule"""
         # update params
@@ -1031,13 +1022,6 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             # if pg["lr"] < 2e-5:
             #    pg["lr"] = 2e-5
             self.log("lr_" + str(i), pg["lr"])
-
-    def on_before_zero_grad(self, optimizer):
-        pass
-
-    def on_train_epoch_end(self):
-        """@see pl.LightningModule"""
-        pass
 
     def on_validation_start(self):
         for k, v in self.mat_labels_hierarchy.items():
@@ -1182,7 +1166,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
     ):
         """
         @see predict_step will save output of predict in multiple self variables
-
+        
         - embs: the cell embeddings (means from label specific embeddings given by self.pred_embedding)
         - pred: the predicted cell classes
         - pos: the genes used

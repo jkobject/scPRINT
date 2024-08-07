@@ -7,6 +7,7 @@
 # The models we train have hidden dim up to 8k anyway (e.g. Llama 70B), so this is fine.
 
 import math
+from typing import Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -17,21 +18,43 @@ import triton.language as tl
 
 
 def layer_norm_ref(
-    x,
-    weight,
-    bias,
-    residual=None,
-    x1=None,
-    weight1=None,
-    bias1=None,
-    eps=1e-6,
-    dropout_p=0.0,
-    rowscale=None,
-    prenorm=False,
-    dropout_mask=None,
-    dropout_mask1=None,
-    upcast=False,
-):
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    bias: Optional[torch.Tensor] = None,
+    residual: Optional[torch.Tensor] = None,
+    x1: Optional[torch.Tensor] = None,
+    weight1: Optional[torch.Tensor] = None,
+    bias1: Optional[torch.Tensor] = None,
+    eps: float = 1e-6,
+    dropout_p: float = 0.0,
+    rowscale: Optional[torch.Tensor] = None,
+    prenorm: bool = False,
+    dropout_mask: Optional[torch.Tensor] = None,
+    dropout_mask1: Optional[torch.Tensor] = None,
+    upcast: bool = False,
+) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+    """
+    Reference implementation of Layer Normalization with optional dropout and residual connections.
+
+    Args:
+        x (torch.Tensor): Input tensor.
+        weight (torch.Tensor): Weight tensor for normalization.
+        bias (Optional[torch.Tensor]): Bias tensor for normalization.
+        residual (Optional[torch.Tensor]): Residual tensor to be added to the input.
+        x1 (Optional[torch.Tensor]): Additional input tensor for parallel LayerNorm.
+        weight1 (Optional[torch.Tensor]): Additional weight tensor for parallel LayerNorm.
+        bias1 (Optional[torch.Tensor]): Additional bias tensor for parallel LayerNorm.
+        eps (float): Epsilon value to avoid division by zero.
+        dropout_p (float): Dropout probability.
+        rowscale (Optional[torch.Tensor]): Row scaling tensor.
+        prenorm (bool): Whether to return the prenormalized output.
+        dropout_mask (Optional[torch.Tensor]): Dropout mask for the input tensor.
+        dropout_mask1 (Optional[torch.Tensor]): Dropout mask for the additional input tensor.
+        upcast (bool): Whether to upcast the input tensors to float.
+
+    Returns:
+        Union[torch.Tensor, Tuple[torch.Tensor, ...]]: Normalized output tensor(s).
+    """
     dtype = x.dtype
     if upcast:
         x = x.float()
@@ -72,21 +95,43 @@ def layer_norm_ref(
 
 
 def rms_norm_ref(
-    x,
-    weight,
-    bias,
-    residual=None,
-    x1=None,
-    weight1=None,
-    bias1=None,
-    eps=1e-6,
-    dropout_p=0.0,
-    rowscale=None,
-    prenorm=False,
-    dropout_mask=None,
-    dropout_mask1=None,
-    upcast=False,
-):
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    bias: Optional[torch.Tensor] = None,
+    residual: Optional[torch.Tensor] = None,
+    x1: Optional[torch.Tensor] = None,
+    weight1: Optional[torch.Tensor] = None,
+    bias1: Optional[torch.Tensor] = None,
+    eps: float = 1e-6,
+    dropout_p: float = 0.0,
+    rowscale: Optional[torch.Tensor] = None,
+    prenorm: bool = False,
+    dropout_mask: Optional[torch.Tensor] = None,
+    dropout_mask1: Optional[torch.Tensor] = None,
+    upcast: bool = False,
+) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+    """
+    Reference implementation of RMS Normalization with optional dropout and residual connections.
+
+    Args:
+        x (torch.Tensor): Input tensor.
+        weight (torch.Tensor): Weight tensor for normalization.
+        bias (Optional[torch.Tensor]): Bias tensor for normalization.
+        residual (Optional[torch.Tensor]): Residual tensor to be added to the input.
+        x1 (Optional[torch.Tensor]): Additional input tensor for parallel RMSNorm.
+        weight1 (Optional[torch.Tensor]): Additional weight tensor for parallel RMSNorm.
+        bias1 (Optional[torch.Tensor]): Additional bias tensor for parallel RMSNorm.
+        eps (float): Epsilon value to avoid division by zero.
+        dropout_p (float): Dropout probability.
+        rowscale (Optional[torch.Tensor]): Row scaling tensor.
+        prenorm (bool): Whether to return the prenormalized output.
+        dropout_mask (Optional[torch.Tensor]): Dropout mask for the input tensor.
+        dropout_mask1 (Optional[torch.Tensor]): Dropout mask for the additional input tensor.
+        upcast (bool): Whether to upcast the input tensors to float.
+
+    Returns:
+        Union[torch.Tensor, Tuple[torch.Tensor, ...]]: Normalized output tensor(s).
+    """
     dtype = x.dtype
     if upcast:
         x = x.float()

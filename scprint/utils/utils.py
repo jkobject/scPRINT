@@ -25,7 +25,16 @@ import io
 from biomart import BiomartServer
 
 
-def run_command(command, **kwargs):
+def run_command(command: str, **kwargs):
+    """
+    run_command runs a command in the shell and prints the output.
+
+    Args:
+        command (str): The command to be executed in the shell.
+
+    Returns:
+        int: The return code of the command executed.
+    """
     process = subprocess.Popen(command, stdout=subprocess.PIPE, **kwargs)
     while True:
         if process.poll() is not None:
@@ -51,24 +60,26 @@ def _fetchFromServer(ensemble_server, attributes):
 
 
 def getBiomartTable(
-    ensemble_server="http://jul2023.archive.ensembl.org/biomart",
-    useCache=False,
-    cache_folder="/tmp/biomart/",
-    attributes=[],
-    bypass_attributes=False,
-):
+    ensemble_server: str = "http://jul2023.archive.ensembl.org/biomart",
+    useCache: bool = False,
+    cache_folder: str = "/tmp/biomart/",
+    attributes: List[str] = [],
+    bypass_attributes: bool = False,
+) -> pd.DataFrame:
     """generate a genelist dataframe from ensembl's biomart
 
     Args:
-        ensemble_server ([type], optional): [description]. Defaults to ENSEMBL_SERVER_V.
-        useCache (bool, optional): [description]. Defaults to False.
-        cache_folder ([type], optional): [description]. Defaults to CACHE_PATH.
+        ensemble_server (str, optional): The URL of the Ensembl Biomart server. Defaults to "http://jul2023.archive.ensembl.org/biomart".
+        useCache (bool, optional): Whether to use cached data if available. Defaults to False.
+        cache_folder (str, optional): The directory where cached data will be stored. Defaults to "/tmp/biomart/".
+        attributes (list, optional): Additional attributes to fetch from the server. Defaults to an empty list.
+        bypass_attributes (bool, optional): Whether to bypass the default attributes. Defaults to False.
 
     Raises:
-        ValueError: [description]
+        ValueError: If the result is not a pandas DataFrame.
 
     Returns:
-        [type]: [description]
+        pd.DataFrame: A DataFrame containing the gene list from Ensembl's Biomart.
     """
     attr = (
         [
@@ -105,14 +116,18 @@ def getBiomartTable(
     return res
 
 
-def gene_vocabulary():
+def pd_load_cached(url: str, loc: str = "/tmp/", cache: bool = True, **kwargs) -> pd.DataFrame:
     """
-    Generate the gene name2id and id2name dictionaries.
+    pd_load_cached loads a csv file from a url, and caches it locally
+
+    Args:
+        url (str): The URL of the CSV file to be loaded.
+        loc (str, optional): The local directory where the file will be cached. Defaults to "/tmp/".
+        cache (bool, optional): Whether to use the cached file if it exists. Defaults to True.
+
+    Returns:
+        pd.DataFrame: The loaded data as a pandas DataFrame.
     """
-    pass
-
-
-def pd_load_cached(url, loc="/tmp/", cache=True, **kwargs):
     # Check if the file exists, if not, download it
     loc += url.split("/")[-1]
     if not os.path.isfile(loc) or not cache:
@@ -121,7 +136,18 @@ def pd_load_cached(url, loc="/tmp/", cache=True, **kwargs):
     return pd.read_csv(loc, **kwargs)
 
 
-def onto_to_name(ids, onto, schema="http://www.ebi.ac.uk/efo/"):
+def onto_to_name(ids: list, onto, schema: str = "http://www.ebi.ac.uk/efo/") -> list:
+    """
+    Convert ontology IDs to names using a given ontology and schema.
+
+    Args:
+        ids (list): A list of ontology IDs to be converted.
+        onto: The ontology object used for searching.
+        schema (str, optional): The schema URL to be used for constructing the search IRI. Defaults to "http://www.ebi.ac.uk/efo/".
+
+    Returns:
+        list: A list of names corresponding to the given ontology IDs.
+    """
     names = []
     for val in ids:
         res = onto.search_one(iri=schema + val.replace(":", "_"))
@@ -132,24 +158,38 @@ def onto_to_name(ids, onto, schema="http://www.ebi.ac.uk/efo/"):
     return names
 
 
-def fileToList(filename, strconv=lambda x: x):
+def fileToList(filename: str, strconv: callable = lambda x: x) -> list:
     """
     loads an input file with a\\n b\\n.. into a list [a,b,..]
+
+    Args:
+        input_str (str): The input string to be completed.
+
+    Returns:
+        str: The completed string with 'complete' appended.
     """
     with open(filename) as f:
         return [strconv(val[:-1]) for val in f.readlines()]
 
 
-def listToFile(l, filename, strconv=lambda x: str(x)):
+def listToFile(l: list, filename: str, strconv: callable = lambda x: str(x)) -> None:
     """
-    loads a list with [a,b,..] into an input file a\\n b\\n..
+    listToFile loads a list with [a,b,..] into an input file a\\n b\\n..
+
+    Args:
+        l (list): The list of elements to be written to the file.
+        filename (str): The name of the file where the list will be written.
+        strconv (callable, optional): A function to convert each element of the list to a string. Defaults to str.
+
+    Returns:
+        None
     """
     with open(filename, "w") as f:
         for item in l:
             f.write("%s\n" % strconv(item))
 
 
-def set_seed(seed):
+def set_seed(seed: int = 42):
     """set random seed."""
     random.seed(seed)
     np.random.seed(seed)
@@ -172,6 +212,15 @@ def createFoldersFor(filepath):
 
 
 def category_str2int(category_strs: List[str]) -> List[int]:
+    """
+    category_str2int converts a list of category strings to a list of category integers.
+
+    Args:
+        category_strs (List[str]): A list of category strings to be converted.
+
+    Returns:
+        List[int]: A list of integers corresponding to the input category strings.
+    """
     set_category_strs = set(category_strs)
     name2id = {name: i for i, name in enumerate(set_category_strs)}
     return [name2id[name] for name in category_strs]
@@ -192,6 +241,15 @@ def isnotebook() -> bool:
 
 
 def load_genes(organisms: Union[str, list] = "NCBITaxon:9606"):  # "NCBITaxon:10090",
+    """
+    load_genes loads the genes for a given organism.
+
+    Args:
+        organisms (Union[str, list], optional): A string or list of strings representing the organism(s) to load genes for. Defaults to "NCBITaxon:9606".
+
+    Returns:
+        pd.DataFrame: A DataFrame containing gene information for the specified organism(s).
+    """
     organismdf = []
     if type(organisms) == str:
         organisms = [organisms]
@@ -214,6 +272,12 @@ def load_genes(organisms: Union[str, list] = "NCBITaxon:9606"):  # "NCBITaxon:10
 
 
 def get_free_gpu():
+    """
+    get_free_gpu finds the GPU with the most free memory using nvidia-smi.
+
+    Returns:
+        int: The index of the GPU with the most free memory.
+    """
     import subprocess
     import sys
     from io import StringIO
@@ -240,6 +304,12 @@ def get_free_gpu():
 
 
 def get_git_commit():
+    """
+    get_git_commit gets the current git commit hash.
+
+    Returns:
+        str: The current git commit
+    """
     return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
 
 

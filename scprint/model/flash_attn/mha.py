@@ -218,13 +218,10 @@ class SelfAttention(nn.Module):
 
 class CrossAttention(nn.Module):
     """Implement the scaled dot product attention with softmax.
-    Arguments
-    ---------
-        softmax_scale: The temperature to use for the softmax attention.
-                      (default: 1/sqrt(d_keys) where d_keys is computed at
-                      runtime)
-        attention_dropout: The dropout rate to apply to the attention
-                           (default: 0.0)
+
+    Args
+        softmax_scale: The temperature to use for the softmax attention. Default to 1/sqrt(d_keys) where d_keys is computed at runtime
+        attention_dropout: The dropout rate to apply to the attention. default to 0.0.
     """
 
     def __init__(self, causal=False, softmax_scale=None, attention_dropout=0.0):
@@ -235,8 +232,8 @@ class CrossAttention(nn.Module):
 
     def forward(self, q, kv, causal=None, key_padding_mask=None, bias=None):
         """Implements the multihead softmax attention.
-        Arguments
-        ---------
+
+        Args
             q: The tensor containing the query. (B, Sq, H, D)
             kv: The tensor containing the key and value. (B, Sk, 2, H_k, D)
             causal: if passed, will override self.causal
