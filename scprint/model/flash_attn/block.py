@@ -247,7 +247,7 @@ class Block(nn.Module):
                     qkv,
                 )
             )
-        # if not prenorm (disregard for scPrint)
+        # if not prenorm (disregard for scPRINT)
         else:
             assert residual is None
             mixer_out = self.mixer(

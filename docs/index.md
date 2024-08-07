@@ -36,17 +36,15 @@ If you want to be using flashattention2, know that it only supports triton 2.0 M
 
 ```python
 conda create -n "[whatever]" python==3.10
-git clone https://github.com/jkobject/scPRINT
 #one of
-pip install scPRINT # OR
-pip install scPRINT[dev] # for the dev dependencies (building etc..) AND/OR [dev,flash]
-pip install scPRINT[flash] && pip install -e "git+https:/
+pip install scprint # OR
+pip install scprint[dev] # for the dev dependencies (building etc..) AND/OR [dev,flash]
+pip install scprint[flash] && pip install -e "git+https:/
 /github.com/triton-lang/triton.git@legacy-backend
 #egg=triton&subdirectory=python" # to use flashattention2, you will need to install triton 2.0.0.dev20221202 specifically, working on removing this dependency # only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
 ```
 
 We make use of some additional packages we developed alongside scPRint.
-
 Please refer to their documentation for more information:
 
 - [scDataLoader](https://github.com/jkobject/scDataLoader): a dataloader for training large cell models.
@@ -106,6 +104,8 @@ model = scPrint.load_from_checkpoint(
 
 We now explore the different usages of scPRINT:
 
+## FAQ
+
 ### I want to generate gene networks from scRNAseq data:
 
 -> Refer to the section . gene network inference in [this notebook](./notebooks/cancer_usecase.ipynb#).
@@ -136,11 +136,27 @@ To run scPRINT, you can use the option to define the gene tokens using protein l
 
 -> Refer to the documentation page [pretrain scprint](pretrain.md)
 
-### Documentation
+### how can I find if scPRINT was trained on my data?
 
-For more information on usage please see the documentation in [https://www.jkobject.com/scPrint/](https://www.jkobject.com/scPrint/)
+If your data is available in cellxgene, scPRINT was likely trained on it. However some cells, datasets were dropped due to low quality data and some were randomly removed to be part of the validation / test sets.
 
-### Model Weights
+### can I use scPRINT on other organisms rather than human?
+
+scPRINT has been pretrained on both humans and mouse, and can be used on any organism with a similar gene set. If you want to use scPRINT on very different organisms, you will need to generate gene embeddings for that organism and re-train scPRINT
+
+### how long does scPRINT takes? what kind of resources do I need? (or in alternative: can i run scPRINT locally?)
+
+please look at our supplementary tables in the [manuscript](https://www.biorxiv.org/content/10.1101/2024.07.29.605556v1)
+
+### I have different scRNASeq batches. Should I integrate my data before running scPRINT?
+
+scPRINT takes raw count as inputs, so please don't use integrated data. Just give the raw counts to scPRINT and it will take care of the rest.
+
+## Documentation
+
+For more information on usage please see the documentation in [https://www.jkobject.com/scPRINT/](https://www.jkobject.com/scPRINT/)
+
+## Model Weights
 
 Model weights are available on [hugging face](https://huggingface.co/jkobject/scPRINT/).
 

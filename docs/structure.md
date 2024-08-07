@@ -1,6 +1,5 @@
 # structure
 
-
 ## gene embedders
 
 Function to get embeddings from a set of genes, given their ensembl ids. For now use 2 different models:

@@ -71,7 +71,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         **flash_attention_kwargs,
     ):
         """
-        scPrint transformer for single cell biology and the inference of Gene Regulatory networks
+        scPRINT transformer for single cell biology and the inference of Gene Regulatory networks
 
         Args:
             genes (list): List of gene names the model will work with.
@@ -1166,7 +1166,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
     ):
         """
         @see predict_step will save output of predict in multiple self variables
-        
+
         - embs: the cell embeddings (means from label specific embeddings given by self.pred_embedding)
         - pred: the predicted cell classes
         - pos: the genes used
