@@ -10,7 +10,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![DOI](https://zenodo.org/badge/391909874.svg)]()
 
-![logo](logo.png)
+![logo](docs/logo.png)
 
 scPRINT is a large transformer model built for the inference of gene networks (connections between genes explaining the cell's expression profile) from scRNAseq data.
 
@@ -25,7 +25,28 @@ scPRINT can be used to perform the following analyses:
 
 [Read the paper!](https://www.biorxiv.org/content/10.1101/2024.07.29.605556v1) if you would like to know more about scPRINT.
 
-![figure1](figure1.png)
+![figure1](docs/figure1.png)
+
+## Table of Contents
+
+- [scPRINT: Large Cell Model for scRNAseq data](#scprint-large-cell-model-for-scrnaseq-data)
+  - [Table of Contents](#table-of-contents)
+  - [Install `scPRINT`](#install-scprint)
+    - [lamin.ai](#laminai)
+  - [Usage](#usage)
+    - [scPRINT's basic commands](#scprints-basic-commands)
+    - [Notes on GPU/CPU usage with triton](#notes-on-gpucpu-usage-with-triton)
+    - [I want to generate gene networks from scRNAseq data:](#i-want-to-generate-gene-networks-from-scrnaseq-data)
+    - [I want to generate cell embeddings and cell label predictions from scRNAseq data:](#i-want-to-generate-cell-embeddings-and-cell-label-predictions-from-scrnaseq-data)
+    - [I want to denoising my scRNAseq dataset:](#i-want-to-denoising-my-scrnaseq-dataset)
+    - [I want to generate an atlas-level embedding](#i-want-to-generate-an-atlas-level-embedding)
+    - [I need to generate gene tokens using pLLMs](#i-need-to-generate-gene-tokens-using-pllms)
+    - [I want to pre-train scPRINT from scratch on my own data](#i-want-to-pre-train-scprint-from-scratch-on-my-own-data)
+    - [Documentation](#documentation)
+    - [Model Weights](#model-weights)
+  - [Development](#development)
+  - [Work in progress:](#work-in-progress)
+
 
 ## Install `scPRINT`
 
@@ -109,7 +130,7 @@ We now explore the different usages of scPRINT:
 
 -> Refer to the section . gene network inference in [this notebook](./docs/notebooks/cancer_usecase.ipynb#).
 
--> More examples in this notebook [./notebooks/assessments/bench_omni.ipynb](./notebooks/assessments/bench_omni.ipynb).
+-> More examples in this notebook [./notebooks/assessments/bench_omni.ipynb](./notebooks/bench_omni.ipynb).
 
 ### I want to generate cell embeddings and cell label predictions from scRNAseq data:
 
@@ -119,7 +140,7 @@ We now explore the different usages of scPRINT:
 
 -> Refer to the Denoising of B-cell section in [this notebook](./docs/notebooks/cancer_usecase.ipynb).
 
--> More example in our benchmark notebook [./notebooks/assessments/bench_denoising.ipynb](./notebooks/assessments/bench_denoising.ipynb).
+-> More example in our benchmark notebook [./notebooks/assessments/bench_denoising.ipynb](./notebooks/bench_denoising.ipynb).
 
 ### I want to generate an atlas-level embedding
 
@@ -129,7 +150,7 @@ We now explore the different usages of scPRINT:
 
 To run scPRINT, you can use the option to define the gene tokens using protein language model embeddings of genes. This is done by providing the path to a parquet file of the precomputed set of embeddings for each gene name to scPRINT via "precpt_gene_emb"
 
--> To generate this file please refer to the notebook [generate_gene_embeddings](docs/notebooks/generate_gene_embeddings.ipynb).
+-> To generate this file please refer to the notebook [generate_gene_embeddings](notebooks/generate_gene_embeddings.ipynb).
 
 ### I want to pre-train scPRINT from scratch on my own data
 
