@@ -1,24 +1,19 @@
 [tool.poetry]
 name = "scprint"
-version = "0.1.0"
+version = "1.0.0"
 license = "MIT"
 description = ""
 authors = ["jeremie kalfon"]
 readme = ["README.md", "LICENSE"]
 repository = "https://github.com/jkobject/scPrint"
-keywords = [
-  "scRNAseq",
-  "transformer",
-  "GRN",
-  "gene regulatory network",
-  "scPrint",
-]
+keywords = ["scRNAseq","transformer","GRN","gene regulatory network","scPrint","large cell model","foundation model"]
+
 
 [tool.poetry.dependencies]
-lamindb = "*"
+lamindb = "<=0.69.9"
+bionty = "<=0.42.6"
 python = "3.10"
 cellxgene-census = "*"
-torch = ">=2.0.0"
 anndata = "*"
 matplotlib = "*"
 seaborn = "*"
@@ -37,22 +32,19 @@ decoupler = "*"
 Bio = "*"
 attridict = "*"
 gget = "*"
-torchvision = "*"
 fair-esm = { git = "https://github.com/facebookresearch/esm.git", branch = "main" }
 hydra-core = "*"
 lightning = "*"
-#torchtext = "*"
-#transformers = "*"
 pynndescent = ">=0.5.11"
 scDataLoader = "*"
+GRnnData = "*"
+BenGRN = "*"
 einops = "*"
 rich = "*"
 typeshed-client = "*"
 tensorboardX = "*"
 jsonargparse = "*"
 docstring-parser = "*"
-lnschema-bionty = "*"
-bionty = "*"
 wandb = "*"
 wandb-core = "*"
 pykeops = "*"
@@ -61,33 +53,50 @@ hdbscan = "*"
 scib-metrics = "*"
 scikit-misc = "*"
 zarr = "*"
-galore-torch = { git = "https://github.com/jiaweizzhao/GaLore", branch = "master" }
-tensorly = "*3
-
-[tool.poetry.group.flashattention.dependencies]
-# C_INCLUDE_PATH=$CONDA_HOME/envs/scprint/include
-torchtext = "0.15.1"
-triton = "2.0.0.dev20221202" #no deps
+tensorly = "*"
 torch = "2.0.0"
-torchvision = "0.15.0"
-torchaudio = "2.0.0"
-pytorch-fast-transformers = "*"
+torchvision = ">=0.15.0"
+torchaudio = ">=2.0.0"
+torchtext = ">=0.15.1"
+galore-torch = { git = "https://github.com/jiaweizzhao/GaLore", branch = "master", optional = true }
+pytorch-fast-transformers = { version = "*", optional = true }
+triton = { git = "https://github.com/triton-lang/triton", tag = "legacy-backend", subdirectory = "python", optional = true }
+pytest = { version = "^7.4.3", optional = true }
+coverage = { version = "^7.3.2", optional = true }
+flake8 = { version = "^6.1.0", optional = true }
+black = { version = "^23.10.1", optional = true }
+isort = { version = "^5.12.0", optional = true }
+pytest-cov = { version = "^4.1.0", optional = true }
+mypy = { version = "^1.6.1", optional = true }
+gitchangelog = { version = "^3.0.4", optional = true }
+mkdocs = { version = "^1.5.3", optional = true }
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4.3"
-coverage = "^7.3.2"
-flake8 = "^6.1.0"
-black = "^23.10.1"
-isort = "^5.12.0"
-pytest-cov = "^4.1.0"
-mypy = "^1.6.1"
-gitchangelog = "^3.0.4"
-mkdocs = "^1.5.3"
-mkdocs-git-revision-date-localized-plugin = "*"
-mkdocstrings = "*"
-mkdocs-git-authors-plugin = "*"
-mkdocs-jupyter = "*"
-mkdocstrings-python = "*"
+[tool.poetry.extras]
+dev = [
+    "pytest",
+    "coverage",
+    "flake8",
+    "black",
+    "isort",
+    "pytest-cov",
+    "mypy",
+    "gitchangelog",
+    "mkdocs",
+    "mkdocs-git-revision-date-localized-plugin",
+    "mkdocstrings",
+    "mkdocs-git-authors-plugin",
+    "mkdocs-jupyter",
+    "mkdocstrings-python"
+]
+
+flash = [
+    "torchtext",
+    "triton",
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "pytorch-fast-transformers"
+]
 
 [build-system]
 requires = ["poetry-core"]

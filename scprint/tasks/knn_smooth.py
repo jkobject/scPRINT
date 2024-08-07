@@ -17,84 +17,63 @@ from sklearn.decomposition import PCA
 import numpy as np
 
 
-def _median_normalize(X):
-    """Performs median-normalization. 
+def _median_normalize(X: np.ndarray):
+    """Performs median-normalization to the UMI counts.
 
-    Parameters
-    ----------
-    X : numpy.ndarray
-        A p-by-n expression matrix containing UMI counts for p genes and n
-        cells.
+    Args:
+        X (numpy.ndarray): A p-by-n expression matrix containing UMI counts for p genes and n cells.
 
-    Returns
-    -------
-    numpy.ndarray
-        A p-by-n expression matrix containing the normalized UMI counts.
+    Returns:
+        numpy.ndarray: A p-by-n expression matrix containing the normalized UMI counts.
 
-    Notes
-    -----
-    We first determine the median total UMI count per cell, and then scale
-    each expression profile so that its total UMI count equals that number.
-    This normalization method was originally described as "Model I" in
-    Grün et al., Nature Methods 2014).
+    Notes:
+        We first determine the median total UMI count per cell, and then scale each expression profile so that its total UMI count equals that number.
+        This normalization method was originally described as "Model I" in Grün et al., Nature Methods 2014.
     """
     num_transcripts = np.sum(X, axis=0)
     X_norm = (np.median(num_transcripts) / num_transcripts) * X
     return X_norm
 
 
-def _freeman_tukey_transform(X):
-    """Applies the Freeman-Tukey transformation, y = sqrt(x) + sqrt(x+1).
+def _freeman_tukey_transform(X: np.ndarray):
+    """Applies the Freeman-Tukey transformation to the UMI counts.
 
-    Parameters
-    ----------
-    X : numpy.ndarray
-        A p-by-n expression matrix containing UMI counts for p genes and n
-        cells (usually after median-normalization).
+    Args:
+        X (numpy.ndarray): A p-by-n expression matrix containing UMI counts for p genes and n cells (usually after median-normalization).
 
-    Returns
-    -------
-    numpy.ndarray
-        A p-by-n expression matrix containing the Freeman-Tukey-transformed
-        UMI counts.
+    Returns:
+        numpy.ndarray: A p-by-n expression matrix containing the Freeman-Tukey-transformed UMI counts.
 
-    Notes
-    -----
-    The Freeman-Tukey transformation serves to stabilize the variance of
-    Poisson-distributed random variables. For X ~ Pois(l) with l >= 1, Freeman
-    and Tukey (1953) show that Var(X) = 1 (+- 6%).
+    Notes:
+        The Freeman-Tukey transformation serves to stabilize the variance of Poisson-distributed random variables. 
+            For X ~ Pois(l) with l >= 1, Freeman and Tukey (1953) show that Var(X) = 1 (+- 6%).
     """
     return np.sqrt(X) + np.sqrt(X+1)
 
 
-def _calculate_pc_scores(matrix, d, seed=0):
+def _calculate_pc_scores(matrix: np.ndarray, d, seed=0):
     """Projects the cells onto their first d principal components.
 
-    Input
-    -----
-    X: `numpy.ndarray`
-        A p-by-n expression matrix containing the UMI counts for p genes and n
-        cells.
+    Args:
+        X (numpy.ndarray): A p-by-n expression matrix containing the UMI counts for p genes and n cells.
+        d (int): The number of principal components to use.
+        seed (int, optional): The seed for initializing the pseudo-random number generator used by the randomized PCA algorithm.
 
     Returns
-    -------
-    `numpy.ndarray`
-        A d-by-n matrix containing the coordinates of n cells in d-dimensional
-        principal component space.
+        numpy.ndarray: A d-by-n matrix containing the coordinates of n cells in d-dimensional principal component space.
 
-    Notes
-    -----
-    We perform median-normalization and Freeman-Tukey-transformation to the UMI
-    counts, before performing PCA. Median-normalization serves to counteract
-    efficiency noise (Grün et al., 2014), whereas Freeman-Tukey transformation
-    stabilizes the technical variance of the data. While PCA does not require
-    homoskedastic data, variance-stabilization ensures that the increased
-    technical variance of highly expressed genes does not result in the first
-    PCs being biased towards highly expressed genes.
+    Notes:
+        We perform median-normalization and Freeman-Tukey-transformation to the UMI
+        counts, before performing PCA. Median-normalization serves to counteract
+        efficiency noise (Grün et al., 2014), whereas Freeman-Tukey transformation
+        stabilizes the technical variance of the data. While PCA does not require
+        homoskedastic data, variance-stabilization ensures that the increased
+        technical variance of highly expressed genes does not result in the first
+        PCs being biased towards highly expressed genes.
 
-    We specify svd_solver='randomized', which invokes the randomized algorithm
-    by Halko et al. (2009) to efficiently calculate the first d principal
-    components. (We assume that d << min(p, n-1).)
+        We specify svd_solver='randomized', which invokes the randomized algorithm
+        by Halko et al. (2009) to efficiently calculate the first d principal
+        components. (We assume that d << min(p, n-1).)
     """
     # median-normalize
     tmatrix = _median_normalize(matrix)
@@ -113,63 +92,49 @@ def _calculate_pc_scores(matrix, d, seed=0):
     return tmatrix
 
 
-def _calculate_pairwise_distances(X, num_jobs=1):
+def _calculate_pairwise_distances(X: np.ndarray, num_jobs=1):
     """Calculates the distances between all cells in X.
 
-    Input: numpy.ndarray
-        A d-by-n matrix containing the coordinates of n cells in d-dimensional
-        space.
-    Output: numpy.ndarray
-        A n-by-n matrix containing all pairwise distances between the cells.
+    Args: 
+        X (numpy.ndarray): A d-by-n matrix containing the coordinates of n cells in d-dimensional space.
+        num_jobs (int, optional): The number of parallel jobs to run. Default to 1.
+    
+    Returns: 
+        numpy.ndarray: A n-by-n matrix containing all pairwise distances between the cells.
 
-    Notes
-    -----
-    This uses the Euclidean metric.
+    Notes:
+        This uses the Euclidean metric.
     """
     D = pairwise_distances(X.T, n_jobs=num_jobs, metric='euclidean')
     return D
 
 
-def knn_smoothing(X, k, d=10, dither=0.03, seed=0):
+def knn_smoothing(X: np.ndarray, k: int, d: int = 10, dither: float = 0.03, seed: int = 0) -> np.ndarray:
     """K-nearest neighbor smoothing for UMI-filtered single-cell RNA-Seq data.
 
-    This function implements an improved version of the kNN-smoothing 2
-    algorithm by Wagner et al.
+    This function implements an improved version of the kNN-smoothing 2 algorithm by Wagner et al.
     (https://www.biorxiv.org/content/early/2018/04/09/217737).
 
-    Parameters
-    ----------
-    X : numpy.ndarray
-        A p-by-n expression matrix containing UMI counts for p genes and n
-        cells. Must contain floating point values, i.e. dtype=np.float64.
-    k : int
-        The number of neighbors to use for smoothing.
-    d : int, optional
-        The number of principal components to use for identifying neighbors.
-        Default: 10.
-    dither : float, optional
-        Amount of dither to apply to the partially smoothed and PCA-transformed
-        data in each step. Specified as the fraction of the range of the
-        cell scores for each PC. Default: 0.03.
-    seed : int, optional
-        The seed for initializing the pseudo-random number generator used by
-        the randomized PCA algorithm. This usually does not need to be changed.
-        Default: 0.
+    Args:
+        X (numpy.ndarray): A p-by-n expression matrix containing UMI counts for p genes and n
+            cells. Must contain floating point values, i.e. dtype=np.float64.
+        k (int): The number of neighbors to use for smoothing.
+        d (int, optional): The number of principal components to use for identifying neighbors. Default to 10.
+        dither (float, optional): Amount of dither to apply to the partially smoothed and PCA-transformed data in each step. 
+            Specified as the fraction of the range of the cell scores for each PC. Default to 0.03.
+        seed (int, optional): The seed for initializing the pseudo-random number generator used by the randomized PCA algorithm. 
+            This usually does not need to be changed.Default to 0.
 
-    Returns
-    -------
-    numpy.ndarray
-        A p-by-n expression matrix containing the smoothed expression values.
-        The matrix is not normalized. Therefore, even though efficiency noise
-        is usually dampened by the smoothing, median-normalization of the
-        smoothed matrix is recommended.
+    Returns:
+        numpy.ndarray A p-by-n expression matrix containing the smoothed expression values.
+            The matrix is not normalized. Therefore, even though efficiency noise
+            is usually dampened by the smoothing, median-normalization of the
+            smoothed matrix is recommended.
 
-    Raises
-    ------
-    ValueError
-        If X does not contain floating point values.
-        If k is invalid (k < 1, or k >= n).
-        If d is invalid (d < 1 or d > # principal components).
+    Raises:
+        ValueError: If X does not contain floating point values.
+        ValueError: If k is invalid (k < 1, or k >= n).
+        ValueError: If d is invalid (d < 1 or d > # principal components).
     """
 
     np.random.seed(seed)

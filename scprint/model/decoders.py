@@ -9,10 +9,10 @@ class GraphSDEExprDecoder(nn.Module):
         """
         Initialize the ExprNeuralSDEDecoder module.
 
-        Parameters:
-        d_model (int): The dimension of the model.
-        drift (nn.Module): The drift component of the SDE.
-        diffusion (nn.Module): The diffusion component of the SDE.
+        Args:
+            d_model (int): The dimension of the model.
+            drift (nn.Module): The drift component of the SDE.
+            diffusion (nn.Module): The diffusion component of the SDE.
         """
         super().__init__()
         self.d_model = d_model
@@ -43,6 +43,7 @@ class ExprDecoder(nn.Module):
             d_model (int): The dimension of the model. This is the size of the input feature vector.
             nfirst_tokens_to_skip (int, optional): The number of initial labels to skip in the sequence. Defaults to 0.
             dropout (float, optional): The dropout rate applied during training to prevent overfitting. Defaults to 0.1.
+            zinb (bool, optional): Whether to use a zero inflated negative binomial distribution. Defaults to True.
         """
         super(ExprDecoder, self).__init__()
         self.nfirst_tokens_to_skip = nfirst_tokens_to_skip

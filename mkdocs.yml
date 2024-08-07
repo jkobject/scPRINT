@@ -7,15 +7,17 @@ site_url: https://www.jkobject.com/scPRINT/
 nav:
   - Home: index.md
   - structure: structure.md
-  - training: notebooks/pretrain.ipynb
-  - grn inference: notebooks/grn.ipynb
-  - cell embedding and classification: notebooks/embeddings.ipynb
-  - gene embeddings: notebooks/generate_gene_embeddings.ipynb
+  - pre-training: pretrain.md
+  - usage example: usage.md
+  - example notebooks:
+      - cancer usecase: notebooks/cancer_usecase.ipynb
+      - cancer usecase part 2: notebooks/cancer_usecase_part2.ipynb
   - documentation:
-      - utils: utils.md
       - model: model.md
-      - embedders: loaders.md
       - tasks: tasks.md
+      - cli: cli.md
+      - embedders: embedder.md
+      - utils: utils.md
 plugins:
   - search
   - mkdocstrings:

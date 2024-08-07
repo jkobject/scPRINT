@@ -20,6 +20,7 @@ from gget.constants import ENSEMBL_REST_API, UNIPROT_REST_API
 import ftplib
 import os
 from Bio import SeqIO
+from typing import List, Optional, Union
 
 
 def list_files(ftp, match=""):
@@ -28,8 +29,18 @@ def list_files(ftp, match=""):
 
 
 def load_fasta_species(
-    species="homo_sapiens", output_path="/tmp/data/fasta/", cache=True
-):
+    species: str = "homo_sapiens",
+    output_path: str = "/tmp/data/fasta/",
+    cache: bool = True,
+) -> None:
+    """
+    Downloads and caches FASTA files for a given species from the Ensembl FTP server.
+
+    Args:
+        species (str, optional): The species name for which to download FASTA files. Defaults to "homo_sapiens".
+        output_path (str, optional): The local directory path where the FASTA files will be saved. Defaults to "/tmp/data/fasta/".
+        cache (bool, optional): If True, use cached files if they exist. If False, re-download the files. Defaults to True.
+    """
     ftp = ftplib.FTP("ftp.ensembl.org")
     ftp.login()
     ftp.cwd("/pub/release-110/fasta/" + species + "/pep/")
@@ -49,13 +60,25 @@ def load_fasta_species(
 
 
 def subset_fasta(
-    gene_tosubset,
-    fasta_path,
-    subfasta_path="./data/fasta/subset.fa",
-    drop_unknown_seq=True,
-):
+    gene_tosubset: set,
+    fasta_path: str,
+    subfasta_path: str = "./data/fasta/subset.fa",
+    drop_unknown_seq: bool = True,
+) -> set:
     """
     subset_fasta: creates a new fasta file with only the sequence which names contain one of gene_names
+
+    Args:
+        gene_tosubset (set): A set of gene names to subset from the original FASTA file.
+        fasta_path (str): The path to the original FASTA file.
+        subfasta_path (str, optional): The path to save the subsetted FASTA file. Defaults to "./data/fasta/subset.fa".
+        drop_unknown_seq (bool, optional): If True, drop sequences containing unknown amino acids (denoted by '*'). Defaults to True.
+
+    Returns:
+        set: A set of gene names that were found and included in the subsetted FASTA file.
+
+    Raises:
+        ValueError: If a gene name does not start with "ENS".
     """
     dup = set()
     weird = 0
@@ -91,34 +114,38 @@ def subset_fasta(
 
 
 def seq(
-    ens_ids,
-    translate=False,
-    isoforms=False,
-    parallel=True,
-    save=False,
-    transcribe=None,
-    seqtype=None,
-    verbose=True,
-):
+    ens_ids: Union[str, List[str]],
+    translate: bool = False,
+    isoforms: bool = False,
+    parallel: bool = True,
+    save: bool = False,
+    transcribe: Optional[bool] = None,
+    seqtype: Optional[str] = None,
+    verbose: bool = True,
+) -> List[str]:
     """
-    Fetch nucleotide or amino acid sequence (FASTA) of a gene
-    (and all its isoforms) or transcript by Ensembl, WormBase or FlyBase ID.
+    Fetch nucleotide or amino acid sequence (FASTA) of a gene (and all its isoforms) or transcript by Ensembl, WormBase, or FlyBase ID.
 
     Args:
-    - ens_ids       One or more Ensembl IDs (passed as string or list of strings).
-                    Also supports WormBase and FlyBase IDs.
-    - translate     True/False (default: False -> returns nucleotide sequences).
-                    Defines whether nucleotide or amino acid sequences are returned.
-                    Nucleotide sequences are fetched from the Ensembl REST API server.
-                    Amino acid sequences are fetched from the UniProt REST API server.
-    - isoforms      If True, returns the sequences of all known transcripts (default: False).
-                    (Only for gene IDs.)
-    - save          If True, saves output FASTA to current directory (default: False).
-    - verbose       True/False whether to print progress information. Default True.
+        ens_ids (Union[str, List[str]]): One or more Ensembl IDs (passed as string or list of strings).
+                                         Also supports WormBase and FlyBase IDs.
+        translate (bool, optional): Defines whether nucleotide or amino acid sequences are returned.
+                                    Defaults to False (returns nucleotide sequences).
+                                    Nucleotide sequences are fetched from the Ensembl REST API server.
+                                    Amino acid sequences are fetched from the UniProt REST API server.
+        isoforms (bool, optional): If True, returns the sequences of all known transcripts. Defaults to False.
+                                   (Only for gene IDs.)
+        parallel (bool, optional): If True, fetches sequences in parallel. Defaults to True.
+        save (bool, optional): If True, saves output FASTA to current directory. Defaults to False.
+        transcribe (bool, optional): Deprecated. Use 'translate' instead.
+        seqtype (str, optional): Deprecated. Use 'translate' instead.
+        verbose (bool, optional): If True, prints progress information. Defaults to True.
 
-    Returns a list (or FASTA file if 'save=True') containing the requested sequences.
+    Returns:
+        List[str]: A list containing the requested sequences, or a FASTA file if 'save' is True.
 
-    Deprecated arguments: 'seqtype', 'transcribe' (use True/False flag 'translate' instead.)
+    Raises:
+        ValueError: If an invalid Ensembl ID is provided.
     """
     # Handle deprecated arguments
     if seqtype:

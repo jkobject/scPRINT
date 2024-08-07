@@ -5,13 +5,30 @@ import torch
 
 
 class SinkhornDistance(torch.nn.Module):
-    def __init__(self, eps=1e-2, max_iter=100, reduction="none"):
+    def __init__(self, eps: float = 1e-2, max_iter: int = 100, reduction: str = "none"):
+        """
+        SinkhornDistance Initialize the SinkhornDistance class
+
+        Args:
+            eps (float, optional): Regularization parameter. Defaults to 1e-2.
+            max_iter (int, optional): Maximum number of Sinkhorn iterations. Defaults to 100.
+            reduction (str, optional): Specifies the reduction to apply to the output. Defaults to "none".
+        """
         super(SinkhornDistance, self).__init__()
         self.eps = eps
         self.max_iter = max_iter
         self.reduction = reduction
 
-    def forward(self, c):
+    def forward(self, c: torch.Tensor):
+        """
+        forward Compute the Sinkhorn distance between two measures with cost matrix c
+
+        Args:
+            c (torch.Tensor): The cost matrix between the two measures.
+
+        Returns:
+            torch.Tensor: The computed Sinkhorn distance.
+        """
         C = -c
         x_points = C.shape[-2]
         batch_size = C.shape[0]

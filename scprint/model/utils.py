@@ -1,25 +1,21 @@
 import torch
+from torch import Tensor
+
 import numpy as np
 from typing import Optional, Union, List, Dict
 from torch.distributions import Poisson, Gamma
 
 import bionty as bt
-
 from collections import Counter
 import math
-import torch.nn as nn
-from torch import Tensor
 
 import scanpy as sc
 from anndata import AnnData
-
-import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 import gc
-
-import gc
 import json
+
 from ..tasks import cell_emb as embbed_task
 from ..tasks import grn as grn_task
 from ..tasks import denoise as denoise_task
@@ -44,17 +40,20 @@ def make_adata(
     This function creates an AnnData object from the given input parameters.
 
     Args:
-        pred (torch.Tensor): Predicted labels. The shape of the tensor is (n_cells, n_classes)
-        embs (torch.Tensor): Embeddings of the cells. The shape of the tensor is (n_cells, n_features)
+        embs (torch.Tensor): Embeddings of the cells. The shape of the tensor is (n_cells, n_features).
         labels (list): List of labels for the predicted classes.
-        step (int, optional): Step number. Default is 0. (for storing the anndata without overwriting others)
+        pred (torch.Tensor, optional): Predicted labels. The shape of the tensor is (n_cells, n_classes). Default is None.
+        attention (torch.Tensor, optional): Attention weights. Default is None.
+        step (int, optional): Step number for storing the AnnData without overwriting others. Default is 0.
         label_decoders (dict, optional): Dictionary to map class codes to class names. Default is None.
+        labels_hierarchy (dict, optional): Dictionary representing the hierarchy of labels. Default is {}.
         gtclass (torch.Tensor, optional): Ground truth class. Default is None.
         name (str, optional): Name of the AnnData object. Default is an empty string.
         mdir (str, optional): Directory to save the AnnData object. Default is "/tmp".
+        doplot (bool, optional): Whether to generate plots. Default is True.
 
     Returns:
-        adata (anndata.AnnData): The created AnnData object.
+        anndata.AnnData: The created AnnData object.
     """
     colname = ["pred_" + i for i in labels]
     if pred is not None:
@@ -231,7 +230,7 @@ def make_adata(
 
 
 def _init_weights(
-    module: nn.Module,
+    module: torch.nn.Module,
     n_layer: int,
     initializer_range: float = 0.02,
     mup_width_scale: float = 1.0,
@@ -249,21 +248,21 @@ def _init_weights(
     number of residual layers.
 
     Args:
-        module (nn.Module): The module whose weights are to be initialized.
+        module (torch.nn.Module): The module whose weights are to be initialized.
         n_layer (int): The number of layers in the module.
         initializer_range (float, optional): The range of the initializer. Defaults to 0.02.
         mup_width_scale (float, optional): The scale for the mup initialization. Defaults to 1.0.
         rescale_prenorm_residual (bool, optional): Flag to indicate whether to rescale the prenorm residual. Defaults to True.
     """
     mup_init_scale = math.sqrt(mup_width_scale)
-    if isinstance(module, nn.Linear):
-        nn.init.normal_(module.weight, std=initializer_range * mup_init_scale)
+    if isinstance(module, torch.nn.Linear):
+        torch.nn.init.normal_(module.weight, std=initializer_range * mup_init_scale)
         optim_cfg = getattr(module.weight, "_optim", {})
         optim_cfg.update({"lr_multiplier": mup_width_scale})
         setattr(module.weight, "_optim", optim_cfg)
         if module.bias is not None:
-            nn.init.zeros_(module.bias)
-    elif isinstance(module, nn.Embedding):
+            torch.nn.init.zeros_(module.bias)
+    elif isinstance(module, torch.nn.Embedding):
         pass
 
     if rescale_prenorm_residual:
@@ -276,7 +275,7 @@ def _init_weights(
         for name, p in module.named_parameters():
             if name in ["out_proj.weight", "fc2.weight"]:
                 # Special Scaled Initialization --> There are 2 Layer Norms per Transformer Block
-                nn.init.normal_(
+                torch.nn.init.normal_(
                     p,
                     mean=0.0,
                     std=initializer_range * mup_init_scale / math.sqrt(2 * n_layer),
@@ -362,8 +361,7 @@ def simple_masker(
     Randomly mask a batch of data.
 
     Args:
-        values (array-like):
-            A batch of tokenized data, with shape (batch_size, n_features).
+        shape (list[int]): The shape of the data.
         mask_ratio (float): The ratio of genes to mask, default to 0.15.
 
     Returns:
@@ -382,8 +380,7 @@ def weighted_masker(
     Randomly mask a batch of data.
 
     Args:
-        values (array-like):
-            A batch of tokenized data, with shape (batch_size, n_features).
+        shape (list[int]): The shape of the data.
         mask_ratio (float): The ratio of genes to mask, default to 0.15.
         mask_value (int): The value to mask with, default to -1.
         pad_value (int): The value of padding in the values, will be kept unchanged.
@@ -472,14 +469,28 @@ def translate(
 
 
 class Attention:
-    def __init__(self, gene_dim, comp_attn=False):
-        self.data = None
-        self.gene_dim = gene_dim
-        self.div = None
-        self.attn = None
-        self.comp_attn = comp_attn
+    def __init__(self, gene_dim: int, comp_attn: bool = False):
+        """
+        Initialize the Attention class.
 
-    def agg(self, x: list[Tensor], pos: Tensor):
+        Args:
+            gene_dim (int): The dimension of the gene.
+            comp_attn (bool, optional): Whether to compute attention. Defaults to False.
+        """
+        self.data: Optional[Tensor] = None
+        self.gene_dim: int = gene_dim
+        self.div: Optional[Tensor] = None
+        self.attn: Optional[Tensor] = None
+        self.comp_attn: bool = comp_attn
+
+    def agg(self, x: List[Tensor], pos: Tensor) -> None:
+        """
+        Aggregate the attention or data based on the comp_attn flag.
+
+        Args:
+            x (List[Tensor]): List of tensors to aggregate.
+            pos (Tensor): Position tensor.
+        """
         if self.comp_attn:
             if self.attn is None:
                 self.attn = torch.zeros([self.gene_dim, self.gene_dim], device="cuda")
@@ -506,7 +517,14 @@ class Attention:
                     self.data[j, loc, :, :, :] += x[j][i].detach().to("cpu")
                 self.div[loc] += 1
 
-    def add(self, x: list[Tensor], pos: Tensor):
+    def add(self, x: List[Tensor], pos: Tensor) -> None:
+        """
+        Add data to the internal storage.
+
+        Args:
+            x (List[Tensor]): List of tensors to add.
+            pos (Tensor): Position tensor.
+        """
         pos = pos.detach().to("cpu")
         if self.data is None:
             self.data = torch.zeros([len(x), self.gene_dim] + list(x[0].shape[2:]))
@@ -519,7 +537,13 @@ class Attention:
             )
             # self.div[loc] += 1
 
-    def get(self):
+    def get(self) -> Optional[np.ndarray]:
+        """
+        Get the aggregated attention or data.
+
+        Returns:
+            Optional[np.ndarray]: The aggregated attention or data.
+        """
         if self.comp_attn:
             loc = self.attn.sum(1) != 0
             return (
@@ -535,7 +559,18 @@ class Attention:
             return self.data / self.div.view(1, self.div.shape[0], 1, 1, 1)
 
 
-def test(model, name, filedir):
+def test(model: torch.nn.Module, name: str, filedir: str) -> None:
+    """
+    Test the given model on the full set of benchmarks and save the results to JSON files.
+
+    Args:
+        model (torch.nn.Module): The model to be tested.
+        name (str): The name to be used for the output JSON files.
+        filedir (str): The directory where the data files are located.
+
+    Returns:
+        None
+    """
     metrics = {}
     res = embbed_task.default_benchmark(
         model, default_dataset="lung", do_class=True, coarse=False

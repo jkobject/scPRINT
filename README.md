@@ -37,18 +37,10 @@ If you want to be using flashattention2, know that it only supports triton 2.0 M
 ```python
 conda create -n "[whatever]" python==3.10
 git clone https://github.com/jkcobject/scPRINT
-git clone https://github.com/jkobject/GRnnData
-git clone https://github.com/jkobject/benGRN
-cd scPRINT
-git submodule init
-git submodule update
 pip install 'lamindb[jupyter,bionty]'
-pip install -e scDataloader
-pip install -e ../GRnnData/
-pip install -e ../benGRN/
 pip install torch==2.0.0 torchvision==0.15.1 torchaudio==2.0.1
 # install the dev tooling if you need it too
-pip install -e ".[dev]"
+pip install -e "scPRINT[dev]"
 pip install -r requirements-dev.txt
 pip install triton==2.0.0.dev20221202 --no-deps # only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
 # install triton as mentioned in .toml if you want to
@@ -71,11 +63,7 @@ In that case, connect with google or github to [lamin.ai](https://lamin.ai/login
 
 ## Install it from PyPI 
 
-**(Work In Progress)**
-
-<!---
 If you want to use flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.
-
 
 ```bash
 pip install 'lamindb[jupyter,bionty]'
@@ -96,7 +84,6 @@ pip install scprint
 You should be good to go. You need those specific versions for everything to work...
 
 This is not my fault, scream at nvidia :wink:
--->
 
 
 ## Usage
@@ -125,8 +112,12 @@ denoiser(model, adata=adata)
 or, from a bash command line
 
 ```bash
-$ scprint fit/train/predict/test --config config/[medium|large|vlarge] ...
+$ scprint fit/train/predict/test/denoise/embed/gninfer --config config/[medium|large|vlarge] ...
 ```
+
+find out more about the commands by running `scprint --help` or `scprint [command] --help`.
+
+more examples of using the command line are available in the [docs](./docs/usage.md).
 
 ### Notes on GPU/CPU usage with triton
 
@@ -144,32 +135,37 @@ We now explore the different usages of scPRINT:
 
 ### I want to generate gene networks from scRNAseq data:
 
--> refer to the section 1. gene network inference in [this notebook](./notebooks/cancer_usecase.ipynb#).
+-> Refer to the section . gene network inference in [this notebook](./docs/notebooks/cancer_usecase.ipynb#).
 
--> more examples in this notebook [./notebooks/assessments/bench_omni.ipynb](./notebooks/assessments/bench_omni.ipynb).
+-> More examples in this notebook [./notebooks/assessments/bench_omni.ipynb](./notebooks/assessments/bench_omni.ipynb).
 
 ### I want to generate cell embeddings and cell label predictions from scRNAseq data:
 
--> Refer to the embeddings and cell annotations section in [this notebook](./notebooks/cancer_usecase.ipynb).
+-> Refer to the embeddings and cell annotations section in [this notebook](./docs/notebooks/cancer_usecase.ipynb#).
 
 ### I want to denoising my scRNAseq dataset:
 
--> Refer to the Denoising of B-cell section in [this notebook](./notebooks/cancer_usecase.ipynb).
+-> Refer to the Denoising of B-cell section in [this notebook](./docs/notebooks/cancer_usecase.ipynb).
 
 -> More example in our benchmark notebook [./notebooks/assessments/bench_denoising.ipynb](./notebooks/assessments/bench_denoising.ipynb).
 
 ### I want to generate an atlas-level embedding
 
--> refer to the notebook [nice_umap.ipynb](./figures/nice_umap.ipynb).
+-> Refer to the notebook [nice_umap.ipynb](./figures/nice_umap.ipynb).
+
+### I need to generate gene tokens using pLLMs
+
+To run scPRINT, you can use the option to define the gene tokens using protein language model embeddings of genes. This is done by providing the path to a parquet file of the precomputed set of embeddings for each gene name to scPRINT via "precpt_gene_emb"
+
+-> To generate this file please refer to the notebook [generate_gene_embeddings](docs/notebooks/generate_gene_embeddings.ipynb).
+
+### I want to pre-train scPRINT from scratch on my own data
+
+-> Refer to the documentation page [pretrain scprint](docs/pretrain.md)
 
 ### Documentation
 
-/!\ WIP /!\
-
-<!-- 
-for more information on usage please see the documentation in [https://www.jkobject.com/scPrint/](https://www.jkobject.com/scPrint/)
-
--->
+For more information on usage please see the documentation in [https://www.jkobject.com/scPrint/](https://www.jkobject.com/scPrint/)
 
 ### Model Weights
 
@@ -179,9 +175,9 @@ Model weights are available on [hugging face](https://huggingface.co/jkobject/sc
 
 Read the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
-Read the [training runs](https://wandb.ai/ml4ig/scprint_scale/reports/scPRINT-trainings--Vmlldzo4ODIxMjgx?accessToken=80metwx7b08hhourotpskdyaxiflq700xzmzymr6scvkp69agybt79l341tv68hp) document to know more about how training was performed and the results there.
+Read the [training runs](https://wandb.ai/ml4ig/scprint_scale/reports/scPRINT-trainings--Vmlldzo4ODIxMjgx?accessToken=80metwx7b08hhourotpskdyaxiflq700xzmzymr6scvkp69agybt79l341tv68hp) document to know more about how pre-training was performed and the its behavior.
 
-acknowledgement:
+Acknowledgement:
 [python template](https://github.com/rochacbruno/python-project-template)
 [laminDB](https://lamin.ai/)
 [lightning](https://lightning.ai/)

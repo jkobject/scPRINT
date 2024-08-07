@@ -41,7 +41,33 @@ class TrainingMode(Callback):
         but at the same time it has training specific methods... so we have to do this.
 
         Args:
-            see @model.py
+            do_denoise (bool): Whether to apply denoising during training. Defaults to True.
+            noise (List[float]): List of noise levels to apply if denoising is enabled. Defaults to [0.6], meaning only one forward path with 60% of the counts being dropped will happen.
+            do_cce (bool): Whether to apply the Contrastive Cell Embedding from scGPT during training. Defaults to False.
+            cce_sim (float): Similarity threshold for CCE. Defaults to 0.5.
+            cce_scale (float): Scaling factor for CCE loss. Defaults to 0.002.
+            do_ecs (bool): Whether to apply the Elastic Cell Similarity loss from scGPT during training. Defaults to False.
+            ecs_threshold (float): Threshold for ECS. Defaults to 0.3.
+            ecs_scale (float): Scaling factor for ECS loss. Defaults to 0.05.
+            do_mvc (bool): Whether to do the cell embedding generation with the scGPT's MVC loss. Defaults to False.
+            mvc_scale (float): Scaling factor for MVC loss. Defaults to 1.0.
+            do_adv_cls (bool): Whether to apply adversarial classification during training. Defaults to False.
+            do_generate (bool): Whether to do the bottleneck learning task. Defaults to True.
+            class_scale (float): Scaling factor for classification loss. Defaults to 1.5.
+            mask_ratio (List[float]): List of mask ratios to apply during training. Defaults to [], meaning no masking is applied during pretraining.
+            warmup_duration (int): Number of warmup steps for learning rate scheduling. Defaults to 500.
+            fused_adam (bool): Whether to use fused Adam optimizer. Defaults to True.
+            adv_class_scale (float): Scaling factor for adversarial classification loss. Defaults to 0.1.
+            lr_reduce_patience (int): Number of epochs with no improvement after which learning rate will be reduced. Defaults to 1.
+            lr_reduce_factor (float): Factor by which the learning rate will be reduced. Defaults to 0.6.
+            lr_reduce_monitor (str): Quantity to be monitored for learning rate reduction. Defaults to "val_loss".
+            do_cls (bool): Whether to perform classification during training. Defaults to True.
+            do_adv_batch (bool): Whether to apply adversarial batch training. Defaults to False.
+            run_full_forward (bool): Whether to run a second forward pass without masking or denoising for the bottleneck learning / MVC case. Defaults to False.
+            lr (float): Initial learning rate. Defaults to 0.001.
+            optim (str): Optimizer to use during training. Defaults to "adamW".
+            weight_decay (float): Weight decay to apply during optimization. Defaults to 0.01.
+            name (str): Name of the training mode. Defaults to an empty string. should be an ID for the model
         """
         super().__init__()
         self.do_denoise = do_denoise

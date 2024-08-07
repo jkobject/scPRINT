@@ -20,7 +20,7 @@ from lightning.pytorch import Trainer
 
 from scipy.stats import spearmanr
 
-from typing import List
+from typing import List, Dict, Any
 from anndata import AnnData
 
 FILE_LOC = os.path.dirname(os.path.realpath(__file__))
@@ -53,7 +53,6 @@ class Embedder:
         Embedder a class to embed and annotate cells using a model
 
         Args:
-            model (torch.nn.Module): The model to be used for embedding and annotating cells.
             batch_size (int, optional): The size of the batches to be used in the DataLoader. Defaults to 64.
             num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 8.
             how (str, optional): The method to be used for selecting valid genes. Defaults to "most expr".
@@ -61,7 +60,12 @@ class Embedder:
             add_zero_genes (int, optional): The number of zero genes to add to the gene sequence. Defaults to 100.
             precision (str, optional): The precision to be used in the Trainer. Defaults to "16-mixed".
             pred_embedding (List[str], optional): The list of labels to be used for plotting embeddings. Defaults to [ "cell_type_ontology_term_id", "disease_ontology_term_id", "self_reported_ethnicity_ontology_term_id", "sex_ontology_term_id", ].
-            output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
+            doclass (bool, optional): Whether to perform classification. Defaults to True.
+            doplot (bool, optional): Whether to generate plots. Defaults to True.
+            keep_all_cls_pred (bool, optional): Whether to keep all class predictions. Defaults to False.
+            devices (List[int], optional): List of device IDs to use. Defaults to [0].
+            dtype (torch.dtype, optional): Data type for computations. Defaults to torch.float16.
+            output_expression (str, optional): The method to output expression data. Options are "none", "all", "sample". Defaults to "none".
         """
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -79,12 +83,28 @@ class Embedder:
         # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, model: torch.nn.Module, adata: AnnData, cache=False):
+        """
+        __call__ function to call the embedding
+
+        Args:
+            model (torch.nn.Module): The scPRINT model to be used for embedding and annotation.
+            adata (AnnData): The annotated data matrix of shape n_obs x n_vars. Rows correspond to cells and columns to genes.
+            cache (bool, optional): Whether to use cached results if available. Defaults to False.
+
+        Raises:
+            ValueError: If the model does not have a logger attribute.
+            ValueError: If the model does not have a global_step attribute.
+
+        Returns:
+            AnnData: The annotated data matrix with embedded cell representations.
+            List[str]: List of gene names used in the embedding.
+            np.ndarray: The predicted expression values if output_expression is not "none".
+            dict: Additional metrics and information from the embedding process.
+        """
         # one of "all" "sample" "none"
         try:
             mdir = (
-                model.logger.save_dir
-                if model.logger.save_dir is not None
-                else "data"
+                model.logger.save_dir if model.logger.save_dir is not None else "data"
             )
         except:
             mdir = "data"
@@ -102,7 +122,7 @@ class Embedder:
             hasfile = os.path.exists(file)
         except:
             hasfile = False
-        
+
         if not cache or not hasfile:
             model.predict_mode = "none"
             model.keep_all_cls_pred = self.keep_all_cls_pred
@@ -363,7 +383,26 @@ class Embedder:
         return metrics
 
 
-def compute_corr(out, to, doplot=True, compute_mean_regress=False, plot_corr_size=64):
+def compute_corr(
+    out: np.ndarray,
+    to: np.ndarray,
+    doplot: bool = True,
+    compute_mean_regress: bool = False,
+    plot_corr_size: int = 64,
+) -> dict:
+    """
+    Compute the correlation between the output and target matrices.
+
+    Args:
+        out (np.ndarray): The output matrix.
+        to (np.ndarray): The target matrix.
+        doplot (bool, optional): Whether to generate a plot of the correlation coefficients. Defaults to True.
+        compute_mean_regress (bool, optional): Whether to compute mean regression. Defaults to False.
+        plot_corr_size (int, optional): The size of the plot for correlation. Defaults to 64.
+
+    Returns:
+        dict: A dictionary containing the computed metrics.
+    """
     metrics = {}
     corr_coef, p_value = spearmanr(
         out,
@@ -399,7 +438,24 @@ def compute_corr(out, to, doplot=True, compute_mean_regress=False, plot_corr_siz
     return metrics
 
 
-def default_benchmark(model, default_dataset="pancreas", do_class=True, coarse=False):
+def default_benchmark(
+    model: torch.nn.Module,
+    default_dataset: str = "pancreas",
+    do_class: bool = True,
+    coarse: bool = False,
+) -> dict:
+    """
+    Run the default benchmark for embedding and annotation using the scPRINT model.
+
+    Args:
+        model (torch.nn.Module): The scPRINT model to be used for embedding and annotation.
+        default_dataset (str, optional): The default dataset to use for benchmarking. Options are "pancreas", "lung", or a path to a dataset. Defaults to "pancreas".
+        do_class (bool, optional): Whether to perform classification. Defaults to True.
+        coarse (bool, optional): Whether to use coarse cell type annotations. Defaults to False.
+
+    Returns:
+        dict: A dictionary containing the benchmark metrics.
+    """
     if default_dataset == "pancreas":
         adata = sc.read(
             FILE_LOC + "/../../data/pancreas_atlas.h5ad",
@@ -455,12 +511,25 @@ def default_benchmark(model, default_dataset="pancreas", do_class=True, coarse=F
 
 
 def compute_classification(
-    adata,
-    classes,
-    label_decoders,
-    labels_hierarchy,
-    metric_type=["macro", "micro", "weighted"],
-):
+    adata: AnnData,
+    classes: List[str],
+    label_decoders: Dict[str, Any],
+    labels_hierarchy: Dict[str, Any],
+    metric_type: List[str] = ["macro", "micro", "weighted"],
+) -> Dict[str, Dict[str, float]]:
+    """
+    Compute classification metrics for the given annotated data.
+
+    Args:
+        adata (AnnData): The annotated data matrix of shape n_obs x n_vars. Rows correspond to cells and columns to genes.
+        classes (List[str]): List of class labels to be used for classification.
+        label_decoders (Dict[str, Any]): Dictionary of label decoders for each class.
+        labels_hierarchy (Dict[str, Any]): Dictionary representing the hierarchy of labels.
+        metric_type (List[str], optional): List of metric types to compute. Defaults to ["macro", "micro", "weighted"].
+
+    Returns:
+        Dict[str, Dict[str, float]]: A dictionary containing classification metrics for each class.
+    """
     metrics = {}
     for label in classes:
         res = []
@@ -522,7 +591,6 @@ FINE = {
     "Type 1": "CL:0002062",
     "Ciliated": "CL:4030034",  # respiratory ciliated
     "Dendritic cell": "CL:0000451",  # leukocyte
-    "Secretory": "CL:0000151",
     "Ionocytes": "CL:0005006",
     "Basal 1": "CL:0000646",  # epithelial
     "Basal 2": "CL:0000646",

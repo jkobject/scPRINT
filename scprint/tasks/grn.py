@@ -1,26 +1,27 @@
-from bengrn import BenGRN, get_sroy_gt, get_perturb_gt
-from scdataloader import Preprocessor
+from scdataloader import Preprocessor, Collator
+from scdataloader.data import SimpleAnnDataset
+
 from bengrn.base import train_classifier
-from bengrn import BenGRN, get_sroy_gt
+from bengrn import BenGRN, get_sroy_gt, get_perturb_gt
 from grnndata import utils as grnutils
+from grnndata import GRNAnnData, from_anndata, read_h5ad
+
 from anndata.utils import make_index_unique
 import scanpy as sc
+from anndata import AnnData
+
 import torch
-import gc
-from scdataloader.data import SimpleAnnDataset
-from scdataloader import Collator
-from grnndata import utils
 from torch.utils.data import DataLoader
+
+import gc
 
 from lightning.pytorch import Trainer
 import joblib
-from typing import List
-from anndata import AnnData
+from typing import List, Optional, Any
 
 from scprint.utils.sinkhorn import SinkhornDistance
 from scprint.utils import load_genes
 
-from grnndata import GRNAnnData, from_anndata, read_h5ad
 
 import umap
 import hdbscan
@@ -42,48 +43,63 @@ FILEDIR = os.path.dirname(os.path.realpath(__file__))
 class GNInfer:
     def __init__(
         self,
-        layer: list[int],
+        layer: Optional[List[int]] = None,
         batch_size: int = 64,
         num_workers: int = 8,
         drop_unexpressed: bool = False,
         num_genes: int = 3000,
         precision: str = "16-mixed",
-        cell_type_col="cell_type",
-        how: str = "random expr",  # random expr, most var withing, most var across, given
-        preprocess="softmax",  # sinkhorn, softmax, none
-        head_agg="mean",  # mean, sum, none
-        filtration="thresh",  # thresh, top-k, mst, known, none
-        k=10,
-        apc=False,
-        known_grn=None,
-        symmetrize=False,
-        doplot=True,
-        max_cells=0,
-        forward_mode="none",
-        genes: list = [],
-        loc="./",
-        dtype=torch.float16,
+        cell_type_col: str = "cell_type",
+        how: str = "random expr",  # random expr, most var within, most var across, given
+        preprocess: str = "softmax",  # sinkhorn, softmax, none
+        head_agg: str = "mean",  # mean, sum, none
+        filtration: str = "thresh",  # thresh, top-k, mst, known, none
+        k: int = 10,
+        apc: bool = False,
+        known_grn: Optional[any] = None,
+        symmetrize: bool = False,
+        doplot: bool = True,
+        max_cells: int = 0,
+        forward_mode: str = "none",
+        genes: List[str] = [],
+        loc: str = "./",
+        dtype: torch.dtype = torch.float16,
         devices: List[int] = [0],
         locname: str = "",
     ):
         """
-        Embedder a class to embed and annotate cells using a model
+        GNInfer a class to infer gene regulatory networks from a dataset using a scPRINT model.
 
         Args:
-            model (torch.nn.Module): The model to be used for embedding and annotating cells.
-            batch_size (int, optional): The size of the batches to be used in the DataLoader. Defaults to 64.
-            num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 8.
-            how (str, optional): The method to be used for selecting valid genes. Defaults to "most expr".
-            max_len (int, optional): The maximum length of the gene sequence. Defaults to 1000.
-            add_zero_genes (int, optional): The number of zero genes to add to the gene sequence. Defaults to 100.
-            precision (str, optional): The precision to be used in the Trainer. Defaults to "16-mixed".
-            pred_embedding (List[str], optional): The list of labels to be used for plotting embeddings. Defaults to [ "cell_type_ontology_term_id", "disease_ontology_term_id", "self_reported_ethnicity_ontology_term_id", "sex_ontology_term_id", ].
-            output_expression (str, optional): The type of output expression to be used. Can be one of "all", "sample", "none". Defaults to "sample".
+            layer (Optional[list[int]], optional): List of layers to use for the inference. Defaults to None.
+            batch_size (int, optional): Batch size for processing. Defaults to 64.
+            num_workers (int, optional): Number of workers for data loading. Defaults to 8.
+            drop_unexpressed (bool, optional): Whether to drop unexpressed genes. Defaults to False.
+            num_genes (int, optional): Number of genes to consider. Defaults to 3000.
+            precision (str, optional): Precision type for computations. Defaults to "16-mixed".
+            cell_type_col (str, optional): Column name for cell type information. Defaults to "cell_type".
+            how (str, optional): Method to select genes. Options are "random expr", "most var within", "most var across", "given". Defaults to "random expr".
+            preprocess (str, optional): Preprocessing method. Options are "softmax", "sinkhorn", "none". Defaults to "softmax".
+            head_agg (str, optional): Aggregation method for heads. Options are "mean", "sum", "none". Defaults to "mean".
+            filtration (str, optional): Filtration method for the adjacency matrix. Options are "thresh", "top-k", "mst", "known", "none". Defaults to "thresh".
+            k (int, optional): Number of top connections to keep if filtration is "top-k". Defaults to 10.
+            apc (bool, optional): Whether to apply Average Product Correction. Defaults to False.
+            known_grn (optional): Known gene regulatory network to use as a reference. Defaults to None.
+            symmetrize (bool, optional): Whether to symmetrize the adjacency matrix. Defaults to False.
+            doplot (bool, optional): Whether to generate plots. Defaults to True.
+            max_cells (int, optional): Maximum number of cells to consider. Defaults to 0.
+            forward_mode (str, optional): Mode for forward pass. Defaults to "none".
+            genes (list, optional): List of genes to consider. Defaults to an empty list.
+            loc (str, optional): Location to save results. Defaults to "./".
+            dtype (torch.dtype, optional): Data type for computations. Defaults to torch.float16.
+            devices (List[int], optional): List of device IDs to use. Defaults to [0].
+            locname (str, optional): Name for the location. Defaults to an empty string.
+
         """
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.layer = layer
-        self.locname=locname
+        self.locname = locname
         self.how = how
         assert self.how in [
             "most var within",
@@ -98,6 +114,7 @@ class GNInfer:
         self.doplot = doplot
         self.genes = genes
         self.apc = apc
+        self.dtype = dtype
         self.forward_mode = forward_mode
         self.k = k
         self.symmetrize = symmetrize
@@ -107,11 +124,23 @@ class GNInfer:
         self.curr_genes = None
         self.drop_unexpressed = drop_unexpressed
         self.precision = precision
-        ##elf.trainer = Trainer(precision=precision, devices=devices, use_distributed_sampler=False)
-        # subset_hvg=1000, use_layer='counts', is_symbol=True,force_preprocess=True, skip_validate=True)
 
     def __call__(self, model: torch.nn.Module, adata: AnnData, cell_type=None):
+        """
+        __call__ runs the method
+
+        Args:
+            model (torch.nn.Module): The model to be used for generating the network
+            adata (AnnData): Annotated data matrix of shape `n_obs` × `n_vars`. `n_obs` is the number of cells and `n_vars` is the number of genes.
+            cell_type (str, optional): Specific cell type to filter the data. Defaults to None.
+
+        Returns:
+            AnnData: Annotated data matrix with predictions and annotations.
+            np.ndarray: Filtered adjacency matrix.
+        """
         # Add at least the organism you are working with
+        if self.layer is None:
+            self.layer = list(range(model.nlayers))
         subadata = self.predict(model, adata, self.layer, cell_type)
         adjacencies = self.aggregate(model.attn.get(), model.genes)
         if self.head_agg == "none":
@@ -123,9 +152,7 @@ class GNInfer:
         self.curr_genes = None
         model.pred_log_adata = False
         if cell_type is not None:
-            subadata = adata[
-                adata.obs[self.cell_type_col] == cell_type
-            ].copy()
+            subadata = adata[adata.obs[self.cell_type_col] == cell_type].copy()
         else:
             subadata = adata.copy()
         if self.how == "most var within":
@@ -147,10 +174,8 @@ class GNInfer:
                 groups=[cell_type],
             )
             diff_expr_genes = adata.uns["rank_genes_groups"]["names"][cell_type]
-            diff_expr_genes = [
-                gene for gene in diff_expr_genes if gene in model.genes
-            ]
-            self.curr_genes = diff_expr_genes[:self.num_genes] + self.genes
+            diff_expr_genes = [gene for gene in diff_expr_genes if gene in model.genes]
+            self.curr_genes = diff_expr_genes[: self.num_genes] + self.genes
             self.curr_genes.sort()
         elif self.how == "random expr":
             self.curr_genes = model.genes
@@ -188,7 +213,7 @@ class GNInfer:
         model.eval()
         device = model.device.type
 
-        with torch.no_grad(), torch.autocast(device_type=device, dtype=dtype):
+        with torch.no_grad(), torch.autocast(device_type=device, dtype=self.dtype):
             for batch in tqdm(dataloader):
                 gene_pos, expression, depth = (
                     batch["genes"].to(device),
@@ -347,7 +372,7 @@ class GNInfer:
             grn=grn,
         )
         # grn = grn[:, (grn.X != 0).sum(0) > (self.max_cells / 32)]
-        grn.var["TFs"] = [True if i in utils.TF else False for i in grn.var["symbol"]]
+        grn.var["TFs"] = [True if i in grnutils.TF else False for i in grn.var["symbol"]]
         grn.uns["grn_scprint_params"] = {
             "filtration": self.filtration,
             "how": self.how,
@@ -361,43 +386,10 @@ class GNInfer:
             return grn
 
 
-def get_GTdb(db="omnipath"):
-    if db == "omnipath":
-        if not os.path.exists(FILEDIR + "/../../data/main/omnipath.parquet"):
-            from omnipath.interactions import AllInteractions
-            from omnipath.requests import Annotations
-
-            interactions = AllInteractions()
-            net = interactions.get(exclude=["small_molecule", "lncrna_mrna"])
-            hgnc = Annotations.get(resources="HGNC")
-            rename = {v.uniprot: v.genesymbol for _, v in hgnc.iterrows()}
-            net = net.replace({"source": rename, "target": rename})
-            genedf = load_genes()
-            rn = {
-                j["symbol"]: i
-                for i, j in genedf[["symbol"]].iterrows()
-                if j["symbol"] is not None
-            }
-            net = net.replace({"source": rn, "target": rn})
-            varnames = list(set(net.iloc[:, :2].values.flatten()))
-            da = np.zeros((len(varnames), len(varnames)), dtype=float)
-            for i, j in net.iloc[:, :2].values:
-                da[varnames.index(i), varnames.index(j)] = 1
-            net = pd.DataFrame(data=da, index=varnames, columns=varnames)
-            net.to_parquet(FILEDIR + "/../../data/main/omnipath.parquet")
-        else:
-            net = pd.read_parquet(FILEDIR + "/../../data/main/omnipath.parquet")
-    if db == "scenic+":
-        net = pd.read_parquet(FILEDIR + "/../../data/main/main_scenic+.parquet")
-    if db == "stringdb":
-        net = pd.read_parquet(FILEDIR + "/../../data/main/stringdb_bias.parquet")
-    return net
-
-
 def default_benchmark(
-    model,
-    default_dataset="sroy",
-    cell_types=[
+    model: Any,
+    default_dataset: str = "sroy",
+    cell_types: List[str] = [
         "kidney distal convoluted tubule epithelial cell",
         "kidney loop of Henle thick ascending limb epithelial cell",
         "kidney collecting duct principal cell",
@@ -409,11 +401,37 @@ def default_benchmark(
         "kidney interstitial fibroblast",
         "endothelial cell",
     ],
-    maxlayers=16,
-    maxgenes=5000,
-    batch_size=32,
-    maxcells=1024,
+    maxlayers: int = 16,
+    maxgenes: int = 5000,
+    batch_size: int = 32,
+    maxcells: int = 1024,
 ):
+    """
+    default_benchmark function to run the default scPRINT GRN benchmark
+
+    Args:
+        model (Any): The scPRINT model to be used for the benchmark.
+        default_dataset (str, optional): The default dataset to use for benchmarking. Defaults to "sroy".
+        cell_types (List[str], optional): List of cell types to include in the benchmark. Defaults to [
+            "kidney distal convoluted tubule epithelial cell",
+            "kidney loop of Henle thick ascending limb epithelial cell",
+            "kidney collecting duct principal cell",
+            "mesangial cell",
+            "blood vessel smooth muscle cell",
+            "podocyte",
+            "macrophage",
+            "leukocyte",
+            "kidney interstitial fibroblast",
+            "endothelial cell",
+        ].
+        maxlayers (int, optional): Maximum number of layers to use from the model. Defaults to 16.
+        maxgenes (int, optional): Maximum number of genes to consider. Defaults to 5000.
+        batch_size (int, optional): Batch size for processing. Defaults to 32.
+        maxcells (int, optional): Maximum number of cells to consider. Defaults to 1024.
+
+    Returns:
+        dict: A dictionary containing the benchmark metrics.
+    """
     metrics = {}
     layers = list(range(model.nlayers))[max(0, model.nlayers - maxlayers) :]
     clf_omni = None

@@ -5,21 +5,13 @@ import numpy as np
 
 def _calculate_new_faces(faces, new, old_set):
     """
-    Calculates the new triangular faces for the network when we
-    add in new
+    Calculates the new triangular faces for the network when we add in new
 
-    Parameters
-    -----------
-    faces : list
-        a list of the faces present in the graph
-    new : int
-        the node id that is being added to the face
-    old_set : set
-        the old face that the node is being added to
+    Args:
+        faces (list): a list of the faces present in the graph
+        new (int): the node id that is being added to the face
+        old_set (set): the old face that the node is being added to
 
-    Returns
-    -------
-    None
     """
     faces.remove(frozenset(old_set))
 
@@ -28,26 +20,16 @@ def _calculate_new_faces(faces, new, old_set):
     faces.add(frozenset([new, old_set[1], old_set[2]]))
 
 
-def _add_triangular_face(G, new, old_set, C, faces):
+def _add_triangular_face(G: nx.Graph, new: int, old_set: set, C: np.ndarray, faces: list) -> None:
     """
     Adds a new triangle to the networkx graph G
 
-    Parameters
-    -----------
-    G : networkx graph
-        the networkx graph to add the new face to
-    new : int
-        the node id that is being added to the face
-    C : array_like
-        correlation matrix
-    old_set : set
-        the old face that the node is being added to
-    faces : list
-        a list of the faces present in the graph
-
-    Returns
-    -------
-    None
+    Args:
+        G (networkx.Graph): The networkx graph to add the new face to.
+        new (int): The node id that is being added to the face.
+        C (array_like): Correlation matrix.
+        old_set (set): The old face that the node is being added to.
+        faces (list): A list of the faces present in the graph.
     """
     if isinstance(new, collections.abc.Sized):
         raise ValueError("New should be a scaler")
@@ -58,24 +40,18 @@ def _add_triangular_face(G, new, old_set, C, faces):
         G.add_edge(new, j, weight=C[new, j])
 
 
-def tmfg(corr, absolute=False, threshold_mean=True):
+def tmfg(corr: np.ndarray, absolute: bool = False, threshold_mean: bool = True) -> nx.Graph:
     """
     Constructs a TMFG from the supplied correlation matrix
 
-    Parameters
-    -----------
-    corr : array_like
-        p x p matrix - correlation matrix
-    absolute : bool
-        whether to use the absolute correlation values for chooisng weights or normal ones
-    threshold_mean : bool
-        this will discard all correlations below the mean value when selecting the first 4
-        vertices, as in the original implementation
+    Args:
+        corr (array_like): p x p matrix - correlation matrix
+        absolute (bool): whether to use the absolute correlation values for chooisng weights or normal ones
+        threshold_mean (bool): this will discard all correlations below the mean value when selecting the first 4 vertices, as in the original implementation
 
-    Returns
-    -------
-    networkx graph
-        The Triangular Maximally Filtered Graph
+    Returns:
+        networkx graph
+            The Triangular Maximally Filtered Graph
     """
     p = corr.shape[0]
 
