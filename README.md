@@ -27,24 +27,21 @@ scPRINT can be used to perform the following analyses:
 
 ![figure1](figure1.png)
 
-## Install `scPRINT` in developers mode
+## Install `scPRINT`
 
 For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Python 3.10.
 
 If you want to be using flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.
 
-
 ```python
 conda create -n "[whatever]" python==3.10
-git clone https://github.com/jkcobject/scPRINT
-pip install 'lamindb[jupyter,bionty]'
-pip install torch==2.0.0 torchvision==0.15.1 torchaudio==2.0.1
-# install the dev tooling if you need it too
-pip install -e "scPRINT[dev]"
-pip install -r requirements-dev.txt
-pip install triton==2.0.0.dev20221202 --no-deps # only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
-# install triton as mentioned in .toml if you want to
-mkdocs serve # to view the dev documentation
+git clone https://github.com/jkobject/scPRINT
+#one of
+pip install scPRINT # OR
+pip install scPRINT[dev] # for the dev dependencies (building etc..) AND/OR [dev,flash]
+pip install scPRINT[flash] && pip install -e "git+https:/
+/github.com/triton-lang/triton.git@legacy-backend
+#egg=triton&subdirectory=python" # to use flashattention2, you will need to install triton 2.0.0.dev20221202 specifically, working on removing this dependency # only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
 ```
 
 We make use of some additional packages we developed alongside scPRint.
@@ -60,31 +57,6 @@ Please refer to their documentation for more information:
 ⚠️ if you want to use the scDataloader's multi-dataset mode or if you want to preprocess datasets and other functions of the model, you will need to use lamin.ai.
 
 In that case, connect with google or github to [lamin.ai](https://lamin.ai/login), then be sure to connect before running anything (or before starting a notebook): `lamin login <email> --key <API-key>`. Follow the instructions on [their website](https://docs.lamin.ai/guide).
-
-## Install it from PyPI 
-
-If you want to use flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.
-
-```bash
-pip install 'lamindb[jupyter,bionty]'
-```
-
-then install scPRINT
-
-```bash
-pip install scprint
-```
-> if you have a GPU that you want to use, you will benefit from flashattention. and you will have to do some more specific installs:
-
-1. find the version of torch 2.0.0 / torchvision 0.15.0 / torchaudio 2.0.0 that match your nvidia drivers on the torch website.
-2. apply the install command
-3. do `pip install pytorch-fast-transformers torchtext==0.15.1`
-4. do `pip install triton==2.0.0.dev20221202 --no-deps`
-
-You should be good to go. You need those specific versions for everything to work...
-
-This is not my fault, scream at nvidia :wink:
-
 
 ## Usage
 
@@ -181,5 +153,13 @@ Acknowledgement:
 [python template](https://github.com/rochacbruno/python-project-template)
 [laminDB](https://lamin.ai/)
 [lightning](https://lightning.ai/)
+
+## Work in progress:
+
+1. remove the triton dependencies
+2. add version with additional labels (tissues, age) and organisms (mouse, zebrafish) and more datasets from cellxgene
+3. version with separate transformer blocks for the encoding part of the bottleneck learning and for the cell embeddings
+4. improve classifier to output uncertainties and topK predictions when unsure
+5. 
 
 Awesome Large Cell Model created by Jeremie Kalfon.

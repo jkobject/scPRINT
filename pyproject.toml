@@ -2,17 +2,16 @@
 name = "scprint"
 version = "1.0.0"
 license = "MIT"
-description = ""
+description = "scPRINT is a Large Cell Model for Gene Network Inference, Denoising and more from scRNAseq data"
 authors = ["jeremie kalfon"]
 readme = ["README.md", "LICENSE"]
 repository = "https://github.com/jkobject/scPrint"
 keywords = ["scRNAseq","transformer","GRN","gene regulatory network","scPrint","large cell model","foundation model"]
 
-
 [tool.poetry.dependencies]
 lamindb = "<=0.69.9"
 bionty = "<=0.42.6"
-python = "3.10"
+python = "^3.10"
 cellxgene-census = "*"
 anndata = "*"
 matplotlib = "*"
@@ -32,7 +31,7 @@ decoupler = "*"
 Bio = "*"
 attridict = "*"
 gget = "*"
-fair-esm = { git = "https://github.com/facebookresearch/esm.git", branch = "main" }
+fair-esm = "*"
 hydra-core = "*"
 lightning = "*"
 pynndescent = ">=0.5.11"
@@ -58,7 +57,6 @@ torch = "2.0.0"
 torchvision = ">=0.15.0"
 torchaudio = ">=2.0.0"
 torchtext = ">=0.15.1"
-galore-torch = { git = "https://github.com/jiaweizzhao/GaLore", branch = "master", optional = true }
 pytorch-fast-transformers = { version = "*", optional = true }
 triton = { git = "https://github.com/triton-lang/triton", tag = "legacy-backend", subdirectory = "python", optional = true }
 pytest = { version = "^7.4.3", optional = true }
@@ -91,7 +89,7 @@ dev = [
 
 flash = [
     "torchtext",
-    "triton",
+#    "triton",
     "torch",
     "torchvision",
     "torchaudio",
