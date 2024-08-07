@@ -1,6 +1,5 @@
 # structure
 
-![](docs/model.structure.drawio.png)
 
 ## gene embedders
 
@@ -46,7 +45,7 @@ is subdivided into multiple parts:
 
 the model uses lightning's training toolkit and CLI tools.
 
-to use CLI, just call scprint ... (will call the `__main__.py` function).
+to use CLI, just call `scprint ...` (will call the `__main__.py` function).
 Additional, training-specific informations are passed to the model using the trainer.py function.
 specific training schemes are available under the `config` folder as `yaml` files.
 Moreover the model can be trained on multiple compute types. SLURM scripts are available under the `slurm` folder.

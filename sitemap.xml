@@ -2,57 +2,57 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://www.jkobject.com/scPRINT/</loc>
-         <lastmod>2024-03-08</lastmod>
+         <lastmod>2024-08-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://www.jkobject.com/scPRINT/loaders/</loc>
-         <lastmod>2024-03-08</lastmod>
+         <loc>https://www.jkobject.com/scPRINT/cli/</loc>
+         <lastmod>2024-08-07</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://www.jkobject.com/scPRINT/embedder/</loc>
+         <lastmod>2024-08-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://www.jkobject.com/scPRINT/model/</loc>
-         <lastmod>2024-03-08</lastmod>
+         <lastmod>2024-08-07</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://www.jkobject.com/scPRINT/pretrain/</loc>
+         <lastmod>2024-08-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://www.jkobject.com/scPRINT/structure/</loc>
-         <lastmod>2024-03-08</lastmod>
+         <lastmod>2024-08-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://www.jkobject.com/scPRINT/tasks/</loc>
-         <lastmod>2024-03-08</lastmod>
+         <lastmod>2024-08-07</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://www.jkobject.com/scPRINT/usage/</loc>
+         <lastmod>2024-08-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://www.jkobject.com/scPRINT/utils/</loc>
-         <lastmod>2024-03-08</lastmod>
+         <lastmod>2024-08-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://www.jkobject.com/scPRINT/notebooks/denoise/</loc>
-         <lastmod>2024-03-08</lastmod>
+         <loc>https://www.jkobject.com/scPRINT/notebooks/cancer_usecase/</loc>
+         <lastmod>2024-08-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://www.jkobject.com/scPRINT/notebooks/embeddings/</loc>
-         <lastmod>2024-03-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://www.jkobject.com/scPRINT/notebooks/generate_gene_embeddings/</loc>
-         <lastmod>2024-03-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://www.jkobject.com/scPRINT/notebooks/grn/</loc>
-         <lastmod>2024-03-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://www.jkobject.com/scPRINT/notebooks/pretrain/</loc>
-         <lastmod>2024-03-08</lastmod>
+         <loc>https://www.jkobject.com/scPRINT/notebooks/cancer_usecase_part2/</loc>
+         <lastmod>2024-08-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
 </urlset>

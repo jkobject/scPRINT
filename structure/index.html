@@ -45,7 +45,7 @@
                 </li>
               </ul>
               <ul class="current">
-                <li class="toctree-l1 current"><a class="reference internal current" href="./">structure</a>
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">structure</a>
     <ul class="current">
     <li class="toctree-l2"><a class="reference internal" href="#gene-embedders">gene embedders</a>
     </li>
@@ -61,30 +61,31 @@
                 </li>
               </ul>
               <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../notebooks/pretrain/">training</a>
+                <li class="toctree-l1"><a class="reference internal" href="../pretrain/">pre-training</a>
                 </li>
               </ul>
               <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../notebooks/grn/">grn inference</a>
+                <li class="toctree-l1"><a class="reference internal" href="../usage/">usage example</a>
                 </li>
               </ul>
+              <p class="caption"><span class="caption-text">example notebooks</span></p>
               <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../notebooks/embeddings/">cell embedding and classification</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../notebooks/generate_gene_embeddings/">gene embeddings</a>
-                </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../notebooks/cancer_usecase/">Cancer usecase</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../notebooks/cancer_usecase_part2/">Cancer usecase (part 2)</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">documentation</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../utils/">utils</a>
-                  </li>
                   <li class="toctree-l1"><a class="reference internal" href="../model/">model</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../embedders.md">loaders</a>
-                  </li>
                   <li class="toctree-l1"><a class="reference internal" href="../tasks/">tasks</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">cli</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../embedder/">embedders</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../utils/">utils</a>
                   </li>
               </ul>
       </div>
@@ -111,7 +112,6 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="structure">structure</h1>
-<p><img alt="" src="docs/model.structure.drawio.png" /></p>
 <h2 id="gene-embedders">gene embedders</h2>
 <p>Function to get embeddings from a set of genes, given their ensembl ids. For now use 2 different models:</p>
 <ul>
@@ -144,7 +144,7 @@ Collates the results using a <code>Collator</code> function.</p>
 </ul>
 <h2 id="trainer-cli">trainer &amp; cli</h2>
 <p>the model uses lightning's training toolkit and CLI tools.</p>
-<p>to use CLI, just call scprint ... (will call the <code>__main__.py</code> function).
+<p>to use CLI, just call <code>scprint ...</code> (will call the <code>__main__.py</code> function).
 Additional, training-specific informations are passed to the model using the trainer.py function.
 specific training schemes are available under the <code>config</code> folder as <code>yaml</code> files.
 Moreover the model can be trained on multiple compute types. SLURM scripts are available under the <code>slurm</code> folder.</p>
@@ -160,7 +160,7 @@ Moreover the model can be trained on multiple compute types. SLURM scripts are a
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
         <a href=".." class="btn btn-neutral float-left" title="Home"><span class="icon icon-circle-arrow-left"></span> Previous</a>
-        <a href="../notebooks/pretrain/" class="btn btn-neutral float-right" title="training">Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="../pretrain/" class="btn btn-neutral float-right" title="pre-training">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -186,7 +186,7 @@ Moreover the model can be trained on multiple compute types. SLURM scripts are a
       <span><a href=".." style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
-      <span><a href="../notebooks/pretrain/" style="color: #fcfcfc">Next &raquo;</a></span>
+      <span><a href="../pretrain/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>
