@@ -156,11 +156,10 @@ class MyCLI(LightningCLI):
             preprocessor = Preprocessor(
                 do_postp=False,
                 force_preprocess=True,
-                skip_validate=True,
-                use_layer="counts",
             )
             adata = preprocessor(adata)
             conf = dict(self.config_init[subcommand])
+
             model = scPrint.load_from_checkpoint(
                 self.config_init[subcommand]["ckpt_path"], precpt_gene_emb=None
             )

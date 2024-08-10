@@ -3,13 +3,11 @@ from typing import Optional, Dict
 from torch import Tensor, optim, nn
 from lightning.pytorch.tuner.lr_finder import _LRCallback
 from lightning.pytorch.callbacks.lr_finder import LearningRateFinder
-import torch.distributed as dist
 import torch
 from galore_torch import GaLoreAdamW
 from math import factorial
 import lightning as L
 import os
-import numpy as np
 import copy
 from scipy.sparse import load_npz
 from huggingface_hub import PyTorchModelHubMixin

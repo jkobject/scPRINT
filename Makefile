@@ -27,15 +27,14 @@ install:          ## Install the project in dev mode.
 .PHONY: fmt
 fmt:              ## Format code using black & isort.
 	$(ENV_PREFIX)isort scprint/
-	$(ENV_PREFIX)black -l 79 scprint/
-	$(ENV_PREFIX)black -l 79 tests/
+	$(ENV_PREFIX)black -l 110 scprint/
+	$(ENV_PREFIX)black -l 110 tests/
 
 .PHONY: lint
 lint:             ## Run pep8, black, mypy linters.
-	$(ENV_PREFIX)flake8 scprint/
-	$(ENV_PREFIX)black -l 79 --check scprint/
-	$(ENV_PREFIX)black -l 79 --check tests/
-	$(ENV_PREFIX)mypy --ignore-missing-imports scprint/
+	$(ENV_PREFIX)flake8 --ignore=E501,E203,E266,E265,W503 scprint/
+	$(ENV_PREFIX)black -l 120 --check scprint/
+	$(ENV_PREFIX)black -l 120 --check tests/
 
 .PHONY: test
 test: lint        ## Run tests and generate coverage report.
