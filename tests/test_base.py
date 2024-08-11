@@ -5,11 +5,22 @@ import urllib.request
 
 from scprint.base import NAME
 from scdataloader import Preprocessor
+from scdataloader.utils import populate_my_ontology
 import subprocess
 
 
 def test_base():
     assert NAME == "scprint"
+    populate_my_ontology(
+        organisms=["NCBITaxon:10090", "NCBITaxon:9606"],
+        sex=["PATO:0000384", "PATO:0000383"],
+        celltypes=None,
+        ethnicities=None,
+        assays=None,
+        tissues=None,
+        diseases=None,
+        dev_stages=None,
+    )
     filepath = os.path.join(os.path.dirname(__file__), "test.h5ad")
     ckpt_path = os.path.join(os.path.dirname(__file__), "small.ckpt")
     if not os.path.exists(ckpt_path):
