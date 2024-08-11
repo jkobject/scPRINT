@@ -169,8 +169,8 @@ lightning_logs/
 collator_output.txt
 data/bias_sparse.npz
 todel/
-tests/*.ckpt
 tests/out_*.h5ad
 data/*.h5ad
 notebooks/**/*.h5ad
 notebooks/*.h5ad
+*.ckpt
