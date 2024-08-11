@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "scprint"
-version = "1.0.12"
+version = "1.0.13"
 license = "MIT"
 description = "scPRINT is a Large Cell Model for Gene Network Inference, Denoising and more from scRNAseq data"
 authors = ["jeremie kalfon"]
