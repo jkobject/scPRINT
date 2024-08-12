@@ -1,10 +1,9 @@
 
 # scPRINT: Large Cell Model for scRNAseq data
 
-[![codecov](https://codecov.io/gh/cantinilab/GRnnData/branch/main/graph/badge.svg?token=GRnnData_token_here)](https://codecov.io/gh/cantinilab/GRnnData)
-[![CI](https://github.com/cantinilab/GRnnData/actions/workflows/main.yml/badge.svg)](https://github.com/cantinilab/GRnnData/actions/workflows/main.yml)
+[![codecov](https://codecov.io/gh/jkobject/scPRINT/branch/main/graph/badge.svg?token=GRnnData_token_here)](https://codecov.io/gh/jkobject/scPRINT)
+[![CI](https://github.com/jkobject/scPRINT/actions/workflows/main.yml/badge.svg)](https://github.com/jkobject/scPRINT/actions/workflows/main.yml)
 [![PyPI version](https://badge.fury.io/py/scprint.svg)](https://badge.fury.io/py/scprint)
-[![Documentation Status](https://readthedocs.org/projects/GRnnData/badge/?version=latest)](https://GRnnData.readthedocs.io/en/latest/?badge=latest)
 [![Downloads](https://pepy.tech/badge/scprint)](https://pepy.tech/project/scprint)
 [![Downloads](https://pepy.tech/badge/scprint/month)](https://pepy.tech/project/scprint)
 [![Downloads](https://pepy.tech/badge/scprint/week)](https://pepy.tech/project/scprint)
