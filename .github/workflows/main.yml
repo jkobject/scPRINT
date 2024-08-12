@@ -15,7 +15,6 @@ on:
 
 jobs:
   linter:
-    needs: free-disk-space
     strategy:
       fail-fast: false
       matrix:
