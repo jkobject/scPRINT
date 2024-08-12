@@ -14,6 +14,24 @@ on:
   workflow_dispatch:
 
 jobs:
+  free-disk-space:
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: false
+
+          # all of these default to true, but feel free to set to
+          # "false" if necessary for your workflow
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
   linter:
     strategy:
       fail-fast: false
