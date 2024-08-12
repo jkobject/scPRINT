@@ -46,6 +46,7 @@ scPRINT can be used to perform the following analyses:
     - [can I use scPRINT on other organisms rather than human?](#can-i-use-scprint-on-other-organisms-rather-than-human)
     - [how long does scPRINT takes? what kind of resources do I need? (or in alternative: can i run scPRINT locally?)](#how-long-does-scprint-takes-what-kind-of-resources-do-i-need-or-in-alternative-can-i-run-scprint-locally)
     - [I have different scRNASeq batches. Should I integrate my data before running scPRINT?](#i-have-different-scrnaseq-batches-should-i-integrate-my-data-before-running-scprint)
+    - [where to find the gene embeddings?](#where-to-find-the-gene-embeddings)
   - [Documentation](#documentation)
   - [Model Weights](#model-weights)
   - [Development](#development)
@@ -177,6 +178,21 @@ please look at our supplementary tables in the [manuscript](https://www.biorxiv.
 ### I have different scRNASeq batches. Should I integrate my data before running scPRINT?
 
 scPRINT takes raw count as inputs, so please don't use integrated data. Just give the raw counts to scPRINT and it will take care of the rest.
+
+### where to find the gene embeddings?
+
+If you think you need the gene embeddings file for loading the model from a checkpoint, you don't, as the embeddings are also stored in the model weights. You just need to load the weights like this:
+
+```python
+model = scPrint.load_from_checkpoint(
+    '../../data/temp/last.ckpt',
+    precpt_gene_emb=None,
+)
+```
+
+You can also recreate the gene embedding file through [this notebook](notebooks/generate_gene_embeddings.ipynb). Just call the functions, and it should recreate the file itself.
+
+the file itself is also available on [hugging face](https://huggingface.co/jkobject/scPRINT/tree/main)
 
 ## Documentation
 

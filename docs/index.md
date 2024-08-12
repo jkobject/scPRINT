@@ -152,6 +152,21 @@ please look at our supplementary tables in the [manuscript](https://www.biorxiv.
 
 scPRINT takes raw count as inputs, so please don't use integrated data. Just give the raw counts to scPRINT and it will take care of the rest.
 
+### where to find the gene embeddings?
+
+If you think you need the gene embeddings file for loading the model from a checkpoint, you don't, as the embeddings are also stored in the model weights. You just need to load the weights like this:
+
+```python
+model = scPrint.load_from_checkpoint(
+    '../../data/temp/last.ckpt',
+    precpt_gene_emb=None,
+)
+```
+
+You can also recreate the gene embedding file through [this notebook](notebooks/generate_gene_embeddings.ipynb). Just call the functions, and it should recreate the file itself.
+
+the file itself is also available on [hugging face](https://huggingface.co/jkobject/scPRINT/tree/main)
+
 ## Documentation
 
 For more information on usage please see the documentation in [https://www.jkobject.com/scPRINT/](https://www.jkobject.com/scPRINT/)
