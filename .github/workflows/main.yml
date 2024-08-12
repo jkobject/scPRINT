@@ -34,9 +34,9 @@ jobs:
           android: true
           dotnet: true
           haskell: true
-          large-packages: true
+          large-packages: false
           docker-images: true
-          swap-storage: true
+          swap-storage: false
   linter:
     needs: free-disk-space
     strategy:
