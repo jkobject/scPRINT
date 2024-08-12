@@ -33,6 +33,7 @@ jobs:
           docker-images: true
           swap-storage: true
   linter:
+    needs: free-disk-space
     strategy:
       fail-fast: false
       matrix:
