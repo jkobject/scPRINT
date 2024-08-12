@@ -1,6 +1,8 @@
 
 # scPRINT: Large Cell Model for scRNAseq data
 
+[![codecov](https://codecov.io/gh/jkobject/scPRINT/branch/main/graph/badge.svg?token=GRnnData_token_here)](https://codecov.io/gh/jkobject/scPRINT)
+[![CI](https://github.com/jkobject/scPRINT/actions/workflows/main.yml/badge.svg)](https://github.com/jkobject/scPRINT/actions/workflows/main.yml)
 [![PyPI version](https://badge.fury.io/py/scprint.svg)](https://badge.fury.io/py/scprint)
 [![Downloads](https://pepy.tech/badge/scprint)](https://pepy.tech/project/scprint)
 [![Downloads](https://pepy.tech/badge/scprint/month)](https://pepy.tech/project/scprint)
