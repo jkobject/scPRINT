@@ -142,7 +142,6 @@ data/fasta/*
 data/scGPT_human
 wandb/*
 */lightning_logs/*
-*.lock
 data/tensorboard/*
 notebooks/tests/*/
 data/logs/*
