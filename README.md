@@ -24,7 +24,7 @@ scPRINT can be used to perform the following analyses:
 - __label prediction__: predict the cell type, disease, sequencer, sex, and ethnicity of your cells
 - __gene network inference__: generate a gene network from any cell or cell cluster in your scRNAseq dataset
 
-[Read the manuscript!](https://www.biorxiv.org/content/10.1101/2024.07.29.605556v1) if you would like to know more about scPRINT.
+[Read the manuscript!](https://www.biorxiv.org/content/10.1101/2024.07.29.605556v1) if you would like to know more about scPRINT. Have a look at some of my [X-plainers](https://twitter.com/jkobject). 
 
 ![figure1](docs/figure1.png)
 
@@ -209,6 +209,8 @@ Model weights are available on [hugging face](https://huggingface.co/jkobject/sc
 Read the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
 Read the [training runs](https://wandb.ai/ml4ig/scprint_scale/reports/scPRINT-trainings--Vmlldzo4ODIxMjgx?accessToken=80metwx7b08hhourotpskdyaxiflq700xzmzymr6scvkp69agybt79l341tv68hp) document to know more about how pre-training was performed and the its behavior.
+
+code coverage is not right as I am using the command line interface for now. >50% of the code is covered by my current unit test.
 
 Acknowledgement:
 [python template](https://github.com/rochacbruno/python-project-template)
