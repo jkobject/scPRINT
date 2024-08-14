@@ -4,6 +4,13 @@ Changelog
 
 (unreleased)
 ------------
+- Debug of test. [jkobject]
+- Huggingfacehub. [jkobject]
+
+
+1.0.14 (2024-08-14)
+-------------------
+- Release: version 1.0.14 🚀 [jkobject]
 - Debug and update. [jkobject]
 - Merge branch 'main' of https://github.com/jkobject/scPRINT into main.
   [jkobject]
