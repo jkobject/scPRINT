@@ -60,16 +60,12 @@ scPRINT can be used to perform the following analyses:
 
 For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Python 3.10.
 
-If you want to be using flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.
-
 ```bash
-conda create -n "[whatever]" python==3.10
+conda create -n "[whatever]" python==3.10 #scprint might work with python >3.10, but it is not tested
 #one of
 pip install scprint # OR
 pip install scprint[dev] # for the dev dependencies (building etc..) OR
-pip install scprint[flash] && pip install -e "git+https:/
-/github.com/triton-lang/triton.git@legacy-backend
-#egg=triton&subdirectory=python" # to use flashattention2, you will need to install triton 2.0.0.dev20221202 specifically, working on removing this dependency # only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
+pip install scprint[flash] # to use flashattention2 with triton: only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
 #OR pip install scPRINT[dev,flash]
 ```
 
@@ -85,9 +81,11 @@ Please refer to their documentation for more information:
 
 scPRINT can run on machines without GPUs, but it will be slow. It is highly recommended to use a GPU for inference.
 
-Once you have a GPU, and installed the required drivers, you might need to install a specific version of pytorch that is compatible with your drivers (e.g. nvidia 550 drivers will lead to a nvidia toolkit 11.7 or 11.8 which will mean you need to install pytorch 2.2.0 using the command:
-`pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118` on linux
+Once you have a GPU, and installed the required drivers, you might need to install a specific version of pytorch that is compatible with your drivers (e.g. nvidia 550 drivers will lead to a nvidia toolkit 11.7 or 11.8 which might mean you need to re-install a different flavor of pytorch for things to work. e.g. using the command:
+`pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118` on my case on linux
  ).
+
+I was able to test it with nvidia 11.7, 11.8, 12.2.
 
 ### lamin.ai
 
