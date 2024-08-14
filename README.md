@@ -33,6 +33,7 @@ scPRINT can be used to perform the following analyses:
 - [scPRINT: Large Cell Model for scRNAseq data](#scprint-large-cell-model-for-scrnaseq-data)
   - [Table of Contents](#table-of-contents)
   - [Install `scPRINT`](#install-scprint)
+    - [pytorch and GPUs](#pytorch-and-gpus)
     - [lamin.ai](#laminai)
   - [Usage](#usage)
     - [scPRINT's basic commands](#scprints-basic-commands)
@@ -79,6 +80,14 @@ Please refer to their documentation for more information:
 - [scDataLoader](https://github.com/jkobject/scDataLoader): a dataloader for training large cell models.
 - [GRnnData](https://github.com/cantinilab/GRnnData): a package to work with gene networks from single cell data.
 - [benGRN](https://github.com/jkobject/benGRN): a package to benchmark gene network inference methods from single cell data.
+
+### pytorch and GPUs
+
+scPRINT can run on machines without GPUs, but it will be slow. It is highly recommended to use a GPU for inference.
+
+Once you have a GPU, and installed the required drivers, you might need to install a specific version of pytorch that is compatible with your drivers (e.g. nvidia 550 drivers will lead to a nvidia toolkit 11.7 or 11.8 which will mean you need to install pytorch 2.2.0 using the command:
+`pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118` on linux
+ ).
 
 ### lamin.ai
 

@@ -9,8 +9,8 @@ repository = "https://github.com/jkobject/scPRINT"
 keywords = ["scRNAseq","transformer","GRN","gene regulatory network","scPRINT","large cell model","foundation model"]
 
 [tool.poetry.dependencies]
-lamindb = "<=0.69.9"
-bionty = "<=0.42.6"
+lamindb = "0.75.1"
+bionty = "0.48.0"
 python = ">=3.10,<3.11"
 cellxgene-census = "*"
 anndata = "*"
@@ -19,7 +19,6 @@ seaborn = "*"
 gseapy = "*"
 ipykernel = "*"
 owlready2 = "*"
-torchdata = "*"
 biomart = "*"
 scib = "*"
 scikit-learn = "*"
@@ -53,12 +52,13 @@ scib-metrics = "*"
 scikit-misc = "*"
 zarr = "*"
 tensorly = "*"
-torch = "2.0.0"
-torchvision = ">=0.15.0"
-torchaudio = ">=2.0.0"
-torchtext = ">=0.15.1"
+torch = "2.2.0"
+triton = "2.2.0"
+torchvision = "0.15.0"
+torchaudio = "2.2.0"
+torchtext = "0.17.0"
+torchdata = "*"
 pytorch-fast-transformers = { version = "*", optional = true }
-# triton = { git = "https://github.com/triton-lang/triton", tag = "legacy-backend", subdirectory = "python", optional = true }
 pytest = { version = "^7.4.3", optional = true }
 coverage = { version = "^7.3.2", optional = true }
 flake8 = { version = "^6.1.0", optional = true }
