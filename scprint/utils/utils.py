@@ -155,7 +155,8 @@ def load_genes(organisms: Union[str, list] = "NCBITaxon:9606"):  # "NCBITaxon:10
         organismdf.append(genesdf)
     organismdf = pd.concat(organismdf)
     organismdf.drop(
-        columns=["source_id", "run_id", "created_by_id", "updated_at"], inplace=True
+        columns=["source_id", "stable_id", "run_id", "created_by_id", "updated_at"],
+        inplace=True,
     )
     return organismdf
 
