@@ -43,120 +43,6 @@ def run_command(command: str, **kwargs):
     return rc
 
 
-def _fetchFromServer(ensemble_server, attributes):
-    server = BiomartServer(ensemble_server)
-    ensmbl = server.datasets["hsapiens_gene_ensembl"]
-    print(attributes)
-    res = pd.read_csv(
-        io.StringIO(
-            ensmbl.search({"attributes": attributes}, header=1).content.decode()
-        ),
-        sep="\t",
-    )
-    return res
-
-
-def getBiomartTable(
-    ensemble_server: str = "http://jul2023.archive.ensembl.org/biomart",
-    useCache: bool = False,
-    cache_folder: str = "/tmp/biomart/",
-    attributes: List[str] = [],
-    bypass_attributes: bool = False,
-) -> pd.DataFrame:
-    """generate a genelist dataframe from ensembl's biomart
-
-    Args:
-        ensemble_server (str, optional): The URL of the Ensembl Biomart server. Defaults to "http://jul2023.archive.ensembl.org/biomart".
-        useCache (bool, optional): Whether to use cached data if available. Defaults to False.
-        cache_folder (str, optional): The directory where cached data will be stored. Defaults to "/tmp/biomart/".
-        attributes (list, optional): Additional attributes to fetch from the server. Defaults to an empty list.
-        bypass_attributes (bool, optional): Whether to bypass the default attributes. Defaults to False.
-
-    Raises:
-        ValueError: If the result is not a pandas DataFrame.
-
-    Returns:
-        pd.DataFrame: A DataFrame containing the gene list from Ensembl's Biomart.
-    """
-    attr = (
-        [
-            "ensembl_gene_id",
-            "hgnc_symbol",
-            "gene_biotype",
-            "entrezgene_id",
-        ]
-        if not bypass_attributes
-        else []
-    )
-    assert cache_folder[-1] == "/"
-
-    cache_folder = os.path.expanduser(cache_folder)
-    createFoldersFor(cache_folder)
-    cachefile = os.path.join(cache_folder, ".biomart.csv")
-    if useCache & os.path.isfile(cachefile):
-        print("fetching gene names from biomart cache")
-        res = pd.read_csv(cachefile)
-    else:
-        print("downloading gene names from biomart")
-
-        res = _fetchFromServer(ensemble_server, attr + attributes)
-        res.to_csv(cachefile, index=False)
-
-    res.columns = attr + attributes
-    if type(res) is not type(pd.DataFrame()):
-        raise ValueError("should be a dataframe")
-    res = res[~(res["ensembl_gene_id"].isna() & res["hgnc_symbol"].isna())]
-    res.loc[res[res.hgnc_symbol.isna()].index, "hgnc_symbol"] = res[
-        res.hgnc_symbol.isna()
-    ]["ensembl_gene_id"]
-
-    return res
-
-
-def pd_load_cached(
-    url: str, loc: str = "/tmp/", cache: bool = True, **kwargs
-) -> pd.DataFrame:
-    """
-    pd_load_cached loads a csv file from a url, and caches it locally
-
-    Args:
-        url (str): The URL of the CSV file to be loaded.
-        loc (str, optional): The local directory where the file will be cached. Defaults to "/tmp/".
-        cache (bool, optional): Whether to use the cached file if it exists. Defaults to True.
-
-    Returns:
-        pd.DataFrame: The loaded data as a pandas DataFrame.
-    """
-    # Check if the file exists, if not, download it
-    loc += url.split("/")[-1]
-    if not os.path.isfile(loc) or not cache:
-        urllib.request.urlretrieve(url, loc)
-    # Load the data from the file
-    return pd.read_csv(loc, **kwargs)
-
-
-def onto_to_name(ids: list, onto, schema: str = "http://www.ebi.ac.uk/efo/") -> list:
-    """
-    Convert ontology IDs to names using a given ontology and schema.
-
-    Args:
-        ids (list): A list of ontology IDs to be converted.
-        onto: The ontology object used for searching.
-        schema (str, optional): The schema URL to be used for constructing the search IRI. Defaults to "http://www.ebi.ac.uk/efo/".
-
-    Returns:
-        list: A list of names corresponding to the given ontology IDs.
-    """
-    names = []
-    for val in ids:
-        res = onto.search_one(iri=schema + val.replace(":", "_"))
-        if res is None:
-            print(val, "was not found")
-        else:
-            names.append(res.label)
-    return names
-
-
 def fileToList(filename: str, strconv: callable = lambda x: x) -> list:
     """
     loads an input file with a\\n b\\n.. into a list [a,b,..]
@@ -267,7 +153,11 @@ def load_genes(organisms: Union[str, list] = "NCBITaxon:9606"):  # "NCBITaxon:10
         genesdf["hb"] = genesdf.symbol.astype(str).str.contains(("^HB[^(P)]"))
         genesdf["organism"] = organism
         organismdf.append(genesdf)
-    return pd.concat(organismdf)
+    organismdf = pd.concat(organismdf)
+    organismdf.drop(
+        columns=["source_id", "run_id", "created_by_id", "updated_at"], inplace=True
+    )
+    return organismdf
 
 
 def get_free_gpu():

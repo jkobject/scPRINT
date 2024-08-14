@@ -4,7 +4,7 @@ from torch import Tensor, optim, nn
 from lightning.pytorch.tuner.lr_finder import _LRCallback
 from lightning.pytorch.callbacks.lr_finder import LearningRateFinder
 import torch
-from galore_torch import GaLoreAdamW
+#from galore_torch import GaLoreAdamW
 from math import factorial
 import lightning as L
 import os
@@ -106,11 +106,11 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         """
         super().__init__()
         # training flags
-        self.do_denoise = False
-        self.noise = [0.3]
+        self.do_denoise = True
+        self.noise = [0.6]
         self.do_cce = False
-        self.cce_sim = 0.6
-        self.cce_scale = 0.01
+        self.cce_sim = 0.5
+        self.cce_scale = 0.002
         self.do_ecs = False
         self.ecs_threshold = 0.3
         self.ecs_scale = 0.05
@@ -127,7 +127,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         self.class_scale = 0.4
         self.do_next_tp = False
         self.do_generate = False
-        self.mask_ratio = [0.3]
+        self.mask_ratio = []
         self.warmup_duration = 500
         self.weight_decay = 0.01
         self.optim = "adamW"
@@ -588,6 +588,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                 fused=self.fused_adam,
             )
         elif self.optim == "galore":
+            raise NotImplementedError("Galore optimizer not implemented")
             param_groups = [
                 {
                     "params": [
@@ -604,7 +605,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                     "proj_type": "std",
                 },
             ]
-            optimizer = GaLoreAdamW(param_groups, lr=self.hparams.lr)
+            #optimizer = GaLoreAdamW(param_groups, lr=self.hparams.lr)
         else:
             raise ValueError(f"Unknown optimizer: {self.optim}")
         lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
