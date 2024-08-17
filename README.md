@@ -33,6 +33,14 @@ For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Py
 
 If you want to be using flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.
 
+### lamin.ai
+
+To use scPRINT, I need you to use lamin.ai. This is needed to load biological informations like genes, cell types, organisms etc...
+
+To do so, you will need to connect with google or github to [lamin.ai](https://lamin.ai/login), then be sure to connect before running anything (or before starting a notebook): `lamin login <email> --key <API-key>`. Follow the instructions on [their website](https://docs.lamin.ai/guide).
+
+To start you will need to do:
+
 ```python
 conda create -n "[whatever]" python==3.10
 git clone https://github.com/jkobject/scPRINT
@@ -42,7 +50,27 @@ pip install scPRINT[dev] # for the dev dependencies (building etc..) AND/OR [dev
 pip install scPRINT[flash] && pip install -e "git+https:/
 /github.com/triton-lang/triton.git@legacy-backend
 #egg=triton&subdirectory=python" # to use flashattention2, you will need to install triton 2.0.0.dev20221202 specifically, working on removing this dependency # only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
+lamin login <email> --key <API-key>
+lamin init --storage [folder-name-where-lamin-data-will-be-stored] --schema bionty
 ```
+
+if you start with lamin and had to do a `lamin init`, you will also need to populate your ontologies. you can do it manually or with our function:
+```python
+from scdataloader.utils import populate_my_ontology
+
+populate_my_ontology() #to populate everything (recommended) (can take 5-20mns)
+populate_my_ontology( #the minimum for scprint to run some inferences (denoising, grn inference)
+organisms: List[str] = ["NCBITaxon:10090", "NCBITaxon:9606"],
+    sex: List[str] = ["PATO:0000384", "PATO:0000383"],
+    celltypes = None,
+    ethnicities = None,
+    assays = None,
+    tissues = None,
+    diseases = None,
+    dev_stages = None,
+)
+```
+
 
 We make use of some additional packages we developed alongside scPRint.
 
@@ -51,12 +79,6 @@ Please refer to their documentation for more information:
 - [scDataLoader](https://github.com/jkobject/scDataLoader): a dataloader for training large cell models.
 - [GRnnData](https://github.com/cantinilab/GRnnData): a package to work with gene networks from single cell data.
 - [benGRN](https://github.com/jkobject/benGRN): a package to benchmark gene network inference methods from single cell data.
-
-### lamin.ai
-
-⚠️ if you want to use the scDataloader's multi-dataset mode or if you want to preprocess datasets and other functions of the model, you will need to use lamin.ai.
-
-In that case, connect with google or github to [lamin.ai](https://lamin.ai/login), then be sure to connect before running anything (or before starting a notebook): `lamin login <email> --key <API-key>`. Follow the instructions on [their website](https://docs.lamin.ai/guide).
 
 ## Usage
 
