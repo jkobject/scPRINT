@@ -36,6 +36,7 @@ scPRINT can be used to perform the following analyses:
     - [lamin.ai](#laminai)
     - [install](#install)
     - [pytorch and GPUs](#pytorch-and-gpus)
+    - [dev install](#dev-install)
   - [Usage](#usage)
     - [scPRINT's basic commands](#scprints-basic-commands)
     - [Notes on GPU/CPU usage with triton](#notes-on-gpucpu-usage-with-triton)
@@ -85,11 +86,15 @@ lamin login <email> --key <API-key>
 lamin init --storage [folder-name-where-lamin-data-will-be-stored] --schema bionty
 ```
 
-if you start with lamin and had to do a `lamin init`, you will also need to populate your ontologies. you can do it manually or with our function:
+if you start with lamin and had to do a `lamin init`, you will also need to populate your ontologies. This is because scPRINT is using ontologies to define its cell types, diseases, sexes, ethnicities, etc.
+
+you can do it manually or with our function:
+
 ```python
 from scdataloader.utils import populate_my_ontology
 
-populate_my_ontology() #to populate everything (recommended) (can take 5-20mns)
+populate_my_ontology() #to populate everything (recommended) (can take 2-10mns)
+
 populate_my_ontology( #the minimum for scprint to run some inferences (denoising, grn inference)
 organisms: List[str] = ["NCBITaxon:10090", "NCBITaxon:9606"],
     sex: List[str] = ["PATO:0000384", "PATO:0000383"],
@@ -101,7 +106,6 @@ organisms: List[str] = ["NCBITaxon:10090", "NCBITaxon:9606"],
     dev_stages = None,
 )
 ```
-
 
 We make use of some additional packages we developed alongside scPRint.
 
@@ -120,6 +124,21 @@ Once you have a GPU, and installed the required drivers, you might need to insta
  ).
 
 I was able to test it with nvidia 11.7, 11.8, 12.2.
+
+### dev install
+
+If you want to use the latest version of scPRINT and work on the code yourself use `git clone` and `pip -e` instead of `pip install`.
+
+```bash
+git clone https://github.com/jkobject/scPRINT
+git clone https://github.com/jkobject/scDataLoader
+git clone https://github.com/cantinilab/GRnnData
+git clone https://github.com/jkobject/benGRN
+pip install -e scPRINT[dev]
+pip install -e scDataLoader[dev]
+pip install -e GRnnData[dev]
+pip install -e benGRN[dev]
+```
 
 ## Usage
 
