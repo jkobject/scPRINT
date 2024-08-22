@@ -1,6 +1,6 @@
 from lightning.pytorch.callbacks import Callback
 from typing import List
-from lightning.pytorch import Trainer as LightningTainer
+
 
 class TrainingMode(Callback):
     def __init__(
@@ -21,7 +21,7 @@ class TrainingMode(Callback):
         class_scale: float = 1.5,
         mask_ratio: List[float] = [],  # 0.3
         warmup_duration: int = 500,
-        fused_adam: bool = True,
+        fused_adam: bool = False,
         adv_class_scale: float = 0.1,
         lr_reduce_patience: int = 1,
         lr_reduce_factor: float = 0.6,

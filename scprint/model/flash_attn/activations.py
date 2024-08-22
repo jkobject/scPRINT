@@ -1,8 +1,5 @@
 # Copied from https://github.com/mlcommons/training_results_v1.1/blob/main/NVIDIA/benchmarks/bert/implementations/pytorch/model/layers/activations.py
-import math
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 # 1/sqrt(2*pi)-> 0.3989423

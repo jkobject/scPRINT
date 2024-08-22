@@ -272,7 +272,7 @@ class BertLayer(nn.Module):
         self.output = BertOutput(config)
 
     def forward(self, hidden_states, attention_mask, attention_show_flg=False):
-        if attention_show_flg == True:
+        if attention_show_flg is True:
             attention_output, attention_probs = self.attention(
                 hidden_states, attention_mask, attention_show_flg
             )
@@ -280,7 +280,7 @@ class BertLayer(nn.Module):
             layer_output = self.output(intermediate_output, attention_output)
             return layer_output, attention_probs
 
-        elif attention_show_flg == False:
+        elif attention_show_flg is False:
             attention_output = self.attention(
                 hidden_states, attention_mask, attention_show_flg
             )
@@ -296,14 +296,14 @@ class BertAttention(nn.Module):
         self.output = BertSelfOutput(config)
 
     def forward(self, input_tensor, attention_mask, attention_show_flg=False):
-        if attention_show_flg == True:
+        if attention_show_flg is True:
             self_output, attention_probs = self.selfattn(
                 input_tensor, attention_mask, attention_show_flg
             )
             attention_output = self.output(self_output, input_tensor)
             return attention_output, attention_probs
 
-        elif attention_show_flg == False:
+        elif attention_show_flg is False:
             self_output = self.selfattn(
                 input_tensor, attention_mask, attention_show_flg
             )
@@ -357,9 +357,9 @@ class BertSelfAttention(nn.Module):
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(*new_context_layer_shape)
 
-        if attention_show_flg == True:
+        if attention_show_flg is True:
             return context_layer, attention_probs
-        elif attention_show_flg == False:
+        elif attention_show_flg is False:
             return context_layer
 
 
@@ -431,11 +431,11 @@ class BertEncoder(nn.Module):
     ):
         all_encoder_layers = []
         for i, layer_module in enumerate(self.layer):
-            if attention_show_flg == True:
+            if attention_show_flg is True:
                 hidden_states, attention_probs = layer_module(
                     hidden_states, attention_mask, attention_show_flg
                 )
-            elif attention_show_flg == False:
+            elif attention_show_flg is False:
                 hidden_states = layer_module(
                     hidden_states, attention_mask, attention_show_flg
                 )
@@ -445,9 +445,9 @@ class BertEncoder(nn.Module):
         if not output_all_encoded_layers:
             all_encoder_layers.append(hidden_states)
 
-        if attention_show_flg == True:
+        if attention_show_flg is True:
             return all_encoder_layers, attention_probs
-        elif attention_show_flg == False:
+        elif attention_show_flg is False:
             return all_encoder_layers
 
 
@@ -496,7 +496,7 @@ class BertModel(nn.Module):
 
         embedding_output = self.embeddings(input_ids, token_type_ids)
 
-        if attention_show_flg == True:
+        if attention_show_flg is True:
             encoded_layers, attention_probs = self.encoder(
                 embedding_output,
                 extended_attention_mask,
@@ -504,7 +504,7 @@ class BertModel(nn.Module):
                 attention_show_flg,
             )
 
-        elif attention_show_flg == False:
+        elif attention_show_flg is False:
             encoded_layers = self.encoder(
                 embedding_output,
                 extended_attention_mask,
@@ -517,9 +517,9 @@ class BertModel(nn.Module):
         if not output_all_encoded_layers:
             encoded_layers = encoded_layers[-1]
 
-        if attention_show_flg == True:
+        if attention_show_flg is True:
             return encoded_layers, pooled_output, attention_probs
-        elif attention_show_flg == False:
+        elif attention_show_flg is False:
             return encoded_layers, pooled_output
 
 
@@ -602,7 +602,7 @@ class BertForMaskedLM(nn.Module):
         attention_mask=None,
         attention_show_flg=False,
     ):
-        if attention_show_flg == False:
+        if attention_show_flg is False:
             encoded_layers, pooled_output = self.bert(
                 input_ids,
                 token_type_ids,

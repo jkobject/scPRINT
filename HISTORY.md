@@ -4,6 +4,47 @@ Changelog
 
 (unreleased)
 ------------
+- Debug of test. [jkobject]
+- Huggingfacehub. [jkobject]
+
+
+1.0.14 (2024-08-14)
+-------------------
+- Release: version 1.0.14 🚀 [jkobject]
+- Debug and update. [jkobject]
+- Merge branch 'main' of https://github.com/jkobject/scPRINT into main.
+  [jkobject]
+- Update README.md. [Jérémie Kalfon]
+- Triton update and lamin update. [jkobject]
+- Merge branch 'main' of https://github.com/jkobject/scPRINT into main.
+  [jkobject]
+- Update README.md. [Jérémie Kalfon]
+- Update README.md. [Jérémie Kalfon]
+- Cleanup and adding info in readme. [jkobject]
+- Oups. [jkobject]
+- Trying something else. [jkobject]
+- Not doing large packages or swap. [jkobject]
+- Need matrix. [jkobject]
+- Needs. [jkobject]
+- Free disk space. [jkobject]
+- Adding lock. [jkobject]
+- 3.10. [jkobject]
+- Python 3.10 for tests. [jkobject]
+- Now testing scprint. [jkobject]
+- Merge branch 'main' of https://github.com/jkobject/scPRINT into main.
+  [jkobject]
+- Add to gititgnore. [jkobject]
+- Debug. [jkobject]
+- Adding tests. [jkobject]
+- Improving docs. [jkobject]
+- Debugging docs. [jkobject]
+- Merge branch 'dev' into main. [jkobject]
+- Finishing doc. [jkobject]
+
+
+1.0.0 (2024-08-07)
+------------------
+- Release: version 1.0.0 🚀 [jkobject]
 - Finishing doc. [jkobject]
 - Starting cleanup and removing scDataLoader. [jkobject]
 

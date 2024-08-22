@@ -1,16 +1,17 @@
 
 # scPRINT: Large Cell Model for scRNAseq data
 
+[![codecov](https://codecov.io/gh/jkobject/scPRINT/branch/main/graph/badge.svg?token=GRnnData_token_here)](https://codecov.io/gh/jkobject/scPRINT)
+[![CI](https://github.com/jkobject/scPRINT/actions/workflows/main.yml/badge.svg)](https://github.com/jkobject/scPRINT/actions/workflows/main.yml)
 [![PyPI version](https://badge.fury.io/py/scprint.svg)](https://badge.fury.io/py/scprint)
-[![Documentation Status](https://readthedocs.org/projects/scprint/badge/?version=latest)](https://scprint.readthedocs.io/en/latest/?badge=latest)
 [![Downloads](https://pepy.tech/badge/scprint)](https://pepy.tech/project/scprint)
 [![Downloads](https://pepy.tech/badge/scprint/month)](https://pepy.tech/project/scprint)
 [![Downloads](https://pepy.tech/badge/scprint/week)](https://pepy.tech/project/scprint)
 [![GitHub issues](https://img.shields.io/github/issues/jkobject/scPRINT)](https://img.shields.io/github/issues/jkobject/scPRINT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![DOI](https://zenodo.org/badge/391909874.svg)]()
+[![DOI](https://zenodo.org/badge/391909874.svg)](https://doi.org/10.1101/2024.07.29.605556)
 
-![logo](logo.png)
+![logo](docs/logo.png)
 
 scPRINT is a large transformer model built for the inference of gene networks (connections between genes explaining the cell's expression profile) from scRNAseq data.
 
@@ -23,9 +24,37 @@ scPRINT can be used to perform the following analyses:
 - __label prediction__: predict the cell type, disease, sequencer, sex, and ethnicity of your cells
 - __gene network inference__: generate a gene network from any cell or cell cluster in your scRNAseq dataset
 
-[Read the paper!](https://www.biorxiv.org/content/10.1101/2024.07.29.605556v1) if you would like to know more about scPRINT.
+[Read the manuscript!](https://www.biorxiv.org/content/10.1101/2024.07.29.605556v1) if you would like to know more about scPRINT. Have a look at some of my [X-plainers](https://twitter.com/jkobject). 
 
-![figure1](figure1.png)
+![figure1](docs/figure1.png)
+
+## Table of Contents
+
+- [scPRINT: Large Cell Model for scRNAseq data](#scprint-large-cell-model-for-scrnaseq-data)
+  - [Table of Contents](#table-of-contents)
+  - [Install `scPRINT`](#install-scprint)
+    - [lamin.ai](#laminai)
+    - [pytorch and GPUs](#pytorch-and-gpus)
+  - [Usage](#usage)
+    - [scPRINT's basic commands](#scprints-basic-commands)
+    - [Notes on GPU/CPU usage with triton](#notes-on-gpucpu-usage-with-triton)
+  - [FAQ](#faq)
+    - [I want to generate gene networks from scRNAseq data:](#i-want-to-generate-gene-networks-from-scrnaseq-data)
+    - [I want to generate cell embeddings and cell label predictions from scRNAseq data:](#i-want-to-generate-cell-embeddings-and-cell-label-predictions-from-scrnaseq-data)
+    - [I want to denoise my scRNAseq dataset:](#i-want-to-denoise-my-scrnaseq-dataset)
+    - [I want to generate an atlas-level embedding](#i-want-to-generate-an-atlas-level-embedding)
+    - [I need to generate gene tokens using pLLMs](#i-need-to-generate-gene-tokens-using-pllms)
+    - [I want to pre-train scPRINT from scratch on my own data](#i-want-to-pre-train-scprint-from-scratch-on-my-own-data)
+    - [how can I find if scPRINT was trained on my data?](#how-can-i-find-if-scprint-was-trained-on-my-data)
+    - [can I use scPRINT on other organisms rather than human?](#can-i-use-scprint-on-other-organisms-rather-than-human)
+    - [how long does scPRINT takes? what kind of resources do I need? (or in alternative: can i run scPRINT locally?)](#how-long-does-scprint-takes-what-kind-of-resources-do-i-need-or-in-alternative-can-i-run-scprint-locally)
+    - [I have different scRNASeq batches. Should I integrate my data before running scPRINT?](#i-have-different-scrnaseq-batches-should-i-integrate-my-data-before-running-scprint)
+    - [where to find the gene embeddings?](#where-to-find-the-gene-embeddings)
+  - [Documentation](#documentation)
+  - [Model Weights](#model-weights)
+  - [Development](#development)
+  - [Work in progress (PR welcomed):](#work-in-progress-pr-welcomed)
+
 
 ## Install `scPRINT`
 
@@ -41,7 +70,7 @@ To do so, you will need to connect with google or github to [lamin.ai](https://l
 
 To start you will need to do:
 
-```python
+```bash
 conda create -n "[whatever]" python==3.10
 git clone https://github.com/jkobject/scPRINT
 #one of
@@ -71,7 +100,6 @@ organisms: List[str] = ["NCBITaxon:10090", "NCBITaxon:9606"],
 )
 ```
 
-
 We make use of some additional packages we developed alongside scPRint.
 
 Please refer to their documentation for more information:
@@ -79,6 +107,17 @@ Please refer to their documentation for more information:
 - [scDataLoader](https://github.com/jkobject/scDataLoader): a dataloader for training large cell models.
 - [GRnnData](https://github.com/cantinilab/GRnnData): a package to work with gene networks from single cell data.
 - [benGRN](https://github.com/jkobject/benGRN): a package to benchmark gene network inference methods from single cell data.
+
+
+### pytorch and GPUs
+
+scPRINT can run on machines without GPUs, but it will be slow. It is highly recommended to use a GPU for inference.
+
+Once you have a GPU, and installed the required drivers, you might need to install a specific version of pytorch that is compatible with your drivers (e.g. nvidia 550 drivers will lead to a nvidia toolkit 11.7 or 11.8 which might mean you need to re-install a different flavor of pytorch for things to work. e.g. using the command:
+`pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118` on my case on linux
+ ).
+
+I was able to test it with nvidia 11.7, 11.8, 12.2.
 
 ## Usage
 
@@ -127,21 +166,23 @@ model = scPrint.load_from_checkpoint(
 
 We now explore the different usages of scPRINT:
 
+## FAQ
+
 ### I want to generate gene networks from scRNAseq data:
 
 -> Refer to the section . gene network inference in [this notebook](./docs/notebooks/cancer_usecase.ipynb#).
 
--> More examples in this notebook [./notebooks/assessments/bench_omni.ipynb](./notebooks/assessments/bench_omni.ipynb).
+-> More examples in this notebook [./notebooks/assessments/bench_omni.ipynb](./notebooks/bench_omni.ipynb).
 
 ### I want to generate cell embeddings and cell label predictions from scRNAseq data:
 
 -> Refer to the embeddings and cell annotations section in [this notebook](./docs/notebooks/cancer_usecase.ipynb#).
 
-### I want to denoising my scRNAseq dataset:
+### I want to denoise my scRNAseq dataset:
 
 -> Refer to the Denoising of B-cell section in [this notebook](./docs/notebooks/cancer_usecase.ipynb).
 
--> More example in our benchmark notebook [./notebooks/assessments/bench_denoising.ipynb](./notebooks/assessments/bench_denoising.ipynb).
+-> More example in our benchmark notebook [./notebooks/assessments/bench_denoising.ipynb](./notebooks/bench_denoising.ipynb).
 
 ### I want to generate an atlas-level embedding
 
@@ -151,17 +192,48 @@ We now explore the different usages of scPRINT:
 
 To run scPRINT, you can use the option to define the gene tokens using protein language model embeddings of genes. This is done by providing the path to a parquet file of the precomputed set of embeddings for each gene name to scPRINT via "precpt_gene_emb"
 
--> To generate this file please refer to the notebook [generate_gene_embeddings](docs/notebooks/generate_gene_embeddings.ipynb).
+-> To generate this file please refer to the notebook [generate_gene_embeddings](notebooks/generate_gene_embeddings.ipynb).
 
 ### I want to pre-train scPRINT from scratch on my own data
 
 -> Refer to the documentation page [pretrain scprint](docs/pretrain.md)
 
-### Documentation
+### how can I find if scPRINT was trained on my data?
 
-For more information on usage please see the documentation in [https://www.jkobject.com/scPrint/](https://www.jkobject.com/scPrint/)
+If your data is available in cellxgene, scPRINT was likely trained on it. However some cells, datasets were dropped due to low quality data and some were randomly removed to be part of the validation / test sets.
 
-### Model Weights
+### can I use scPRINT on other organisms rather than human?
+
+scPRINT has been pretrained on both humans and mouse, and can be used on any organism with a similar gene set. If you want to use scPRINT on very different organisms, you will need to generate gene embeddings for that organism and re-train scPRINT
+
+### how long does scPRINT takes? what kind of resources do I need? (or in alternative: can i run scPRINT locally?)
+
+please look at our supplementary tables in the [manuscript](https://www.biorxiv.org/content/10.1101/2024.07.29.605556v1)
+
+### I have different scRNASeq batches. Should I integrate my data before running scPRINT?
+
+scPRINT takes raw count as inputs, so please don't use integrated data. Just give the raw counts to scPRINT and it will take care of the rest.
+
+### where to find the gene embeddings?
+
+If you think you need the gene embeddings file for loading the model from a checkpoint, you don't, as the embeddings are also stored in the model weights. You just need to load the weights like this:
+
+```python
+model = scPrint.load_from_checkpoint(
+    '../../data/temp/last.ckpt',
+    precpt_gene_emb=None,
+)
+```
+
+You can also recreate the gene embedding file through [this notebook](notebooks/generate_gene_embeddings.ipynb). Just call the functions, and it should recreate the file itself.
+
+the file itself is also available on [hugging face](https://huggingface.co/jkobject/scPRINT/tree/main)
+
+## Documentation
+
+For more information on usage please see the documentation in [https://www.jkobject.com/scPRINT/](https://www.jkobject.com/scPRINT/)
+
+## Model Weights
 
 Model weights are available on [hugging face](https://huggingface.co/jkobject/scPRINT/).
 
@@ -171,17 +243,19 @@ Read the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
 Read the [training runs](https://wandb.ai/ml4ig/scprint_scale/reports/scPRINT-trainings--Vmlldzo4ODIxMjgx?accessToken=80metwx7b08hhourotpskdyaxiflq700xzmzymr6scvkp69agybt79l341tv68hp) document to know more about how pre-training was performed and the its behavior.
 
+code coverage is not right as I am using the command line interface for now. >50% of the code is covered by my current unit test.
+
 Acknowledgement:
 [python template](https://github.com/rochacbruno/python-project-template)
 [laminDB](https://lamin.ai/)
 [lightning](https://lightning.ai/)
 
-## Work in progress:
+## Work in progress (PR welcomed):
 
 1. remove the triton dependencies
 2. add version with additional labels (tissues, age) and organisms (mouse, zebrafish) and more datasets from cellxgene
 3. version with separate transformer blocks for the encoding part of the bottleneck learning and for the cell embeddings
 4. improve classifier to output uncertainties and topK predictions when unsure
-5. 
+5. setup latest lamindb version
 
 Awesome Large Cell Model created by Jeremie Kalfon.

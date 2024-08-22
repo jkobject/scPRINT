@@ -1,6 +1,4 @@
 import os
-import time
-import subprocess
 from scprint.utils.utils import run_command
 import pandas as pd
 from torch import load
@@ -25,7 +23,9 @@ class PROTBERT:
         self.config = config
         self.pretrained_model = pretrained_model
 
-    def __call__(self, input_file: str, output_folder: str = "/tmp/esm_out/", cache: bool = True) -> pd.DataFrame:
+    def __call__(
+        self, input_file: str, output_folder: str = "/tmp/esm_out/", cache: bool = True
+    ) -> pd.DataFrame:
         """
         Call the PROTBERT model on the input file.
 
