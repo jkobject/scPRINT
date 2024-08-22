@@ -33,8 +33,9 @@ scPRINT can be used to perform the following analyses:
 - [scPRINT: Large Cell Model for scRNAseq data](#scprint-large-cell-model-for-scrnaseq-data)
   - [Table of Contents](#table-of-contents)
   - [Install `scPRINT`](#install-scprint)
-    - [pytorch and GPUs](#pytorch-and-gpus)
     - [lamin.ai](#laminai)
+    - [install](#install)
+    - [pytorch and GPUs](#pytorch-and-gpus)
   - [Usage](#usage)
     - [scPRINT's basic commands](#scprints-basic-commands)
     - [Notes on GPU/CPU usage with triton](#notes-on-gpucpu-usage-with-triton)
@@ -60,6 +61,18 @@ scPRINT can be used to perform the following analyses:
 
 For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Python 3.10.
 
+If you want to be using flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.
+
+### lamin.ai
+
+To use scPRINT, I need you to use lamin.ai. This is needed to load biological informations like genes, cell types, organisms etc...
+
+To do so, you will need to connect with google or github to [lamin.ai](https://lamin.ai/login), then be sure to connect before running anything (or before starting a notebook): `lamin login <email> --key <API-key>`. Follow the instructions on [their website](https://docs.lamin.ai/guide).
+
+### install
+
+To start you will need to do:
+
 ```bash
 conda create -n "[whatever]" python==3.10 #scprint might work with python >3.10, but it is not tested
 #one of
@@ -67,7 +80,28 @@ pip install scprint # OR
 pip install scprint[dev] # for the dev dependencies (building etc..) OR
 pip install scprint[flash] # to use flashattention2 with triton: only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
 #OR pip install scPRINT[dev,flash]
+
+lamin login <email> --key <API-key>
+lamin init --storage [folder-name-where-lamin-data-will-be-stored] --schema bionty
 ```
+
+if you start with lamin and had to do a `lamin init`, you will also need to populate your ontologies. you can do it manually or with our function:
+```python
+from scdataloader.utils import populate_my_ontology
+
+populate_my_ontology() #to populate everything (recommended) (can take 5-20mns)
+populate_my_ontology( #the minimum for scprint to run some inferences (denoising, grn inference)
+organisms: List[str] = ["NCBITaxon:10090", "NCBITaxon:9606"],
+    sex: List[str] = ["PATO:0000384", "PATO:0000383"],
+    celltypes = None,
+    ethnicities = None,
+    assays = None,
+    tissues = None,
+    diseases = None,
+    dev_stages = None,
+)
+```
+
 
 We make use of some additional packages we developed alongside scPRint.
 
@@ -86,12 +120,6 @@ Once you have a GPU, and installed the required drivers, you might need to insta
  ).
 
 I was able to test it with nvidia 11.7, 11.8, 12.2.
-
-### lamin.ai
-
-⚠️ if you want to use the scDataloader's multi-dataset mode or if you want to preprocess datasets and other functions of the model, you will need to use lamin.ai.
-
-In that case, connect with google or github to [lamin.ai](https://lamin.ai/login), then be sure to connect before running anything (or before starting a notebook): `lamin login <email> --key <API-key>`. Follow the instructions on [their website](https://docs.lamin.ai/guide).
 
 ## Usage
 
