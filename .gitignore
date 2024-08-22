@@ -174,3 +174,7 @@ notebooks/**/*.h5ad
 notebooks/*.h5ad
 *.ckpt
 data/main/bias_sparse.npz
+*.gv.*
+*.gv
+data/log/
+file.txt
