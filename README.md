@@ -82,7 +82,7 @@ pip install scprint[flash] # to use flashattention2 with triton: only if you hav
 #OR pip install scPRINT[dev,flash]
 
 lamin login <email> --key <API-key>
-lamin init --storage [folder-name-where-lamin-data-will-be-stored] --schema bionty
+lamin init --storage <folder-name-where-lamin-data-will-be-stored> --schema bionty
 ```
 
 if you start with lamin and had to do a `lamin init`, you will also need to populate your ontologies. you can do it manually or with our function:
