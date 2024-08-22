@@ -74,7 +74,7 @@ To do so, you will need to connect with google or github to [lamin.ai](https://l
 To start you will need to do:
 
 ```bash
-conda create -n "[whatever]" python==3.10 #scprint might work with python >3.10, but it is not tested
+conda create -n <env-name> python==3.10 #scprint might work with python >3.10, but it is not tested
 #one of
 pip install scprint # OR
 pip install scprint[dev] # for the dev dependencies (building etc..) OR
