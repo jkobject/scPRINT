@@ -142,7 +142,6 @@ data/fasta/*
 data/scGPT_human
 wandb/*
 */lightning_logs/*
-*.lock
 data/tensorboard/*
 notebooks/tests/*/
 data/logs/*
@@ -152,7 +151,6 @@ data/main/embeddings.parquet
 slurm-*.out
 notebooks/tests/step_0_.h5ad
 data/main/gene_embeddings.parquet
-*.h5ad
 data/main/main_scenic+.parquet
 scdataloader.out
 data/main/9606.protein.links.v12.0.txt.gz
@@ -170,3 +168,13 @@ lightning_logs/
 collator_output.txt
 data/bias_sparse.npz
 todel/
+tests/out_*.h5ad
+data/*.h5ad
+notebooks/**/*.h5ad
+notebooks/*.h5ad
+*.ckpt
+data/main/bias_sparse.npz
+*.gv.*
+*.gv
+data/log/
+file.txt

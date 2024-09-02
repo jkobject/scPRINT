@@ -1,14 +1,4 @@
 import logging
-
-# Add and format time stamp in logging messages
-logging.basicConfig(
-    format="%(asctime)s %(levelname)s %(message)s",
-    level=logging.INFO,
-    datefmt="%c",
-)
-# Mute numexpr threads info
-logging.getLogger("numexpr").setLevel(logging.WARNING)
-
 import numpy as np
 
 # Custom functions
@@ -21,6 +11,15 @@ import ftplib
 import os
 from Bio import SeqIO
 from typing import List, Optional, Union
+
+# Add and format time stamp in logging messages
+logging.basicConfig(
+    format="%(asctime)s %(levelname)s %(message)s",
+    level=logging.INFO,
+    datefmt="%c",
+)
+# Mute numexpr threads info
+logging.getLogger("numexpr").setLevel(logging.WARNING)
 
 
 def list_files(ftp, match=""):
@@ -159,7 +158,7 @@ def seq(
     ## Clean up arguments
     # Clean up Ensembl IDs
     # If single Ensembl ID passed as string, convert to list
-    if type(ens_ids) == str:
+    if type(ens_ids) is str:
         ens_ids = [ens_ids]
     # Remove Ensembl ID version if passed
     ens_ids_clean = []
@@ -228,7 +227,7 @@ def seq(
                     )
 
             # If isoforms true, fetch sequences of isoforms instead
-            if isoforms == True:
+            if isoforms is True:
                 # Get ID type (gene, transcript, ...) using gget info
                 info_df = info(
                     ensembl_ID, verbose=False, pdb=False, ncbi=False, uniprot=False
@@ -390,7 +389,7 @@ def seq(
 
             else:
                 logging.warning(
-                    f"ensembl_IDs not recognized as either a gene or transcript ID. It will not be included in the UniProt query."
+                    "ensembl_IDs not recognized as either a gene or transcript ID. It will not be included in the UniProt query."
                 )
 
             # Fetch the amino acid sequences of the transcript Ensembl IDs
@@ -499,8 +498,6 @@ def seq(
                     + str(query_ensembl_id)
                     + " gene_name: "
                     + str(gene_name)
-                    + " gene_id: "
-                    + str(gene_id)
                     + " organism: "
                     + str(organism)
                     + " sequence_length: "
@@ -510,7 +507,7 @@ def seq(
 
     # Save
     if save:
-        file: TextIOWrapper = open("gget_seq_results.fa", "w")
+        file = open("gget_seq_results.fa", "w")
         for element in fasta:
             file.write(element + "\n")
         file.close()

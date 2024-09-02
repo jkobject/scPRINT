@@ -6,14 +6,10 @@ import torch
 from scdataloader.data import SimpleAnnDataset
 from scdataloader import Collator, Preprocessor
 from scprint.model import utils
-from scprint.tasks import compute_corr
 
-import bionty as bt
 from torch.utils.data import DataLoader
 import sklearn.metrics
-import pandas as pd
 
-from lightning.pytorch import Trainer
 import anndata as ad
 from anndata import AnnData
 

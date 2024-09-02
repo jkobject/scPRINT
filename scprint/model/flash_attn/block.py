@@ -5,7 +5,6 @@ from typing import Optional, Callable, Type, Dict, Any
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import Tensor
 from torchvision.ops import StochasticDepth
 
@@ -247,7 +246,7 @@ class Block(nn.Module):
                     qkv,
                 )
             )
-        # if not prenorm (disregard for scPrint)
+        # if not prenorm (disregard for scPRINT)
         else:
             assert residual is None
             mixer_out = self.mixer(

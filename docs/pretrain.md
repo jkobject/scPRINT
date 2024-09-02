@@ -30,6 +30,7 @@ Thus a full command line to train scPRINT on a slurm cluster might look like thi
 
 ```bash
 conda activate scprint
+### slurm level stuff
 module load cuda/11.7
 srun 
   -p gpu #gpu partition
@@ -38,6 +39,8 @@ srun
   --cpus-per-task 16
   --mem-per-gpu 90G #RAM per GPU
   --ntasks-per-node=1 
+####
+  # actuall scprint command
   scprint fit 
     --config config/base.yml #base config file (see below)
     --config config/pretrain_large.yml #the differences when training a large model

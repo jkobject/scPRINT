@@ -23,6 +23,8 @@ except ModuleNotFoundError as e:
     flash_attn_kvpacked_func = None
     flash_attn_qkvpacked_func = None
 
+from .flashattention_triton import attention as triton_attention
+
 flash_attn_varlen_kvpacked_func = None
 flash_attn_varlen_qkvpacked_func = None
 flash_attn_with_kvcache = None
@@ -38,6 +40,7 @@ class FlashSelfAttention(nn.Module):
         attention_dropout: float = 0.0,
         alibi_slopes: Optional[Any] = None,
         deterministic: bool = False,
+        use_triton: bool = False,
     ):
         """Implement the scaled dot product attention with softmax.
 
@@ -50,8 +53,10 @@ class FlashSelfAttention(nn.Module):
             causal (bool, optional): Whether to use causal attention. Defaults to False.
         """
         super().__init__()
-        assert flash_attn_qkvpacked_func is not None, "FlashAttention is not installed"
-        assert flash_attn_qkvpacked_func is not None, "FlashAttention is not installed"
+        if flash_attn_qkvpacked_func is None:
+            print("FlashAttention is not installed, using triton instead")
+            use_triton = True
+        self.use_triton = use_triton
         self.causal = causal
         self.softmax_scale = softmax_scale
 
@@ -84,13 +89,25 @@ class FlashSelfAttention(nn.Module):
         assert qkv.dtype in [torch.float16, torch.bfloat16]
         assert qkv.is_cuda
         causal = self.causal if causal is None else causal
-        return flash_attn_qkvpacked_func(
-            qkv,
-            bias,
-            # self.drop.p if self.training else 0.0,
-            causal,
-            self.softmax_scale,
-        )
+        if self.use_triton:
+            if qkv.stride(-1) != 1:
+                qkv = qkv.contiguous()
+            return triton_attention(
+                qkv[:, :, 0],
+                qkv[:, :, 1],
+                qkv[:, :, 2],
+                bias,
+                causal,
+                self.softmax_scale,
+            )
+        else:
+            return flash_attn_qkvpacked_func(
+                qkv,
+                bias,
+                # self.drop.p if self.training else 0.0,
+                causal,
+                self.softmax_scale,
+            )
 
 
 class FlashCrossAttention(nn.Module):
