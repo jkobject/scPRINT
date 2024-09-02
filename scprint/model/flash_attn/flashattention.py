@@ -44,6 +44,7 @@ import math
 import torch
 import triton
 import triton.language as tl
+from typing import Optional, Tuple
 
 
 # Disabling autotune for now, set num_warps=4 if headdim=64 and num_warps=8 if headdim=128
@@ -927,9 +928,6 @@ def _bwd_kernel(
             BLOCK_M=BLOCK_M,
             BLOCK_N=BLOCK_N,
         )
-
-
-from typing import Optional, Tuple
 
 
 def _flash_attn_forward(

@@ -4,7 +4,8 @@ from torch import Tensor, optim, nn
 from lightning.pytorch.tuner.lr_finder import _LRCallback
 from lightning.pytorch.callbacks.lr_finder import LearningRateFinder
 import torch
-#from galore_torch import GaLoreAdamW
+
+# from galore_torch import GaLoreAdamW
 from math import factorial
 import lightning as L
 import os
@@ -246,9 +247,10 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         # Linear
         if transformer == "linear":
             # linear transformer using the fast transformer package
-            self.transformer = FastTransformerEncoder(
-                d_model, nhead, d_hid, nlayers, dropout, "linear"
-            )
+            # self.transformer = FastTransformerEncoder(
+            #    d_model, nhead, d_hid, nlayers, dropout, "linear"
+            # )
+            raise NotImplementedError("Linear transformer is not implemented")
         # regular or flash
         else:
             self.transformer = FlashTransformerEncoder(
@@ -605,7 +607,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
                     "proj_type": "std",
                 },
             ]
-            #optimizer = GaLoreAdamW(param_groups, lr=self.hparams.lr)
+            # optimizer = GaLoreAdamW(param_groups, lr=self.hparams.lr)
         else:
             raise ValueError(f"Unknown optimizer: {self.optim}")
         lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(

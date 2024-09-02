@@ -20,7 +20,9 @@ def _calculate_new_faces(faces, new, old_set):
     faces.add(frozenset([new, old_set[1], old_set[2]]))
 
 
-def _add_triangular_face(G: nx.Graph, new: int, old_set: set, C: np.ndarray, faces: list) -> None:
+def _add_triangular_face(
+    G: nx.Graph, new: int, old_set: set, C: np.ndarray, faces: list
+) -> None:
     """
     Adds a new triangle to the networkx graph G
 
@@ -40,7 +42,9 @@ def _add_triangular_face(G: nx.Graph, new: int, old_set: set, C: np.ndarray, fac
         G.add_edge(new, j, weight=C[new, j])
 
 
-def tmfg(corr: np.ndarray, absolute: bool = False, threshold_mean: bool = True) -> nx.Graph:
+def tmfg(
+    corr: np.ndarray, absolute: bool = False, threshold_mean: bool = True
+) -> nx.Graph:
     """
     Constructs a TMFG from the supplied correlation matrix
 

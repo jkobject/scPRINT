@@ -50,7 +50,7 @@ class GeneEmbedding(object):
         _, ax = plt.subplots(1, 1, figsize=(3, 6))
         sns.barplot(data=df, y="Gene", x="Similarity", palette="magma_r", ax=ax)
         ax.set_title("{} Similarity".format(gene))
-        if save != None:
+        if save is not None:
             plt.savefig(save)
 
     def plot_metagene(self, gdata, mg=None, title="Gene Embedding"):
@@ -210,16 +210,6 @@ class GeneEmbedding(object):
                 vector.append(vec)
         assert len(vector) != 0, genes
         return list(np.average(vector, axis=0))
-
-    def generate_weighted_vector(self, genes, weights):
-        vector = []
-        weight = []
-        for gene, vec in zip(self.genes, self.vector):
-            if gene in genes and gene in weights:
-                vector.append(vec)
-                weight.append(weights[gene])
-        assert len(vector) != 0, genes
-        return list(np.average(vector, axis=0, weights=weight))
 
     def cluster_definitions_as_df(self, top_n=20):
         similarities = self.cluster_definitions

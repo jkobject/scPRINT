@@ -372,7 +372,9 @@ class GNInfer:
             grn=grn,
         )
         # grn = grn[:, (grn.X != 0).sum(0) > (self.max_cells / 32)]
-        grn.var["TFs"] = [True if i in grnutils.TF else False for i in grn.var["symbol"]]
+        grn.var["TFs"] = [
+            True if i in grnutils.TF else False for i in grn.var["symbol"]
+        ]
         grn.uns["grn_scprint_params"] = {
             "filtration": self.filtration,
             "how": self.how,

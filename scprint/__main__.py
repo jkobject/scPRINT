@@ -29,7 +29,7 @@ class MySaveConfig(SaveConfigCallback):
             if trainer.is_global_zero:
                 print(trainer.datamodule)
                 print(trainer.callbacks)
-                #print(pl_module.hparams)
+                # print(pl_module.hparams)
         return super().setup(trainer, pl_module, stage)
 
 

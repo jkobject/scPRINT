@@ -39,6 +39,7 @@ scPRINT can be used to perform the following analyses:
   - [Usage](#usage)
     - [scPRINT's basic commands](#scprints-basic-commands)
     - [Notes on GPU/CPU usage with triton](#notes-on-gpucpu-usage-with-triton)
+    - [Simple tests:](#simple-tests)
   - [FAQ](#faq)
     - [I want to generate gene networks from scRNAseq data:](#i-want-to-generate-gene-networks-from-scrnaseq-data)
     - [I want to generate cell embeddings and cell label predictions from scRNAseq data:](#i-want-to-generate-cell-embeddings-and-cell-label-predictions-from-scrnaseq-data)
@@ -59,7 +60,7 @@ scPRINT can be used to perform the following analyses:
 
 ## Install `scPRINT`
 
-For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Python 3.10.
+For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Python 3.10. Its instalation takes on average 10 minutes.
 
 If you want to be using flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.
 
@@ -165,6 +166,10 @@ model = scPrint.load_from_checkpoint(
     '../data/temp/last.ckpt', precpt_gene_emb=None,
     transformer="normal")
 ```
+
+### Simple tests:
+
+An instalation of scPRINT and a simple test of the denoiser is performed during each commit to the main branch with a [Github action](https://github.com/jkobject/scPRINT/actions) and [pytest workflow](.github/workflows/main.yml). It also provides an expected runtime for the installation and run of scPRINT.
 
 We now explore the different usages of scPRINT:
 
