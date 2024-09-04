@@ -23,7 +23,7 @@ except ModuleNotFoundError as e:
     flash_attn_kvpacked_func = None
     flash_attn_qkvpacked_func = None
 
-from .flashattention_triton import attention as triton_attention
+# from .flashattention_triton import attention as triton_attention
 
 flash_attn_varlen_kvpacked_func = None
 flash_attn_varlen_qkvpacked_func = None
@@ -90,16 +90,17 @@ class FlashSelfAttention(nn.Module):
         assert qkv.is_cuda
         causal = self.causal if causal is None else causal
         if self.use_triton:
+            raise NotImplementedError("OpenAI's flashattention is not implemented")
             if qkv.stride(-1) != 1:
                 qkv = qkv.contiguous()
-            return triton_attention(
-                qkv[:, :, 0],
-                qkv[:, :, 1],
-                qkv[:, :, 2],
-                bias,
-                causal,
-                self.softmax_scale,
-            )
+            # return triton_attention(
+            #    qkv[:, :, 0],
+            #    qkv[:, :, 1],
+            #    qkv[:, :, 2],
+            #    bias,
+            #    causal,
+            #    self.softmax_scale,
+            # )
         else:
             return flash_attn_qkvpacked_func(
                 qkv,
@@ -393,7 +394,12 @@ class MHA(nn.Module):
         self.rotary_emb_dim = rotary_emb_dim
         self.use_flash_attn = use_flash_attn
         if self.use_flash_attn and (flash_attn_kvpacked_func is None):
-            raise ValueError("flash transformer requires flash package")
+            print(
+                "you requested flash transformer but it requires the flash package which is not installed"
+            )
+            print("falling back to regular transformer...")
+            self.use_flash_attn = False
+
             # NOT flash transformer using the special tritton kernel
             # or parallelMHA (add the process group thing and faster)
         self.return_residual = return_residual
@@ -436,12 +442,12 @@ class MHA(nn.Module):
         wqkv_cls = linear_cls if not self.return_residual else linear_resid_cls
         inner_attn_cls = (
             partial(FlashSelfAttention, alibi_slopes=alibi_slopes)
-            if use_flash_attn
+            if self.use_flash_attn
             else SelfAttention
         )
         inner_cross_attn_cls = (
             partial(FlashCrossAttention, alibi_slopes=alibi_slopes)
-            if use_flash_attn
+            if self.use_flash_attn
             else CrossAttention
         )
         if not self.cross_attn:
