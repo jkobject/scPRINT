@@ -81,12 +81,14 @@ release:          ## Create a new tag for release.
 	@echo "$${TAG}" > scprint/VERSION
 	@sed -i 's/^version = .*/version = "'$${TAG}'"/' pyproject.toml
 	@$(ENV_PREFIX)gitchangelog > HISTORY.md
-	@git add scprint/VERSION HISTORY.md
+	@git add scprint/VERSION HISTORY.md pyproject.toml
 	@git commit -m "release: version $${TAG} 🚀"
 	@echo "creating git tag : $${TAG}"
 	@git tag $${TAG}
 	@git push -u origin HEAD --tags
 	@echo "Github Actions will detect the new tag and release the new version."
+	@mkdocs gh-deploy
+	@echo "Documentation deployed to https://jkobject.github.io/scPRINT/"
 
 .PHONY: docs
 docs:             ## Build the documentation.
