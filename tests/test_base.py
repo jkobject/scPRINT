@@ -40,7 +40,10 @@ def test_base():
     # conf = dict(self.config_init[subcommand])
 
     model = scPrint.load_from_checkpoint(
-        ckpt_path, precpt_gene_emb=None, attention_type="normal"
+        ckpt_path,
+        precpt_gene_emb=None,
+        # triton gets installed so it must think it has cuda enabled
+        transformer="normal",
     )
     dn = Denoiser(
         plot_corr_size=10,
