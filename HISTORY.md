@@ -4,6 +4,27 @@ Changelog
 
 (unreleased)
 ------------
+- Debug2. [jkobject]
+- Debug. [jkobject]
+- Nothing really. [jkobject]
+- Nothing really. [jkobject]
+- Merge branch 'main' of https://github.com/jkobject/scPRINT into main.
+  [jkobject]
+- Lmprovements. [jkobject]
+- Adding better linting and removing RNABERT. [jkobject]
+- Update README.md. [Jérémie Kalfon]
+- Update README.md. [Jérémie Kalfon]
+- Tiny updates. [jkobject]
+- Add more info. [jkobject]
+- Merge remote-tracking branch 'origin/dev' into main. [jkobject]
+- Update README.md. [Jérémie Kalfon]
+- Adding gitignore. [jkobject]
+- Improving readme. [jkobject]
+
+
+1.0.15 (2024-08-14)
+-------------------
+- Release: version 1.0.15 🚀 [jkobject]
 - Debug of test. [jkobject]
 - Huggingfacehub. [jkobject]
 
