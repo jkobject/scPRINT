@@ -2,8 +2,9 @@ Changelog
 =========
 
 
-(unreleased)
-------------
+1.1.1 (2024-09-04)
+------------------
+- Release: version 1.1.1 🚀 [jkobject]
 - Adding a term in the test. [jkobject]
 - Ready for releases. [jkobject]
 
