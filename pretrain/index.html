@@ -66,9 +66,9 @@
               </ul>
               <p class="caption"><span class="caption-text">example notebooks</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../notebooks/cancer_usecase/">Cancer usecase</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../notebooks/cancer_usecase/">scPRINT use case on BPH</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../notebooks/cancer_usecase_part2/">Cancer usecase (part 2)</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../notebooks/cancer_usecase_part2/">scPRINT use case on BPH (part 2, GN analysis)</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">documentation</span></p>
@@ -123,6 +123,7 @@
 <p>More hyperparameters are given to the scPRINT model via a Trainer callback I created (see <code>trainer/trainer.py</code>). This is used to specify parameters to scPRINT that are used solely during training and are not part of the model definition itself, like lr, schedulers, optimizers, etc.. I use a callback as it is how pytorch lightning requires us to send training parameters to the model.</p>
 <p>Thus a full command line to train scPRINT on a slurm cluster might look like this:</p>
 <pre><code class="language-bash">conda activate scprint
+### slurm level stuff
 module load cuda/11.7
 srun 
   -p gpu #gpu partition
@@ -131,6 +132,8 @@ srun
   --cpus-per-task 16
   --mem-per-gpu 90G #RAM per GPU
   --ntasks-per-node=1 
+####
+  # actuall scprint command
   scprint fit 
     --config config/base.yml #base config file (see below)
     --config config/pretrain_large.yml #the differences when training a large model

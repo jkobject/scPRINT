@@ -55,6 +55,10 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#notes-on-gpucpu-usage-with-triton">Notes on GPU/CPU usage with triton</a>
     </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#faq">FAQ</a>
+        <ul>
     <li class="toctree-l3"><a class="reference internal" href="#i-want-to-generate-gene-networks-from-scrnaseq-data">I want to generate gene networks from scRNAseq data:</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#i-want-to-generate-cell-embeddings-and-cell-label-predictions-from-scrnaseq-data">I want to generate cell embeddings and cell label predictions from scRNAseq data:</a>
@@ -67,11 +71,21 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#i-want-to-pre-train-scprint-from-scratch-on-my-own-data">I want to pre-train scPRINT from scratch on my own data</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#documentation">Documentation</a>
+    <li class="toctree-l3"><a class="reference internal" href="#how-can-i-find-if-scprint-was-trained-on-my-data">how can I find if scPRINT was trained on my data?</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#model-weights">Model Weights</a>
+    <li class="toctree-l3"><a class="reference internal" href="#can-i-use-scprint-on-other-organisms-rather-than-human">can I use scPRINT on other organisms rather than human?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#how-long-does-scprint-takes-what-kind-of-resources-do-i-need-or-in-alternative-can-i-run-scprint-locally">how long does scPRINT takes? what kind of resources do I need? (or in alternative: can i run scPRINT locally?)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#i-have-different-scrnaseq-batches-should-i-integrate-my-data-before-running-scprint">I have different scRNASeq batches. Should I integrate my data before running scPRINT?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#where-to-find-the-gene-embeddings">where to find the gene embeddings?</a>
     </li>
         </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#documentation">Documentation</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#model-weights">Model Weights</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#development">Development</a>
     </li>
@@ -94,9 +108,9 @@
               </ul>
               <p class="caption"><span class="caption-text">example notebooks</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="notebooks/cancer_usecase/">Cancer usecase</a>
+                  <li class="toctree-l1"><a class="reference internal" href="notebooks/cancer_usecase/">scPRINT use case on BPH</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="notebooks/cancer_usecase_part2/">Cancer usecase (part 2)</a>
+                  <li class="toctree-l1"><a class="reference internal" href="notebooks/cancer_usecase_part2/">scPRINT use case on BPH (part 2, GN analysis)</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">documentation</span></p>
@@ -160,16 +174,15 @@
 <p>For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Python 3.10.</p>
 <p>If you want to be using flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.</p>
 <pre><code class="language-python">conda create -n &quot;[whatever]&quot; python==3.10
-git clone https://github.com/jkobject/scPRINT
 #one of
-pip install scPRINT # OR
-pip install scPRINT[dev] # for the dev dependencies (building etc..) AND/OR [dev,flash]
-pip install scPRINT[flash] &amp;&amp; pip install -e &quot;git+https:/
+pip install scprint # OR
+pip install scprint[dev] # for the dev dependencies (building etc..) AND/OR [dev,flash]
+pip install scprint[flash] &amp;&amp; pip install -e &quot;git+https:/
 /github.com/triton-lang/triton.git@legacy-backend
 #egg=triton&amp;subdirectory=python&quot; # to use flashattention2, you will need to install triton 2.0.0.dev20221202 specifically, working on removing this dependency # only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
 </code></pre>
-<p>We make use of some additional packages we developed alongside scPRint.</p>
-<p>Please refer to their documentation for more information:</p>
+<p>We make use of some additional packages we developed alongside scPRint.
+Please refer to their documentation for more information:</p>
 <ul>
 <li><a href="https://github.com/jkobject/scDataLoader">scDataLoader</a>: a dataloader for training large cell models.</li>
 <li><a href="https://github.com/cantinilab/GRnnData">GRnnData</a>: a package to work with gene networks from single cell data.</li>
@@ -209,6 +222,7 @@ denoiser(model, adata=adata)
     transformer=&quot;normal&quot;)
 </code></pre>
 <p>We now explore the different usages of scPRINT:</p>
+<h2 id="faq">FAQ</h2>
 <h3 id="i-want-to-generate-gene-networks-from-scrnaseq-data">I want to generate gene networks from scRNAseq data:</h3>
 <p>-&gt; Refer to the section . gene network inference in <a href="notebooks/cancer_usecase/">this notebook</a>.</p>
 <p>-&gt; More examples in this notebook <a href="../notebooks/bench_omni.ipynb">notebooks/assessments/bench_omni.ipynb</a>.</p>
@@ -224,9 +238,26 @@ denoiser(model, adata=adata)
 <p>-&gt; To generate this file please refer to the notebook <a href="../notebooks/generate_gene_embeddings.ipynb">notebooks/generate_gene_embeddings.ipynb</a>.</p>
 <h3 id="i-want-to-pre-train-scprint-from-scratch-on-my-own-data">I want to pre-train scPRINT from scratch on my own data</h3>
 <p>-&gt; Refer to the documentation page <a href="pretrain/">pretrain scprint</a></p>
-<h3 id="documentation">Documentation</h3>
-<p>For more information on usage please see the documentation in <a href="https://www.jkobject.com/scPrint/">https://www.jkobject.com/scPrint/</a></p>
-<h3 id="model-weights">Model Weights</h3>
+<h3 id="how-can-i-find-if-scprint-was-trained-on-my-data">how can I find if scPRINT was trained on my data?</h3>
+<p>If your data is available in cellxgene, scPRINT was likely trained on it. However some cells, datasets were dropped due to low quality data and some were randomly removed to be part of the validation / test sets.</p>
+<h3 id="can-i-use-scprint-on-other-organisms-rather-than-human">can I use scPRINT on other organisms rather than human?</h3>
+<p>scPRINT has been pretrained on both humans and mouse, and can be used on any organism with a similar gene set. If you want to use scPRINT on very different organisms, you will need to generate gene embeddings for that organism and re-train scPRINT</p>
+<h3 id="how-long-does-scprint-takes-what-kind-of-resources-do-i-need-or-in-alternative-can-i-run-scprint-locally">how long does scPRINT takes? what kind of resources do I need? (or in alternative: can i run scPRINT locally?)</h3>
+<p>please look at our supplementary tables in the <a href="https://www.biorxiv.org/content/10.1101/2024.07.29.605556v1">manuscript</a></p>
+<h3 id="i-have-different-scrnaseq-batches-should-i-integrate-my-data-before-running-scprint">I have different scRNASeq batches. Should I integrate my data before running scPRINT?</h3>
+<p>scPRINT takes raw count as inputs, so please don't use integrated data. Just give the raw counts to scPRINT and it will take care of the rest.</p>
+<h3 id="where-to-find-the-gene-embeddings">where to find the gene embeddings?</h3>
+<p>If you think you need the gene embeddings file for loading the model from a checkpoint, you don't, as the embeddings are also stored in the model weights. You just need to load the weights like this:</p>
+<pre><code class="language-python">model = scPrint.load_from_checkpoint(
+    '../../data/temp/last.ckpt',
+    precpt_gene_emb=None,
+)
+</code></pre>
+<p>You can also recreate the gene embedding file through <a href="notebooks/generate_gene_embeddings.ipynb">this notebook</a>. Just call the functions, and it should recreate the file itself.</p>
+<p>the file itself is also available on <a href="https://huggingface.co/jkobject/scPRINT/tree/main">hugging face</a></p>
+<h2 id="documentation">Documentation</h2>
+<p>For more information on usage please see the documentation in <a href="https://www.jkobject.com/scPRINT/">https://www.jkobject.com/scPRINT/</a></p>
+<h2 id="model-weights">Model Weights</h2>
 <p>Model weights are available on <a href="https://huggingface.co/jkobject/scPRINT/">hugging face</a>.</p>
 <h2 id="development">Development</h2>
 <p>Read the <a href="CONTRIBUTING.md">CONTRIBUTING.md</a> file.</p>
@@ -292,5 +323,5 @@ denoiser(model, adata=adata)
 
 <!--
 MkDocs version : 1.6.0
-Build Date UTC : 2024-08-07 14:26:42.295691+00:00
+Build Date UTC : 2024-09-04 16:55:30.146389+00:00
 -->

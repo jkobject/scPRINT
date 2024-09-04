@@ -58,9 +58,9 @@
               </ul>
               <p class="caption"><span class="caption-text">example notebooks</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../notebooks/cancer_usecase/">Cancer usecase</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../notebooks/cancer_usecase/">scPRINT use case on BPH</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../notebooks/cancer_usecase_part2/">Cancer usecase (part 2)</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../notebooks/cancer_usecase_part2/">scPRINT use case on BPH (part 2, GN analysis)</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">documentation</span></p>
@@ -475,7 +475,7 @@ but at the same time it has training specific methods... so we have to do this.<
             <li>
               <b><code>fused_adam</code></b>
                   (<code>bool</code>, default:
-                      <code>True</code>
+                      <code>False</code>
 )
               –
               <div class="doc-md-description">
@@ -712,7 +712,7 @@ but at the same time it has training specific methods... so we have to do this.<
     <span class="n">class_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.5</span><span class="p">,</span>
     <span class="n">mask_ratio</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>  <span class="c1"># 0.3</span>
     <span class="n">warmup_duration</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
-    <span class="n">fused_adam</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">fused_adam</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">adv_class_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
     <span class="n">lr_reduce_patience</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">lr_reduce_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.6</span><span class="p">,</span>
