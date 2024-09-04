@@ -188,7 +188,7 @@ def compute_joint_attention(att_mat, add_residual=True):
 
 def plot_attention_heatmap(att, s_position, t_positions, sentence):
     cls_att = np.flip(att[:, s_position, t_positions], axis=0)
-    xticklb = input_tokens = list(
+    xticklb = list(
         itertools.compress(
             ["<cls>"] + sentence.split(),
             [i in t_positions for i in np.arange(len(sentence) + 1)],
@@ -199,10 +199,10 @@ def plot_attention_heatmap(att, s_position, t_positions, sentence):
     return ax
 
 
-def convert_adjmat_tomats(self, adjmat, n_layers, l):
-    mats = np.zeros((n_layers, l, l))
+def convert_adjmat_tomats(self, adjmat, n_layers, li):
+    mats = np.zeros((n_layers, li, li))
 
     for i in np.arange(n_layers):
-        mats[i] = adjmat[(i + 1) * l : (i + 2) * l, i * l : (i + 1) * l]
+        mats[i] = adjmat[(i + 1) * li : (i + 2) * li, i * li : (i + 1) * li]
 
     return mats

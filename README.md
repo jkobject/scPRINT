@@ -40,6 +40,7 @@ scPRINT can be used to perform the following analyses:
   - [Usage](#usage)
     - [scPRINT's basic commands](#scprints-basic-commands)
     - [Notes on GPU/CPU usage with triton](#notes-on-gpucpu-usage-with-triton)
+    - [Simple tests:](#simple-tests)
   - [FAQ](#faq)
     - [I want to generate gene networks from scRNAseq data:](#i-want-to-generate-gene-networks-from-scrnaseq-data)
     - [I want to generate cell embeddings and cell label predictions from scRNAseq data:](#i-want-to-generate-cell-embeddings-and-cell-label-predictions-from-scrnaseq-data)
@@ -60,7 +61,7 @@ scPRINT can be used to perform the following analyses:
 
 ## Install `scPRINT`
 
-For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Python 3.10.
+For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Python 3.10. Its instalation takes on average 10 minutes.
 
 If you want to be using flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.
 
@@ -75,7 +76,7 @@ To do so, you will need to connect with google or github to [lamin.ai](https://l
 To start you will need to do:
 
 ```bash
-conda create -n "[whatever]" python==3.10 #scprint might work with python >3.10, but it is not tested
+conda create -n <env-name> python==3.10 #scprint might work with python >3.10, but it is not tested
 #one of
 pip install scprint # OR
 pip install scprint[dev] # for the dev dependencies (building etc..) OR
@@ -83,7 +84,7 @@ pip install scprint[flash] # to use flashattention2 with triton: only if you hav
 #OR pip install scPRINT[dev,flash]
 
 lamin login <email> --key <API-key>
-lamin init --storage [folder-name-where-lamin-data-will-be-stored] --schema bionty
+lamin init --storage <folder-name-where-lamin-data-will-be-stored> --schema bionty
 ```
 
 if you start with lamin and had to do a `lamin init`, you will also need to populate your ontologies. This is because scPRINT is using ontologies to define its cell types, diseases, sexes, ethnicities, etc.
@@ -184,6 +185,10 @@ model = scPrint.load_from_checkpoint(
     '../data/temp/last.ckpt', precpt_gene_emb=None,
     transformer="normal")
 ```
+
+### Simple tests:
+
+An instalation of scPRINT and a simple test of the denoiser is performed during each commit to the main branch with a [Github action](https://github.com/jkobject/scPRINT/actions) and [pytest workflow](.github/workflows/main.yml). It also provides an expected runtime for the installation and run of scPRINT.
 
 We now explore the different usages of scPRINT:
 

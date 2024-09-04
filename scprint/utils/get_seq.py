@@ -198,7 +198,7 @@ def seq(
             results_dict = {ensembl_ID: {}}
 
             # If isoforms False, just fetch sequences of passed Ensembl ID
-            if isoforms == False:
+            if isoforms is False:
                 # sequence/id/ query: Request sequence by stable identifier
                 query = "sequence/id/" + ensembl_ID + "?"
 

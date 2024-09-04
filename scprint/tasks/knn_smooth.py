@@ -178,10 +178,10 @@ def knn_smoothing(
 
         Y = _calculate_pc_scores(S, d, seed=seed)
         if dither > 0:
-            for l in range(d):
-                ptp = np.ptp(Y[l, :])
+            for li in range(d):
+                ptp = np.ptp(Y[li, :])
                 dy = (np.random.rand(Y.shape[1]) - 0.5) * ptp * dither
-                Y[l, :] = Y[l, :] + dy
+                Y[li, :] = Y[li, :] + dy
 
         # determine cell-cell distances using smoothed matrix
         t0 = time.time()
@@ -248,7 +248,6 @@ if __name__ == "__main__":
         "--test", is_flag=True, help="Test if results for test data are correct."
     )
     def main(k, d, dither, fpath, saveto, seed, sep, test):
-
         print("Loading the data...", end=" ")
         sys.stdout.flush()
         t0 = time.time()
