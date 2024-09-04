@@ -39,7 +39,9 @@ def test_base():
     adata = preprocessor(adata)
     # conf = dict(self.config_init[subcommand])
 
-    model = scPrint.load_from_checkpoint(ckpt_path, precpt_gene_emb=None)
+    model = scPrint.load_from_checkpoint(
+        ckpt_path, precpt_gene_emb=None, attention_type="normal"
+    )
     dn = Denoiser(
         plot_corr_size=10,
         batch_size=2,
