@@ -4,6 +4,13 @@ Changelog
 
 (unreleased)
 ------------
+- Adding a term in the test. [jkobject]
+- Ready for releases. [jkobject]
+
+
+1.1.0 (2024-09-04)
+------------------
+- Release: version 1.1.0 🚀 [jkobject]
 - Merge branch 'main' of https://github.com/jkobject/scPRINT into main.
   [jkobject]
 - Release: version  🚀 [jkobject]
