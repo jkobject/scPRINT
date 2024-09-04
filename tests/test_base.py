@@ -2,6 +2,7 @@ import scanpy as sc
 import numpy as np
 import os
 import urllib.request
+import torch
 
 from scprint.base import NAME
 from scdataloader import Preprocessor
@@ -46,11 +47,10 @@ def test_base():
         max_len=300,
         downsample=0.3,
         predict_depth_mult=3,
+        dtype=torch.float32,
     )
     metrics, random_indices, genes, expr_pred = dn(
         model=model,
         adata=adata,
     )
-    print("metrics:")
-    print(metrics)
     assert metrics["reco2full"] - metrics["noisy2full"] > 0
