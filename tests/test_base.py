@@ -53,4 +53,4 @@ def test_base():
         model=model,
         adata=adata,
     )
-    assert metrics["reco2full"] - metrics["noisy2full"] > 0
+    assert metrics["reco2full"] - metrics["noisy2full"] > 0, "Model is not denoising"
