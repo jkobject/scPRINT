@@ -4,10 +4,14 @@ Changelog
 
 (unreleased)
 ------------
+- Merge branch 'main' of https://github.com/jkobject/scPRINT into main.
+  [jkobject]
+- Release: version  🚀 [jkobject]
 - Debug2. [jkobject]
 - Debug. [jkobject]
 - Nothing really. [jkobject]
 - Nothing really. [jkobject]
+- Wip on tests. [jkobject]
 - Merge branch 'main' of https://github.com/jkobject/scPRINT into main.
   [jkobject]
 - Lmprovements. [jkobject]
