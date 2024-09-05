@@ -2,11 +2,14 @@ import scanpy as sc
 import numpy as np
 import os
 import urllib.request
+import torch
 
 from scprint.base import NAME
 from scdataloader import Preprocessor
 from scdataloader.utils import populate_my_ontology
-import subprocess
+from scprint.tasks import Denoiser
+from scprint import scPrint
+import pytest
 
 
 def test_base():
@@ -14,12 +17,12 @@ def test_base():
     populate_my_ontology(
         organisms=["NCBITaxon:10090", "NCBITaxon:9606"],
         sex=["PATO:0000384", "PATO:0000383"],
-        celltypes=None,
-        ethnicities=None,
-        assays=None,
-        tissues=None,
-        diseases=None,
-        dev_stages=None,
+        # celltypes=None,
+        # ethnicities=None,
+        # assays=None,
+        # tissues=None,
+        # diseases=None,
+        # dev_stages=None,
     )
     filepath = os.path.join(os.path.dirname(__file__), "test.h5ad")
     ckpt_path = os.path.join(os.path.dirname(__file__), "small.ckpt")
@@ -27,28 +30,35 @@ def test_base():
         url = "https://huggingface.co/jkobject/scPRINT/resolve/main/small.ckpt"
         urllib.request.urlretrieve(url, ckpt_path)
 
-    result = subprocess.run(
-        [
-            "scprint",
-            "denoise",
-            "--ckpt_path",
-            ckpt_path,
-            "--adata",
-            filepath,
-            "--output_filename",
-            "out",
-            "--plot_corr_size",
-            "10",
-            "--species",
-            "NCBITaxon:9606",
-        ],
-        capture_output=True,
-        text=True,
+    adata = sc.read_h5ad(filepath)
+    adata.obs.drop(columns="is_primary_data", inplace=True, errors="ignore")
+    adata.obs["organism_ontology_term_id"] = "NCBITaxon:9606"
+    preprocessor = Preprocessor(
+        do_postp=False,
+        force_preprocess=True,
     )
-
-    exit_code = result.returncode
-    print("stdout:", result.stdout)
-    if exit_code != 0:
-        print("stderr:", result.stderr)
-        assert False, f"scPRINT denoise test failed with exit code {exit_code}"
-    assert exit_code == 0, f"scPRINT denoise test failed with exit code {exit_code}"
+    adata = preprocessor(adata)
+    # conf = dict(self.config_init[subcommand])
+    try:
+        model = scPrint.load_from_checkpoint(
+            ckpt_path,
+            precpt_gene_emb=None,
+            # triton gets installed so it must think it has cuda enabled
+            transformer="normal",
+        )
+        dn = Denoiser(
+            plot_corr_size=10,
+            batch_size=2,
+            num_workers=1,
+            max_len=300,
+            downsample=0.3,
+            predict_depth_mult=3,
+            dtype=torch.float32,
+        )
+        metrics, random_indices, genes, expr_pred = dn(
+            model=model,
+            adata=adata,
+        )
+    except Exception as e:
+        pytest.fail(f"An exception occurred: {str(e)}")
+    assert metrics["reco2full"] - metrics["noisy2full"] > 0, "Model is not denoising"

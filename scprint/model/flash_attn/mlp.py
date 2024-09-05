@@ -49,7 +49,9 @@ class Mlp(nn.Module):
             hidden_features, out_features, bias=bias2, **factory_kwargs
         )
 
-    def forward(self, x: torch.Tensor) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+    def forward(
+        self, x: torch.Tensor
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """
         Forward pass of the MLP.
 

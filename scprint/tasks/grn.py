@@ -14,6 +14,7 @@ import torch
 from torch.utils.data import DataLoader
 
 import gc
+from scipy import sparse
 
 from lightning.pytorch import Trainer
 import joblib
@@ -315,21 +316,21 @@ class GNInfer:
                     else attn.detach().cpu().numpy()
                 )
             elif self.head_agg == "none":
+                attn = attn.detach().cpu().numpy()
+                attn[attn < 0.01] = 0
+                attn = attn.reshape(attn.shape[0], attn.shape[1], 1)
+                attn = sparse.COO.from_numpy(attn)
                 if attns is not None:
-                    if len(attns.shape) > 2:
-                        attns = np.concatenate(
-                            [attns, attn.detach().cpu().numpy()[..., np.newaxis]],
-                            axis=-1,
-                        )
-                    else:
-                        attns = np.stack([attns, attn.detach().cpu().numpy()], axis=-1)
-
+                    attns = sparse.concat([attns, attn], axis=2)
                 else:
-                    attns = attn.detach().cpu().numpy()
+                    attns = attn
             else:
                 raise ValueError("head_agg must be one of 'mean', 'max' or 'None'")
         if self.head_agg == "mean":
             attns = attns / Qs.shape[0]
+        if self.head_agg in ["max", "mean"]:
+            attns[attns < 0.01] = 0
+            attns = sparse.csr_matrix(attns)
         return attns
 
     def filter(self, adj, gt=None):
@@ -372,7 +373,9 @@ class GNInfer:
             grn=grn,
         )
         # grn = grn[:, (grn.X != 0).sum(0) > (self.max_cells / 32)]
-        grn.var["TFs"] = [True if i in grnutils.TF else False for i in grn.var["symbol"]]
+        grn.var["TFs"] = [
+            True if i in grnutils.TF else False for i in grn.var["symbol"]
+        ]
         grn.uns["grn_scprint_params"] = {
             "filtration": self.filtration,
             "how": self.how,
