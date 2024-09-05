@@ -39,23 +39,22 @@ def test_base():
     )
     adata = preprocessor(adata)
     # conf = dict(self.config_init[subcommand])
-
-    model = scPrint.load_from_checkpoint(
-        ckpt_path,
-        precpt_gene_emb=None,
-        # triton gets installed so it must think it has cuda enabled
-        transformer="normal",
-    )
-    dn = Denoiser(
-        plot_corr_size=10,
-        batch_size=2,
-        num_workers=1,
-        max_len=300,
-        downsample=0.3,
-        predict_depth_mult=3,
-        dtype=torch.float32,
-    )
     try:
+        model = scPrint.load_from_checkpoint(
+            ckpt_path,
+            precpt_gene_emb=None,
+            # triton gets installed so it must think it has cuda enabled
+            transformer="normal",
+        )
+        dn = Denoiser(
+            plot_corr_size=10,
+            batch_size=2,
+            num_workers=1,
+            max_len=300,
+            downsample=0.3,
+            predict_depth_mult=3,
+            dtype=torch.float32,
+        )
         metrics, random_indices, genes, expr_pred = dn(
             model=model,
             adata=adata,
