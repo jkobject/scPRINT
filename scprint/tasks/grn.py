@@ -14,7 +14,8 @@ import torch
 from torch.utils.data import DataLoader
 
 import gc
-from scipy import sparse
+import sparse
+import scipy.sparse
 
 from lightning.pytorch import Trainer
 import joblib
@@ -33,7 +34,6 @@ import seaborn as sns
 import numpy as np
 from .tmfg import tmfg
 import networkx as nx
-import scipy.sparse
 import os.path
 
 import pandas as pd
@@ -330,7 +330,7 @@ class GNInfer:
             attns = attns / Qs.shape[0]
         if self.head_agg in ["max", "mean"]:
             attns[attns < 0.01] = 0
-            attns = sparse.csr_matrix(attns)
+            attns = scipy.sparse.csr_matrix(attns)
         return attns
 
     def filter(self, adj, gt=None):
