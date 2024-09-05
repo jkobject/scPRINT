@@ -34,6 +34,7 @@ scPRINT can be used to perform the following analyses:
   - [Table of Contents](#table-of-contents)
   - [Install `scPRINT`](#install-scprint)
     - [lamin.ai](#laminai)
+    - [install](#install)
     - [pytorch and GPUs](#pytorch-and-gpus)
   - [Usage](#usage)
     - [scPRINT's basic commands](#scprints-basic-commands)
@@ -68,19 +69,20 @@ To use scPRINT, I need you to use lamin.ai. This is needed to load biological in
 
 To do so, you will need to connect with google or github to [lamin.ai](https://lamin.ai/login), then be sure to connect before running anything (or before starting a notebook): `lamin login <email> --key <API-key>`. Follow the instructions on [their website](https://docs.lamin.ai/guide).
 
+### install
+
 To start you will need to do:
 
 ```bash
-conda create -n "[whatever]" python==3.10
-git clone https://github.com/jkobject/scPRINT
+conda create -n <env-name> python==3.10 #scprint might work with python >3.10, but it is not tested
 #one of
-pip install scPRINT # OR
-pip install scPRINT[dev] # for the dev dependencies (building etc..) AND/OR [dev,flash]
-pip install scPRINT[flash] && pip install -e "git+https:/
-/github.com/triton-lang/triton.git@legacy-backend
-#egg=triton&subdirectory=python" # to use flashattention2, you will need to install triton 2.0.0.dev20221202 specifically, working on removing this dependency # only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
+pip install scprint # OR
+pip install scprint[dev] # for the dev dependencies (building etc..) OR
+pip install scprint[flash] # to use flashattention2 with triton: only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
+#OR pip install scPRINT[dev,flash]
+
 lamin login <email> --key <API-key>
-lamin init --storage [folder-name-where-lamin-data-will-be-stored] --schema bionty
+lamin init --storage <folder-name-where-lamin-data-will-be-stored> --schema bionty
 ```
 
 if you start with lamin and had to do a `lamin init`, you will also need to populate your ontologies. you can do it manually or with our function:
@@ -107,7 +109,6 @@ Please refer to their documentation for more information:
 - [scDataLoader](https://github.com/jkobject/scDataLoader): a dataloader for training large cell models.
 - [GRnnData](https://github.com/cantinilab/GRnnData): a package to work with gene networks from single cell data.
 - [benGRN](https://github.com/jkobject/benGRN): a package to benchmark gene network inference methods from single cell data.
-
 
 ### pytorch and GPUs
 
