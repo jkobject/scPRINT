@@ -43,9 +43,17 @@
               <ul class="current">
                 <li class="toctree-l1 current"><a class="reference internal current" href="#">Home</a>
     <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#table-of-contents">Table of Contents</a>
+    </li>
     <li class="toctree-l2"><a class="reference internal" href="#install-scprint">Install scPRINT</a>
         <ul>
     <li class="toctree-l3"><a class="reference internal" href="#laminai">lamin.ai</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#install">install</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#pytorch-and-gpus">pytorch and GPUs</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#dev-install">dev install</a>
     </li>
         </ul>
     </li>
@@ -55,6 +63,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#notes-on-gpucpu-usage-with-triton">Notes on GPU/CPU usage with triton</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#simple-tests">Simple tests:</a>
+    </li>
         </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#faq">FAQ</a>
@@ -63,7 +73,7 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#i-want-to-generate-cell-embeddings-and-cell-label-predictions-from-scrnaseq-data">I want to generate cell embeddings and cell label predictions from scRNAseq data:</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#i-want-to-denoising-my-scrnaseq-dataset">I want to denoising my scRNAseq dataset:</a>
+    <li class="toctree-l3"><a class="reference internal" href="#i-want-to-denoise-my-scrnaseq-dataset">I want to denoise my scRNAseq dataset:</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#i-want-to-generate-an-atlas-level-embedding">I want to generate an atlas-level embedding</a>
     </li>
@@ -89,7 +99,7 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#development">Development</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#work-in-progress">Work in progress:</a>
+    <li class="toctree-l2"><a class="reference internal" href="#work-in-progress-pr-welcomed">Work in progress (PR welcomed):</a>
     </li>
     </ul>
                 </li>
@@ -150,14 +160,15 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="scprint-large-cell-model-for-scrnaseq-data">scPRINT: Large Cell Model for scRNAseq data</h1>
-<p><a href="https://badge.fury.io/py/scprint"><img alt="PyPI version" src="https://badge.fury.io/py/scprint.svg" /></a>
-<a href="https://scprint.readthedocs.io/en/latest/?badge=latest"><img alt="Documentation Status" src="https://readthedocs.org/projects/scprint/badge/?version=latest" /></a>
+<p><a href="https://codecov.io/gh/jkobject/scPRINT"><img alt="codecov" src="https://codecov.io/gh/jkobject/scPRINT/branch/main/graph/badge.svg?token=GRnnData_token_here" /></a>
+<a href="https://github.com/jkobject/scPRINT/actions/workflows/main.yml"><img alt="CI" src="https://github.com/jkobject/scPRINT/actions/workflows/main.yml/badge.svg" /></a>
+<a href="https://badge.fury.io/py/scprint"><img alt="PyPI version" src="https://badge.fury.io/py/scprint.svg" /></a>
 <a href="https://pepy.tech/project/scprint"><img alt="Downloads" src="https://pepy.tech/badge/scprint" /></a>
 <a href="https://pepy.tech/project/scprint"><img alt="Downloads" src="https://pepy.tech/badge/scprint/month" /></a>
 <a href="https://pepy.tech/project/scprint"><img alt="Downloads" src="https://pepy.tech/badge/scprint/week" /></a>
 <a href="https://img.shields.io/github/issues/jkobject/scPRINT"><img alt="GitHub issues" src="https://img.shields.io/github/issues/jkobject/scPRINT" /></a>
 <a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg" /></a>
-<a href=""><img alt="DOI" src="https://zenodo.org/badge/391909874.svg" /></a></p>
+<a href="https://doi.org/10.1101/2024.07.29.605556"><img alt="DOI" src="https://zenodo.org/badge/391909874.svg" /></a></p>
 <p><img alt="logo" src="logo.png" /></p>
 <p>scPRINT is a large transformer model built for the inference of gene networks (connections between genes explaining the cell's expression profile) from scRNAseq data.</p>
 <p>It uses novel encoding and decoding of the cell expression profile and new pre-training methodologies to learn a cell model.</p>
@@ -168,29 +179,103 @@
 <li><strong>label prediction</strong>: predict the cell type, disease, sequencer, sex, and ethnicity of your cells</li>
 <li><strong>gene network inference</strong>: generate a gene network from any cell or cell cluster in your scRNAseq dataset</li>
 </ul>
-<p><a href="https://www.biorxiv.org/content/10.1101/2024.07.29.605556v1">Read the paper!</a> if you would like to know more about scPRINT.</p>
+<p><a href="https://www.biorxiv.org/content/10.1101/2024.07.29.605556v1">Read the manuscript!</a> if you would like to know more about scPRINT. Have a look at some of my <a href="https://twitter.com/jkobject">X-plainers</a>. </p>
 <p><img alt="figure1" src="figure1.png" /></p>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ul>
+<li><a href="#scprint-large-cell-model-for-scrnaseq-data">scPRINT: Large Cell Model for scRNAseq data</a></li>
+<li><a href="#table-of-contents">Table of Contents</a></li>
+<li><a href="#install-scprint">Install <code>scPRINT</code></a><ul>
+<li><a href="#laminai">lamin.ai</a></li>
+<li><a href="#install">install</a></li>
+<li><a href="#pytorch-and-gpus">pytorch and GPUs</a></li>
+<li><a href="#dev-install">dev install</a></li>
+</ul>
+</li>
+<li><a href="#usage">Usage</a><ul>
+<li><a href="#scprints-basic-commands">scPRINT's basic commands</a></li>
+<li><a href="#notes-on-gpucpu-usage-with-triton">Notes on GPU/CPU usage with triton</a></li>
+<li><a href="#simple-tests">Simple tests:</a></li>
+</ul>
+</li>
+<li><a href="#faq">FAQ</a><ul>
+<li><a href="#i-want-to-generate-gene-networks-from-scrnaseq-data">I want to generate gene networks from scRNAseq data:</a></li>
+<li><a href="#i-want-to-generate-cell-embeddings-and-cell-label-predictions-from-scrnaseq-data">I want to generate cell embeddings and cell label predictions from scRNAseq data:</a></li>
+<li><a href="#i-want-to-denoise-my-scrnaseq-dataset">I want to denoise my scRNAseq dataset:</a></li>
+<li><a href="#i-want-to-generate-an-atlas-level-embedding">I want to generate an atlas-level embedding</a></li>
+<li><a href="#i-need-to-generate-gene-tokens-using-pllms">I need to generate gene tokens using pLLMs</a></li>
+<li><a href="#i-want-to-pre-train-scprint-from-scratch-on-my-own-data">I want to pre-train scPRINT from scratch on my own data</a></li>
+<li><a href="#how-can-i-find-if-scprint-was-trained-on-my-data">how can I find if scPRINT was trained on my data?</a></li>
+<li><a href="#can-i-use-scprint-on-other-organisms-rather-than-human">can I use scPRINT on other organisms rather than human?</a></li>
+<li><a href="#how-long-does-scprint-takes-what-kind-of-resources-do-i-need-or-in-alternative-can-i-run-scprint-locally">how long does scPRINT takes? what kind of resources do I need? (or in alternative: can i run scPRINT locally?)</a></li>
+<li><a href="#i-have-different-scrnaseq-batches-should-i-integrate-my-data-before-running-scprint">I have different scRNASeq batches. Should I integrate my data before running scPRINT?</a></li>
+<li><a href="#where-to-find-the-gene-embeddings">where to find the gene embeddings?</a></li>
+</ul>
+</li>
+<li><a href="#documentation">Documentation</a></li>
+<li><a href="#model-weights">Model Weights</a></li>
+<li><a href="#development">Development</a></li>
+<li><a href="#work-in-progress-pr-welcomed">Work in progress (PR welcomed):</a></li>
+</ul>
 <h2 id="install-scprint">Install <code>scPRINT</code></h2>
-<p>For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Python 3.10.</p>
+<p>For the moment scPRINT has been tested on MacOS and Linux (Ubuntu 20.04) with Python 3.10. Its instalation takes on average 10 minutes.</p>
 <p>If you want to be using flashattention2, know that it only supports triton 2.0 MLIR's version and torch==2.0.0 for now.</p>
-<pre><code class="language-python">conda create -n &quot;[whatever]&quot; python==3.10
+<h3 id="laminai">lamin.ai</h3>
+<p>To use scPRINT, I need you to use lamin.ai. This is needed to load biological informations like genes, cell types, organisms etc...</p>
+<p>To do so, you will need to connect with google or github to <a href="https://lamin.ai/login">lamin.ai</a>, then be sure to connect before running anything (or before starting a notebook): <code>lamin login &lt;email&gt; --key &lt;API-key&gt;</code>. Follow the instructions on <a href="https://docs.lamin.ai/guide">their website</a>.</p>
+<h3 id="install">install</h3>
+<p>To start you will need to do:</p>
+<pre><code class="language-bash">conda create -n &lt;env-name&gt; python==3.10 #scprint might work with python &gt;3.10, but it is not tested
 #one of
 pip install scprint # OR
-pip install scprint[dev] # for the dev dependencies (building etc..) AND/OR [dev,flash]
-pip install scprint[flash] &amp;&amp; pip install -e &quot;git+https:/
-/github.com/triton-lang/triton.git@legacy-backend
-#egg=triton&amp;subdirectory=python&quot; # to use flashattention2, you will need to install triton 2.0.0.dev20221202 specifically, working on removing this dependency # only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
+pip install scprint[dev] # for the dev dependencies (building etc..) OR
+pip install scprint[flash] # to use flashattention2 with triton: only if you have a compatible gpu (e.g. not available for apple GPUs for now, see https://github.com/triton-lang/triton?tab=readme-ov-file#compatibility)
+#OR pip install scPRINT[dev,flash]
+
+lamin login &lt;email&gt; --key &lt;API-key&gt;
+lamin init --storage &lt;folder-name-where-lamin-data-will-be-stored&gt; --schema bionty
 </code></pre>
-<p>We make use of some additional packages we developed alongside scPRint.
-Please refer to their documentation for more information:</p>
+<p>if you start with lamin and had to do a <code>lamin init</code>, you will also need to populate your ontologies. This is because scPRINT is using ontologies to define its cell types, diseases, sexes, ethnicities, etc.</p>
+<p>you can do it manually or with our function:</p>
+<pre><code class="language-python">from scdataloader.utils import populate_my_ontology
+
+populate_my_ontology() #to populate everything (recommended) (can take 2-10mns)
+
+populate_my_ontology( #the minimum for scprint to run some inferences (denoising, grn inference)
+organisms: List[str] = [&quot;NCBITaxon:10090&quot;, &quot;NCBITaxon:9606&quot;],
+    sex: List[str] = [&quot;PATO:0000384&quot;, &quot;PATO:0000383&quot;],
+    celltypes = None,
+    ethnicities = None,
+    assays = None,
+    tissues = None,
+    diseases = None,
+    dev_stages = None,
+)
+</code></pre>
+<p>We make use of some additional packages we developed alongside scPRint.</p>
+<p>Please refer to their documentation for more information:</p>
 <ul>
 <li><a href="https://github.com/jkobject/scDataLoader">scDataLoader</a>: a dataloader for training large cell models.</li>
 <li><a href="https://github.com/cantinilab/GRnnData">GRnnData</a>: a package to work with gene networks from single cell data.</li>
 <li><a href="https://github.com/jkobject/benGRN">benGRN</a>: a package to benchmark gene network inference methods from single cell data.</li>
 </ul>
-<h3 id="laminai">lamin.ai</h3>
-<p>⚠️ if you want to use the scDataloader's multi-dataset mode or if you want to preprocess datasets and other functions of the model, you will need to use lamin.ai.</p>
-<p>In that case, connect with google or github to <a href="https://lamin.ai/login">lamin.ai</a>, then be sure to connect before running anything (or before starting a notebook): <code>lamin login &lt;email&gt; --key &lt;API-key&gt;</code>. Follow the instructions on <a href="https://docs.lamin.ai/guide">their website</a>.</p>
+<h3 id="pytorch-and-gpus">pytorch and GPUs</h3>
+<p>scPRINT can run on machines without GPUs, but it will be slow. It is highly recommended to use a GPU for inference.</p>
+<p>Once you have a GPU, and installed the required drivers, you might need to install a specific version of pytorch that is compatible with your drivers (e.g. nvidia 550 drivers will lead to a nvidia toolkit 11.7 or 11.8 which might mean you need to re-install a different flavor of pytorch for things to work. e.g. using the command:
+<code>pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118</code> on my case on linux
+ ).</p>
+<p>I was able to test it with nvidia 11.7, 11.8, 12.2.</p>
+<h3 id="dev-install">dev install</h3>
+<p>If you want to use the latest version of scPRINT and work on the code yourself use <code>git clone</code> and <code>pip -e</code> instead of <code>pip install</code>.</p>
+<pre><code class="language-bash">git clone https://github.com/jkobject/scPRINT
+git clone https://github.com/jkobject/scDataLoader
+git clone https://github.com/cantinilab/GRnnData
+git clone https://github.com/jkobject/benGRN
+pip install -e scPRINT[dev]
+pip install -e scDataLoader[dev]
+pip install -e GRnnData[dev]
+pip install -e benGRN[dev]
+</code></pre>
 <h2 id="usage">Usage</h2>
 <h3 id="scprints-basic-commands">scPRINT's basic commands</h3>
 <p>This is the most minimal example of how scPRINT works:</p>
@@ -213,7 +298,7 @@ denoiser(model, adata=adata)
 <pre><code class="language-bash">$ scprint fit/train/predict/test/denoise/embed/gninfer --config config/[medium|large|vlarge] ...
 </code></pre>
 <p>find out more about the commands by running <code>scprint --help</code> or <code>scprint [command] --help</code>.</p>
-<p>more examples of using the command line are available in the <a href="./docs/usage.md">docs</a>.</p>
+<p>more examples of using the command line are available in the <a href="usage/">docs</a>.</p>
 <h3 id="notes-on-gpucpu-usage-with-triton">Notes on GPU/CPU usage with triton</h3>
 <p>If you do not have <a href="https://triton-lang.org/main/python-api/triton.html">triton</a> installed you will not be able to take advantage of GPU acceleration, but you can still use the model on the CPU.</p>
 <p>In that case, if loading from a checkpoint that was trained with flashattention, you will need to specify <code>transformer="normal"</code> in the <code>load_from_checkpoint</code> function like so:</p>
@@ -221,21 +306,23 @@ denoiser(model, adata=adata)
     '../data/temp/last.ckpt', precpt_gene_emb=None,
     transformer=&quot;normal&quot;)
 </code></pre>
+<h3 id="simple-tests">Simple tests:</h3>
+<p>An instalation of scPRINT and a simple test of the denoiser is performed during each commit to the main branch with a <a href="https://github.com/jkobject/scPRINT/actions">Github action</a> and <a href="https://github.com/jkobject/scPRINT/blob/main/.github/workflows/main.yml">pytest workflow</a>. It also provides an expected runtime for the installation and run of scPRINT.</p>
 <p>We now explore the different usages of scPRINT:</p>
 <h2 id="faq">FAQ</h2>
 <h3 id="i-want-to-generate-gene-networks-from-scrnaseq-data">I want to generate gene networks from scRNAseq data:</h3>
 <p>-&gt; Refer to the section . gene network inference in <a href="notebooks/cancer_usecase/">this notebook</a>.</p>
-<p>-&gt; More examples in this notebook <a href="../notebooks/bench_omni.ipynb">notebooks/assessments/bench_omni.ipynb</a>.</p>
+<p>-&gt; More examples in this notebook <a href="https://github.com/jkobject/scPRINT/blob/main/notebooks/bench_omni.ipynb">./notebooks/assessments/bench_omni.ipynb</a>.</p>
 <h3 id="i-want-to-generate-cell-embeddings-and-cell-label-predictions-from-scrnaseq-data">I want to generate cell embeddings and cell label predictions from scRNAseq data:</h3>
 <p>-&gt; Refer to the embeddings and cell annotations section in <a href="notebooks/cancer_usecase/">this notebook</a>.</p>
-<h3 id="i-want-to-denoising-my-scrnaseq-dataset">I want to denoising my scRNAseq dataset:</h3>
+<h3 id="i-want-to-denoise-my-scrnaseq-dataset">I want to denoise my scRNAseq dataset:</h3>
 <p>-&gt; Refer to the Denoising of B-cell section in <a href="notebooks/cancer_usecase/">this notebook</a>.</p>
-<p>-&gt; More example in our benchmark notebook <a href="../notebooks/bench_denoising.ipynb">notebooks/assessments/bench_denoising.ipynb</a>.</p>
+<p>-&gt; More example in our benchmark notebook <a href="https://github.com/jkobject/scPRINT/blob/main/notebooks/bench_denoising.ipynb">./notebooks/assessments/bench_denoising.ipynb</a>.</p>
 <h3 id="i-want-to-generate-an-atlas-level-embedding">I want to generate an atlas-level embedding</h3>
-<p>-&gt; Refer to the notebook <a href="../figures/nice_umap.ipynb">figures/nice_umap.ipynb</a>.</p>
+<p>-&gt; Refer to the notebook <a href="https://github.com/jkobject/scPRINT/blob/main/figures/nice_umap.ipynb">nice_umap.ipynb</a>.</p>
 <h3 id="i-need-to-generate-gene-tokens-using-pllms">I need to generate gene tokens using pLLMs</h3>
 <p>To run scPRINT, you can use the option to define the gene tokens using protein language model embeddings of genes. This is done by providing the path to a parquet file of the precomputed set of embeddings for each gene name to scPRINT via "precpt_gene_emb"</p>
-<p>-&gt; To generate this file please refer to the notebook <a href="../notebooks/generate_gene_embeddings.ipynb">notebooks/generate_gene_embeddings.ipynb</a>.</p>
+<p>-&gt; To generate this file please refer to the notebook <a href="https://github.com/jkobject/scPRINT/blob/main/notebooks/generate_gene_embeddings.ipynb">generate_gene_embeddings</a>.</p>
 <h3 id="i-want-to-pre-train-scprint-from-scratch-on-my-own-data">I want to pre-train scPRINT from scratch on my own data</h3>
 <p>-&gt; Refer to the documentation page <a href="pretrain/">pretrain scprint</a></p>
 <h3 id="how-can-i-find-if-scprint-was-trained-on-my-data">how can I find if scPRINT was trained on my data?</h3>
@@ -253,26 +340,27 @@ denoiser(model, adata=adata)
     precpt_gene_emb=None,
 )
 </code></pre>
-<p>You can also recreate the gene embedding file through <a href="notebooks/generate_gene_embeddings.ipynb">this notebook</a>. Just call the functions, and it should recreate the file itself.</p>
+<p>You can also recreate the gene embedding file through <a href="https://github.com/jkobject/scPRINT/blob/main/notebooks/generate_gene_embeddings.ipynb">this notebook</a>. Just call the functions, and it should recreate the file itself.</p>
 <p>the file itself is also available on <a href="https://huggingface.co/jkobject/scPRINT/tree/main">hugging face</a></p>
 <h2 id="documentation">Documentation</h2>
 <p>For more information on usage please see the documentation in <a href="https://www.jkobject.com/scPRINT/">https://www.jkobject.com/scPRINT/</a></p>
 <h2 id="model-weights">Model Weights</h2>
 <p>Model weights are available on <a href="https://huggingface.co/jkobject/scPRINT/">hugging face</a>.</p>
 <h2 id="development">Development</h2>
-<p>Read the <a href="CONTRIBUTING.md">CONTRIBUTING.md</a> file.</p>
+<p>Read the <a href="https://github.com/jkobject/scPRINT/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> file.</p>
 <p>Read the <a href="https://wandb.ai/ml4ig/scprint_scale/reports/scPRINT-trainings--Vmlldzo4ODIxMjgx?accessToken=80metwx7b08hhourotpskdyaxiflq700xzmzymr6scvkp69agybt79l341tv68hp">training runs</a> document to know more about how pre-training was performed and the its behavior.</p>
+<p>code coverage is not right as I am using the command line interface for now. &gt;50% of the code is covered by my current unit test.</p>
 <p>Acknowledgement:
 <a href="https://github.com/rochacbruno/python-project-template">python template</a>
 <a href="https://lamin.ai/">laminDB</a>
 <a href="https://lightning.ai/">lightning</a></p>
-<h2 id="work-in-progress">Work in progress:</h2>
+<h2 id="work-in-progress-pr-welcomed">Work in progress (PR welcomed):</h2>
 <ol>
 <li>remove the triton dependencies</li>
 <li>add version with additional labels (tissues, age) and organisms (mouse, zebrafish) and more datasets from cellxgene</li>
 <li>version with separate transformer blocks for the encoding part of the bottleneck learning and for the cell embeddings</li>
 <li>improve classifier to output uncertainties and topK predictions when unsure</li>
-<li></li>
+<li>setup latest lamindb version</li>
 </ol>
 <p>Awesome Large Cell Model created by Jeremie Kalfon.</p>
               
@@ -323,5 +411,5 @@ denoiser(model, adata=adata)
 
 <!--
 MkDocs version : 1.6.0
-Build Date UTC : 2024-09-04 16:59:20.856212+00:00
+Build Date UTC : 2024-09-09 15:05:07.963583+00:00
 -->
