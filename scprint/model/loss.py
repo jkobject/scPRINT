@@ -1,9 +1,10 @@
-import torch.nn.functional as F
+from typing import Dict, Optional
+
 import torch
-from torch import nn, Tensor
+import torch.nn.functional as F
+from torch import Tensor, nn
 from torch.autograd import Function
 from torch.distributions import NegativeBinomial
-from typing import Dict, Optional
 
 
 def mse(input: Tensor, target: Tensor) -> Tensor:

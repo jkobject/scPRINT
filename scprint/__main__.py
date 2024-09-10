@@ -1,14 +1,12 @@
 """Entry point for scprint."""
 
-from scprint import scPrint
-from scprint.cli import MyCLI
+from lightning.pytorch import LightningModule, Trainer
+from lightning.pytorch.cli import ArgsType, SaveConfigCallback
+from lightning.pytorch.loggers import WandbLogger
 from scdataloader import DataModule
 
-from lightning.pytorch.cli import SaveConfigCallback
-from lightning.pytorch.loggers import WandbLogger
-from lightning.pytorch import LightningModule, Trainer
-
-from lightning.pytorch.cli import ArgsType
+from scprint import scPrint
+from scprint.cli import MyCLI
 
 
 class MySaveConfig(SaveConfigCallback):
@@ -34,7 +32,7 @@ class MySaveConfig(SaveConfigCallback):
 
 
 def main(args: ArgsType = None):
-    cli = MyCLI(
+    cli = MyCLI(  # noqa: F841
         scPrint,
         DataModule,
         args=args,

@@ -1,29 +1,26 @@
 # from scprint.base.base_model import BaseModel
-from typing import Optional, Dict
-from torch import Tensor, optim, nn
-from lightning.pytorch.tuner.lr_finder import _LRCallback
-from lightning.pytorch.callbacks.lr_finder import LearningRateFinder
-import torch
+import copy
+import os
+from functools import partial
 
 # from galore_torch import GaLoreAdamW
 from math import factorial
-import lightning as L
-import os
-import copy
-from scipy.sparse import load_npz
-from huggingface_hub import PyTorchModelHubMixin
-import pandas as pd
-from functools import partial
+from typing import Dict, Optional
 
-from .flash_attn import FlashTransformerEncoder
-from . import encoders
-from . import decoders
+import lightning as L
+import pandas as pd
+import torch
+from huggingface_hub import PyTorchModelHubMixin
+from lightning.pytorch.callbacks.lr_finder import LearningRateFinder
+from lightning.pytorch.tuner.lr_finder import _LRCallback
+from scipy.sparse import load_npz
+from torch import Tensor, nn, optim
 
 # from .linear_transformer import FastTransformerEncoderWrapper as FastTransformerEncoder
-from . import loss
-from .utils import simple_masker
-from . import utils
+from . import decoders, encoders, loss, utils
+from .flash_attn import FlashTransformerEncoder
 from .loss import grad_reverse
+from .utils import simple_masker
 
 FILEDIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -446,8 +443,7 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
         if len(self.classes) > 0 and do_class:
             output.update(
                 {
-                    "cls_output_"
-                    + clsname: self.cls_decoders[clsname](
+                    "cls_output_" + clsname: self.cls_decoders[clsname](
                         output["cell_embs"][
                             :, 2 + i, :
                         ]  # the first elem is the base cell embedding
@@ -591,22 +587,22 @@ class scPrint(L.LightningModule, PyTorchModelHubMixin):
             )
         elif self.optim == "galore":
             raise NotImplementedError("Galore optimizer not implemented")
-            param_groups = [
-                {
-                    "params": [
-                        v for k, v in self.named_parameters() if "transformer" not in k
-                    ]
-                },
-                {
-                    "params": [
-                        v for k, v in self.named_parameters() if "transformer" in k
-                    ],
-                    "rank": 128,
-                    "update_proj_gap": 200,
-                    "scale": 0.25,
-                    "proj_type": "std",
-                },
-            ]
+            # param_groups = [
+            #    {
+            #        "params": [
+            #            v for k, v in self.named_parameters() if "transformer" not in k
+            #        ]
+            #    },
+            #    {
+            #        "params": [
+            #            v for k, v in self.named_parameters() if "transformer" in k
+            #        ],
+            #        "rank": 128,
+            #        "update_proj_gap": 200,
+            #        "scale": 0.25,
+            #        "proj_type": "std",
+            #    },
+            # ]
             # optimizer = GaLoreAdamW(param_groups, lr=self.hparams.lr)
         else:
             raise ValueError(f"Unknown optimizer: {self.optim}")

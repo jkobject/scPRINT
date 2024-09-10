@@ -11,7 +11,7 @@ from typing import Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
-from torch.cuda.amp import custom_fwd, custom_bwd
+from torch.cuda.amp import custom_bwd, custom_fwd
 
 import triton
 import triton.language as tl

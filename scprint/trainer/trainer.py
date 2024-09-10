@@ -1,5 +1,6 @@
-from lightning.pytorch.callbacks import Callback
 from typing import List
+
+from lightning.pytorch.callbacks import Callback
 
 
 class TrainingMode(Callback):

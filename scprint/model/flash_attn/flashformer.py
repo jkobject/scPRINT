@@ -1,17 +1,17 @@
+import os
+import sys
+from functools import partial
+from typing import Callable, Optional
+
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 from torch.nn.init import trunc_normal_
 from torchvision.ops import StochasticDepth
-
-from typing import Optional, Callable
-from functools import partial
-import sys
-import os
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
-from . import MHA, Block, Mlp
+from . import MHA, Block, Mlp  # noqa: E402
 
 try:
     from .layer_norm import layer_norm_fn

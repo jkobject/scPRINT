@@ -1,16 +1,17 @@
+import ftplib
 import logging
-import numpy as np
+import os
+from typing import List, Optional, Union
 
-# Custom functions
-from gget.utils import rest_query, get_uniprot_seqs
-from gget.gget_info import info
+import numpy as np
+from Bio import SeqIO
 
 # Constants
 from gget.constants import ENSEMBL_REST_API, UNIPROT_REST_API
-import ftplib
-import os
-from Bio import SeqIO
-from typing import List, Optional, Union
+from gget.gget_info import info
+
+# Custom functions
+from gget.utils import get_uniprot_seqs, rest_query
 
 # Add and format time stamp in logging messages
 logging.basicConfig(

@@ -7,14 +7,14 @@
 #   Yun Yan <yun.yan@nyumc.org>
 # Copyright (c) 2017, 2018 New York University
 
-import time
-import sys
-from math import log, ceil
 import hashlib
+import sys
+import time
+from math import ceil, log
 
-from sklearn.metrics.pairwise import pairwise_distances
-from sklearn.decomposition import PCA
 import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.metrics.pairwise import pairwise_distances
 
 
 def _median_normalize(X: np.ndarray):

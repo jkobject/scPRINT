@@ -1,27 +1,25 @@
-from sklearn.metrics import f1_score
-from scdataloader import Preprocessor
+import os
+from typing import Any, Dict, List
+
+import bionty as bt
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import scanpy as sc
+import torch
+from anndata import AnnData
+from lightning.pytorch import Trainer
+from networkx import average_node_connectivity
+from scdataloader import Collator, Preprocessor
+from scdataloader.data import SimpleAnnDataset
 from scdataloader.utils import get_descendants
 from scib_metrics.benchmark import Benchmarker
-from networkx import average_node_connectivity
-import scanpy as sc
-import numpy as np
-import matplotlib.pyplot as plt
-import torch
-
-from scdataloader.data import SimpleAnnDataset
-from scdataloader import Collator
-from scprint.model import utils
-import bionty as bt
-from torch.utils.data import DataLoader
-import os
-import pandas as pd
-from tqdm import tqdm
-from lightning.pytorch import Trainer
-
 from scipy.stats import spearmanr
+from sklearn.metrics import f1_score
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
-from typing import List, Dict, Any
-from anndata import AnnData
+from scprint.model import utils
 
 FILE_LOC = os.path.dirname(os.path.realpath(__file__))
 

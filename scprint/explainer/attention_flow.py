@@ -1,9 +1,10 @@
 # @title Utilities
-import numpy as np
-import networkx as nx
-import matplotlib.pyplot as plt
-import seaborn as sns
 import itertools
+
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import seaborn as sns
 
 
 def get_adjmat(mat, input_tokens):

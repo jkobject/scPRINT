@@ -1,25 +1,22 @@
-import json
-import torch
-import pandas as pd
-from pathlib import Path
-from itertools import repeat
-from collections import OrderedDict
-
-
 import functools
-import bionty as bt
+import io
+import json
 import os
 import random
 import subprocess
-from typing import Dict, List, Optional, Tuple, Union
-import numpy as np
-from anndata import AnnData
-from IPython import get_ipython
 import urllib.request
+from collections import OrderedDict
+from itertools import repeat
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
 
-
-import io
+import bionty as bt
+import numpy as np
+import pandas as pd
+import torch
+from anndata import AnnData
 from biomart import BiomartServer
+from IPython import get_ipython
 
 
 def run_command(command: str, **kwargs):
@@ -171,6 +168,7 @@ def get_free_gpu():
     import subprocess
     import sys
     from io import StringIO
+
     import pandas as pd
 
     gpu_stats = subprocess.check_output(

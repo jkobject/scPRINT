@@ -1,8 +1,9 @@
 import torch
 
-# from . import flash_attn_func
-from . import hyper_attn_func, AngularLSHTriton, add_self_attentions
 from ..flash_attn.flashattention import flash_attn_qkvpacked_func
+
+# from . import flash_attn_func
+from . import AngularLSHTriton, add_self_attentions, hyper_attn_func
 
 
 class HyperAttention(torch.nn.Module):

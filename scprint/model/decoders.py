@@ -1,7 +1,8 @@
-from typing import Dict, Union, Callable
+from typing import Callable, Dict, Union
+
+import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
-import torch
 
 
 class GraphSDEExprDecoder(nn.Module):

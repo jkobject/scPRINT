@@ -1,7 +1,7 @@
 import torch
-from torch import nn, Tensor
 from fast_transformers.builders import TransformerEncoderBuilder
 from fast_transformers.masking import LengthMask
+from torch import Tensor, nn
 
 
 class FastTransformerEncoderWrapper(nn.Module):

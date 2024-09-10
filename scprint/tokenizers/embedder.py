@@ -1,11 +1,14 @@
-from scprint import utils
-from . import PROTBERT
+import os
+
+import pandas as pd
+import torch
 
 # from RNABERT import RNABERT
 from torch.nn import AdaptiveAvgPool1d
-import pandas as pd
-import torch
-import os
+
+from scprint import utils
+
+from . import PROTBERT
 
 
 def protein_embeddings_generator(

@@ -1,13 +1,16 @@
-from lightning.pytorch.cli import LightningCLI, _get_short_description
-from lightning.pytorch.callbacks import EarlyStopping
-from lightning.pytorch.callbacks import LearningRateMonitor
-from .trainer import TrainingMode
-from lightning.pytorch.callbacks import ModelCheckpoint
-from lightning.pytorch.callbacks import StochasticWeightAveraging
 import torch
 from jsonargparse import class_from_function
+from lightning.pytorch.callbacks import (
+    EarlyStopping,
+    LearningRateMonitor,
+    ModelCheckpoint,
+    StochasticWeightAveraging,
+)
+from lightning.pytorch.cli import LightningCLI, _get_short_description
 
-from scprint.tasks import Embedder, GNInfer, Denoiser
+from scprint.tasks import Denoiser, Embedder, GNInfer
+
+from .trainer import TrainingMode
 
 TASKS = [("embed", Embedder), ("gninfer", GNInfer), ("denoise", Denoiser)]
 
@@ -143,10 +146,11 @@ class MyCLI(LightningCLI):
             if callable(after_fn):
                 after_fn()
         else:
-            import scanpy as sc
-            from scprint import scPrint
-            from scdataloader import Preprocessor
             import numpy as np
+            import scanpy as sc
+            from scdataloader import Preprocessor
+
+            from scprint import scPrint
 
             adata = sc.read_h5ad(self.config_init[subcommand]["adata"])
             adata.obs.drop(columns="is_primary_data", inplace=True, errors="ignore")

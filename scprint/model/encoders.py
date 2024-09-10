@@ -1,8 +1,9 @@
-from torch import nn, Tensor
-import torch
-from typing import Optional
 import math
+from typing import Optional
+
 import numpy as np
+import torch
+from torch import Tensor, nn
 
 
 class GeneEncoder(nn.Module):

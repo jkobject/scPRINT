@@ -1,42 +1,35 @@
-from scdataloader import Preprocessor, Collator
-from scdataloader.data import SimpleAnnDataset
-
-from bengrn.base import train_classifier
-from bengrn import BenGRN, get_sroy_gt, get_perturb_gt
-from grnndata import utils as grnutils
-from grnndata import GRNAnnData, from_anndata, read_h5ad
-
-from anndata.utils import make_index_unique
-import scanpy as sc
-from anndata import AnnData
-
-import torch
-from torch.utils.data import DataLoader
-
 import gc
-import sparse
-import scipy.sparse
+import os.path
+from typing import Any, List, Optional
 
-from lightning.pytorch import Trainer
-import joblib
-from typing import List, Optional, Any
-
-from scprint.utils.sinkhorn import SinkhornDistance
-from scprint.utils import load_genes
-
-
-import umap
 import hdbscan
+import joblib
+import networkx as nx
+import numpy as np
+import pandas as pd
+import scanpy as sc
+import scipy.sparse
+import seaborn as sns
+import sparse
+import torch
+import umap
+from anndata import AnnData
+from anndata.utils import make_index_unique
+from bengrn import BenGRN, get_perturb_gt, get_sroy_gt
+from bengrn.base import train_classifier
+from grnndata import GRNAnnData, from_anndata, read_h5ad
+from grnndata import utils as grnutils
+from lightning.pytorch import Trainer
+from matplotlib import pyplot as plt
+from scdataloader import Collator, Preprocessor
+from scdataloader.data import SimpleAnnDataset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from matplotlib import pyplot as plt
-import seaborn as sns
-import numpy as np
-from .tmfg import tmfg
-import networkx as nx
-import os.path
+from scprint.utils import load_genes
+from scprint.utils.sinkhorn import SinkhornDistance
 
-import pandas as pd
+from .tmfg import tmfg
 
 FILEDIR = os.path.dirname(os.path.realpath(__file__))
 

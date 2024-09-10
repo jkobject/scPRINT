@@ -40,11 +40,12 @@ than CUDA forward + backward.
 """
 
 import math
+from typing import Optional, Tuple
 
 import torch
+
 import triton
 import triton.language as tl
-from typing import Optional, Tuple
 
 
 # Disabling autotune for now, set num_warps=4 if headdim=64 and num_warps=8 if headdim=128

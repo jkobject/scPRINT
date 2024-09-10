@@ -1,7 +1,7 @@
 # Copyright (c) 2024, Tri Dao.
 
 from functools import partial
-from typing import Optional, Callable, Type, Dict, Any
+from typing import Any, Callable, Dict, Optional, Type
 
 import torch
 import torch.nn as nn
@@ -12,7 +12,7 @@ from .mha import MHA
 from .mlp import Mlp
 
 try:
-    from .layer_norm import layer_norm_fn, RMSNorm
+    from .layer_norm import RMSNorm, layer_norm_fn
 except ModuleNotFoundError:
     layer_norm_fn = None
     RMSNorm = None

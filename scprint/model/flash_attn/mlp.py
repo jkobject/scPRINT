@@ -1,12 +1,13 @@
 # Copyright (c) 2023, Tri Dao.
 
+from typing import Callable, Optional, Tuple, Union
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributed import ProcessGroup
 
 from .activations import swiglu
-from typing import Optional, Callable, Union, Tuple
 
 
 class Mlp(nn.Module):

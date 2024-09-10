@@ -137,7 +137,7 @@ class GeneEmbedding(object):
                 scores = scaler.fit_transform(scores)
                 scores = list(scores.reshape(1, -1))[0]
                 adata.obs[str(p) + "_SCORE"] = scores
-            except Exception as e:
+            except Exception:
                 adata.obs[str(p) + "_SCORE"] = 0.0
 
     def get_metagenes(self, gdata):
@@ -231,7 +231,7 @@ class GeneEmbedding(object):
                 line = line.split()
                 gene = line.pop(0)
                 vecs[gene] = list(map(float, line))
-            except Exception as e:
+            except Exception:
                 continue
         return vecs, dims
 

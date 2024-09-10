@@ -1,15 +1,16 @@
-import scanpy as sc
-import numpy as np
 import os
 import urllib.request
-import torch
 
-from scprint.base import NAME
+import numpy as np
+import pytest
+import scanpy as sc
+import torch
 from scdataloader import Preprocessor
 from scdataloader.utils import populate_my_ontology
-from scprint.tasks import Denoiser
+
 from scprint import scPrint
-import pytest
+from scprint.base import NAME
+from scprint.tasks import Denoiser
 
 
 def test_base():

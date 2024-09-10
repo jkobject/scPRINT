@@ -2,8 +2,7 @@
 
 import math
 from functools import partial
-
-from typing import Optional, Any
+from typing import Any, Optional
 
 import torch
 import torch.nn as nn
@@ -166,7 +165,7 @@ class FlashCrossAttention(nn.Module):
         assert q.dtype in [torch.float16, torch.bfloat16]
         assert q.is_cuda and kv.is_cuda
         causal = self.causal if causal is None else causal
-        batch_size, seqlen_q = q.shape[0], q.shape[1]
+        batch_size, _ = q.shape[0], q.shape[1]
         assert kv.shape[0] == batch_size and kv.shape[4] == q.shape[3]
         return flash_attn_kvpacked_func(
             q,
