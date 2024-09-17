@@ -1,3 +1,4 @@
+| go to [cantinilab/scPRINT](https://github.com/cantinilab/scPRINT/) for the latest version of scPRINT
 
 # scPRINT: Large Cell Model for scRNAseq data
 
