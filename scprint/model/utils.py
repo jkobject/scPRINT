@@ -458,14 +458,33 @@ def translate(
         obj = bt.Ethnicity.df().set_index("ontology_id")
     else:
         return None
+    def _lookup(ontology_id: str) -> str:
+        """Look up a single ontology id, falling back to the raw id on miss.
+
+        CELLxGENE allows comma-concatenated ontology terms (e.g.
+        self_reported_ethnicity_ontology_term_id='HANCESTRO:0005,HANCESTRO:0008')
+        which are not themselves entries in lamindb. Split, resolve each part,
+        and rejoin the names so translation no longer crashes on such cells.
+        See https://github.com/cantinilab/scPRINT/issues/49
+        """
+        if ontology_id == "unknown":
+            return ontology_id
+        if "," in ontology_id:
+            parts = [p.strip() for p in ontology_id.split(",") if p.strip()]
+            return ",".join(_lookup(p) for p in parts)
+        try:
+            return obj.loc[ontology_id]["name"]
+        except KeyError:
+            # Unknown ontology id (not in the current lamindb instance):
+            # fall back to the raw id rather than crashing the whole call.
+            return ontology_id
+
     if type(val) is str:
-        if val == "unknown":
-            return {val: val}
-        return {val: obj.loc[val]["name"]}
+        return {val: _lookup(val)}
     elif type(val) is list or type(val) is set:
-        return {i: obj.loc[i]["name"] if i != "unknown" else i for i in set(val)}
+        return {i: _lookup(i) for i in set(val)}
     elif type(val) is dict or type(val) is Counter:
-        return {obj.loc[k]["name"] if k != "unknown" else k: v for k, v in val.items()}
+        return {_lookup(k): v for k, v in val.items()}
 
 
 class Attention:
